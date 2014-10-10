@@ -31,8 +31,8 @@ class Merger(object):
         args = self.parseMergerLine(instr)                                                          # Extract target quanitites from string
 
         self.time     = args[0]                                                                     # Simulation time at merger
-        self.bhin     = Blackhole(args[1], args[2], args[0])                                        # Accretor BH
-        self.bhout    = Blackhole(args[3], args[4], args[0])                                        # Accreted BH
+        self.bhin     = Blackhole(args[3], args[4], args[0])                                        # Accreted BH
+        self.bhout    = Blackhole(args[1], args[2], args[0])                                        # Accretor BH
 
     def __str__(self):
         return "Time: %g  In , Out  =  %s , %s" % (self.time, str(self.bhin), str(self.bhout))
