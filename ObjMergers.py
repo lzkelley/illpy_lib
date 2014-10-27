@@ -1,5 +1,5 @@
 # ==================================================================================================
-# ObjMerger.py
+# ObjMergers.py
 # ------------
 # 
 #
@@ -10,12 +10,10 @@
 # ==================================================================================================
 
 import numpy as np
-import readsnapHDF5 as rs
 from glob import glob
 from datetime import datetime
 
-from BlackholeMergerSettings import *
-
+from Constants import *
 
 
 class Mergers(object):
@@ -54,11 +52,11 @@ class Mergers(object):
     
     def __init__(self, nums):
         ''' Initialize object with empty arrays for 'num' entries '''
-        self.time     = np.zeros(nums, dtype=FLT )
-        self.out_id   = np.zeros(nums, dtype=UINT)
-        self.out_mass = np.zeros(nums, dtype=FLT )
-        self.in_id    = np.zeros(nums, dtype=UINT)
-        self.in_mass  = np.zeros(nums, dtype=FLT )
+        self.time     = np.zeros(nums, dtype=DBL)
+        self.out_id   = np.zeros(nums, dtype=LONG)
+        self.out_mass = np.zeros(nums, dtype=DBL)
+        self.in_id    = np.zeros(nums, dtype=LONG)
+        self.in_mass  = np.zeros(nums, dtype=DBL)
         self.__len    = nums
 
 
