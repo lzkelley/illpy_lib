@@ -1,3 +1,4 @@
 h5py/
 inspector_gadget/
 *.pyc
+.*~
