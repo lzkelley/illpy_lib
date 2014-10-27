@@ -1,7 +1,7 @@
 # ==================================================================================================
 # AuxFuncs.py - Auxilliary functions
 # -----------
-# 
+#
 #
 # Functions
 # ---------
@@ -18,7 +18,6 @@
 # ==================================================================================================
 
 import numpy as np
-import readsnapHDF5 as rs
 import warnings
 import os
 import matplotlib                  as mpl
@@ -28,16 +27,22 @@ from matplotlib import pyplot      as plt
 from glob import glob
 from datetime import datetime
 
-from ObjBlackhole import Blackhole
-from ObjMerger    import Mergers
-import LyzeMergers as lyze
+from Constants import *
+from ObjMergers import Mergers
+#import readsnapHDF5 as rs
 
-from BlackholeMergerSettings import *
-
-VERBOSE = True
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
+
+
+
+def verbosePrint(nv, arg):
+    if( nv >= 0 ):
+        prep = " -"*nv
+        if( nv > 0 ): prep += " "
+        print prep + arg
+    
 
 
 ###  ====================================  ###
@@ -45,35 +50,40 @@ DT_THRESH = 1.0e-5                                                              
 ###  ====================================  ###
 
 
-def getIllustrisMergerFilenames(target=lyze.TARGET_RUN):
+def getIllustrisMergerFilenames(runNum, runsDir, verbose=-1):
     '''Get a list of 'blackhole_mergers' files for a target Illustris simulation'''
 
-    fileDir      = lyze.RUN_DIRS[target]
-    if( VERBOSE ): print " - - - - Searching for merger files in '%s'" % ( fileDir )
-    filePattern  = fileDir + lyze.BH_MERGERS_FILENAMES
-    files        = sorted(glob(filePattern))                                                        # Find and sort files
-    if( VERBOSE ): print " - - - - - Found %d files" % ( len(files) )
+    vb = verbose
+    verbosePrint(vb, "getIllustrisMergerFilenames()")
+
+    mergerNames      = np.copy(runsDir).tostring()
+    if( not mergerNames.endswith('/') ): mergerNames += '/'
+    mergerNames += RUN_DIRS[runNum]
+    if( not mergerNames.endswith('/') ): mergerNames += '/'
+    mergerNames += BH_MERGERS_FILENAMES
+
+    verbosePrint(vb+1, "Searching '%s'" % mergerNames)
+    files        = sorted(glob(mergerNames))                                                        # Find and sort files
+    verbosePrint(vb+2, "Found %d files" % (len(files)) )
+
     return files
 
 
-def getMergerSaveFilename( target=lyze.TARGET_RUN ):
-    outdir  = lyze.WORKING_DIR + (MERGERS_SAVE_DIR_NAME % (target))                                 # Directory for NPZ files
-    outname = outdir + (MERGERS_SAVE_FILENAME % (target))                                           # Filename for     "
-    return outdir, outname
-
-
-
-def loadAllIllustrisMergers(target=lyze.TARGET_RUN):
-
-    # Load list of merger filenames for this simulation run (target)
-    mergerFiles = getIllustrisMergerFilenames(target)
-    if( VERBOSE ): print " - - - Found %d illustris merger files" % ( len(mergerFiles) )
+def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
+    vb = verbose
+    if( verbose >= 0 ): verbosePrint(vb, "loadAllIllustrisMergers()")
+    
+    # Load list of merger filenames for this simulation run (runNum)
+    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, verbose=verbose+1)
+    if( verbose >= 0 ): verbosePrint(vb+1,"Found %d illustris merger files" % (len(mergerFiles)) )  
 
     # Load Merger Data from Illutris Files
-    tmpList = [ parseIllustrisMergerLine(mline) for mfile in mergerFiles for mline in open(mfile) ]   
-    mnum = len(tmpList)                                                                             
+    if( verbose >= 0 ): verbosePrint(vb+1,"Parsing merger lines")
+    tmpList = [ parseIllustrisMergerLine(mline) for mfile in mergerFiles for mline in open(mfile) ]
+    mnum = len(tmpList)
 
     # Fill merger object with Merger Data
+    if( verbose >= 0 ): verbosePrint(vb+1,"Creating mergers object")
     mergers = Mergers( mnum )
     for ii, tmp in enumerate(tmpList):
         mergers[ii] = tmp
@@ -82,30 +92,35 @@ def loadAllIllustrisMergers(target=lyze.TARGET_RUN):
 
 
 
-def loadMergers(target=lyze.TARGET_RUN, load=True, save=True):
+def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
+    vb = verbose
+    verbosePrint(vb, "loadMergers()")
+    verbosePrint(vb+1, "Loading Mergers from run %d" % (runNum))
 
-    if( VERBOSE ): print " - - - - Loading Mergers from run %d" % (target)
+    if( loadFile ): load = True
+    if( saveFile ): save = True
 
     # Load an existing save file (NPZ)
     if( load ):
-        if( VERBOSE ): print " - - - - - Trying to load mergers from NPZ files"
+        if( verbose >= 0 ): verbosePrint(vb+1,"Trying to load mergers from '%s'" % (loadFile))
         # Try to load save-file
-        try: mergers = loadMergersFromSave( target=target )
+        try: mergers = loadMergersFromSave(loadFile)
         # Fall back to loading mergers from merger-files
-        except Exception, err: 
-            if( VERBOSE ): print " - - - - - - Could not load from NPZ files '%s'" % err.message
+        except Exception, err:
+            if( verbose >= 0 ): verbosePrint(vb+2,"failed '%s'" % err.message)
             load = False
-            
+
 
     # Load Mergers from Illustris merger files
-    if( not load ):
-        if( VERBOSE ): print " - - - - - Loading mergers directly from Merger files"
-        mergers = loadAllIllustrisMergers(target)
-        if( VERBOSE ): print " - - - - - - Loaded %d mergers." % ( len(mergers) )
+    if( not load or len(mergers) == 0 ):
+        verbosePrint(vb+1,"Loading mergers directly from Illustris Merger files")
+        mergers = loadAllIllustrisMergers(runNum, runsDir, verbose=verbose+1)
+
+    if( verbose >= 0 ): verbosePrint(vb+1,"Loaded %d mergers." % (len(mergers)) )
 
     # Save Mergers to save-file if desired
-    if( save ): saveMergers(mergers, target)
-     
+    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, verbose=verbose)
+
     return mergers
 
 
@@ -115,34 +130,46 @@ def parseIllustrisMergerLine(instr):
     Parse a line from an Illustris blachole_mergers_#.txt file
 
     The line is formatted (in C) as:
-        '%d %g %llu %g %llu %g\n', 
+        '%d %g %llu %g %llu %g\n',
         ThisTask, All.Time, (long long) id,  mass, (long long) P[no].ID, BPP(no).BH_Mass
 
     return time, accretor_id, accretor_mass, accreted_id, accreted_mass
     '''
-
     args = instr.split()
-    return FLT(args[1]), INT(args[2]), FLT(args[3]), INT(args[4]), FLT(args[5])  
+    return FLT(args[1]), INT(args[2]), FLT(args[3]), INT(args[4]), FLT(args[5])
 
 
-def saveMergers(mergers, target):
-    
-    outDir, outFilename = getMergerSaveFilename(target=target)
-    checkDir(outDir)
 
-    if( VERBOSE ): print " - - - - Saving %d mergers to '%s'" % (len(mergers), outFilename)
-    saveFile = open(outFilename, 'wb')
+def saveMergers(mergers, saveFilename, verbose=-1):
+    '''
+    Save mergers object using pickle.
+
+    Overwrites any existing file.  If directories along the path don't exist,
+    they are created.
+    '''
+
+    vb = verbose
+    if( verbose >= 0 ): verbosePrint(vb,"saveMergers()")
+
+    # Make sure output directory exists
+    saveDir, saveName = os.path.split(saveFilename)
+    checkDir(saveDir)
+
+    # Save binary pickle file
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saving mergers to '%s'" % (saveFilename))
+    saveFile = open(saveFilename, 'wb')
     pickle.dump(mergers, saveFile)
-    if( VERBOSE ): print " - - - - - Saved"
-
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSize(saveFilename))
     return
 
 
-def loadMergersFromSave( target=lyze.TARGET_RUN ):
 
-    saveDir, saveFilename = getMergerSaveFilename( target=target )
-    saveFile = open(saveFilename, 'rb')
-    mergers = pickle.load(saveFile)
+def loadMergersFromSave(loadFilename):
+    '''
+    Load mergers object from file.
+    '''
+    loadFile = open(loadFilename, 'rb')
+    mergers = pickle.load(loadFile)
     return mergers
 
 
@@ -154,8 +181,10 @@ def loadMergersFromSave( target=lyze.TARGET_RUN ):
 ###  ======================================  ###
 
 
+'''
+
 def getSnapshotFilename(snap, run=lyze.TARGET_RUN):
-    '''
+    """
     Given a run number and snapshot number, construct the approprirate snapshot filename.
 
     input
@@ -166,7 +195,8 @@ def getSnapshotFilename(snap, run=lyze.TARGET_RUN):
     output
     ------
     return     filename : [str]
-    '''
+    """
+
     snapName = (lyze.SNAPSHOT_DIRS % snap) + (lyze.SNAPSHOT_FILENAMES % snap)
     filename = lyze.RUN_DIRS[run] + snapName
     return filename
@@ -174,7 +204,7 @@ def getSnapshotFilename(snap, run=lyze.TARGET_RUN):
 
 
 def loadSnapshotTimes(run_num=lyze.TARGET_RUN, load=True, save=False):
-    '''
+    """
     Get the time (scale-factor) of each snapshot
 
     input
@@ -185,8 +215,8 @@ def loadSnapshotTimes(run_num=lyze.TARGET_RUN, load=True, save=False):
     output
     ------
     return   times : list of [float]   simulation times (scale-factors)
-    
-    '''
+
+    """
 
     times             = np.zeros(lyze.NUM_SNAPS, dtype=np.float)
     snapTimesFilename = SNAP_TIMES_FILE + "%d.npz" % (run_num)
@@ -224,8 +254,8 @@ def loadSnapshotTimes(run_num=lyze.TARGET_RUN, load=True, save=False):
 ###  =========================================  ###
 
 def getGroupFilename(snap_num, run_num=lyze.TARGET_RUN):
-    '''
-    Given a run number and snapshot/catalog number (i.e. output time), construct group filename.    
+    """
+    Given a run number and snapshot/catalog number (i.e. output time), construct group filename.
 
     input
     -----
@@ -235,7 +265,7 @@ def getGroupFilename(snap_num, run_num=lyze.TARGET_RUN):
     output
     ------
     return     filename : [str]
-    '''
+    """
     groupName = (lyze.GROUP_CAT_DIRS % snap_num) + (lyze.GROUP_CAT_FILENAMES % snap_num)
     filename = lyze.RUN_DIRS[run_num] + groupName
     return filename
@@ -243,7 +273,7 @@ def getGroupFilename(snap_num, run_num=lyze.TARGET_RUN):
 
 
 def constructOffsetTables(gcat):
-    '''
+    """
     Construct a table of particle offsets for each halo/subhalo.
 
     Based on code from filter.Halo.reset()
@@ -258,7 +288,7 @@ def constructOffsetTables(gcat):
       |                            ...
       |                        NS_0 -1     <-- number of particles in subhalo 0, minus 1
       |               1 ---------------
-      |                           NS_0   
+      |                           NS_0
       |                            ...
       |                 NS_0 + NS_1 -1
       |
@@ -277,13 +307,13 @@ def constructOffsetTables(gcat):
       |
       |              ...           ...
       |
-      | NONE --------------------------    <-- particles NOT IN A HALO    (end of entire file)  
-      |              
+      | NONE --------------------------    <-- particles NOT IN A HALO    (end of entire file)
+      |
       |              ...           ...
       | ===============================
 
 
-    '''
+    """
 
     DTYPE       = np.uint64
 
@@ -298,13 +328,13 @@ def constructOffsetTables(gcat):
     subhalo_offsets      = np.zeros( (numSubhalos+1, 6), dtype=DTYPE )
     halo_subhalo_offsets = np.zeros(  numHalos+1       , dtype=DTYPE )
 
-    # offset_table 
+    # offset_table
     # ------------
     #    One entry for first particles in each subhalo, particles in each halo and NO subhalo,
     #        and a single entry for particles with NO halo and NO subhalo
     #    Each entry is [ HALO, SUBHALO, PART0, ..., PART5 ]
     #        when there is no (sub)halo, the number will be '-1'
-    # 
+    #
     offset_table         = np.zeros( [numHalos+numSubhalos+1, 8], type=UINT)
 
     ### Determine halo offsets ###
@@ -337,10 +367,10 @@ def constructOffsetTables(gcat):
 
         cumPartTypes = cumHaloPartTypes                                                             # Increment particle numbers to include this halo
 
-        
+
     ### Add entry for end of all halo particles / start of particles with NO halo ###
     offset_table[offs] = np.append([-1,-1], cumPartTypes)
-    
+
     subh = 0
     # Iterate over all halos
     for ii in np.arange(numHalos):
@@ -355,8 +385,8 @@ def constructOffsetTables(gcat):
             sub2 = subh + gcat.group.GroupNsubs[ii] + 1                                         # Last  subhalo index
 
             # To each subhalo after zeroth, add sum of particles up to previous subhalo
-            subhalo_offsets[sub1:sub2,:] = ( 
-                tmp + 
+            subhalo_offsets[sub1:sub2,:] = (
+                tmp +
                 np.cumsum(gcat.subhalo.SubhaloLenType[subh:sub2-1,:], axis=0, dtype=DTYPE)
                 )
 
@@ -371,7 +401,7 @@ def constructOffsetTables(gcat):
 
 
 
-    
+
 
 
 
@@ -387,7 +417,7 @@ def createFigures(nfigs=1):
     figs = [ plt.figure(figsize=FIG_SIZE) for ii in range(nfigs) ]
     for ff in figs:
         for axpos,axsize in zip(AX_POS,AX_SIZE):
-            ff.add_axes(axpos + axsize) 
+            ff.add_axes(axpos + axsize)
 
     return figs
 
@@ -399,20 +429,20 @@ def createFigures(nfigs=1):
 ###  ===================================  ###
 
 def incrementRollingStats(avevar, count, val):
-    '''
+    """
     Increment a rolling average and stdev calculation with a new value
 
     avevar   : INOUT [ave, var]  the rolling average and variance respectively
     count    : IN    [int]       the *NEW* count for this bin (including new value)
     val      : IN    [float]     the new value to be included
-    
+
     return
     ------
     avevar   : [float, float] incremented average and variation
 
-    '''
+    """
     delta      = val - avevar[0]
-    
+
     avevar[0] += delta/count
     avevar[1] += delta*(val - avevar[0])
 
@@ -420,7 +450,7 @@ def incrementRollingStats(avevar, count, val):
 
 
 def finishRollingStats(avevar, count):
-    ''' Finish a rolling average and stdev calculation by find the stdev '''
+    """ Finish a rolling average and stdev calculation by find the stdev """
 
     if( count > 1 ): avevar[1] = np.sqrt( avevar[1]/(count-1) )
     else:            avevar[1] = 0.0
@@ -430,14 +460,14 @@ def finishRollingStats(avevar, count):
 
 
 def getMagnitude(vect):
-    ''' Get the magnitude of a vector of arbitrary length '''
+    """ Get the magnitude of a vector of arbitrary length """
     return np.sqrt( np.sum([np.square(vv) for vv in vect]) )
 
 
 
 
 def findBins(target, bins, thresh=DT_THRESH):
-    '''
+    """
     Find the array indices (of "bins") bounding the "target"
 
     If target is outside bins, the missing bound will be 'None'
@@ -457,28 +487,28 @@ def findBins(target, bins, thresh=DT_THRESH):
 
     Return   low  : [int] index below target (or None if none)
              high : [int] index above target (or None if none)
-    '''
+    """
 
     # deltat  : test whether the fractional difference between two values is less than threshold
     #           This function allows the later conditions to accomodate smaller numerical
     #           differences, between effectively the same value  (e.g.   1.0 vs. 0.9999999999989)
-    # 
+    #
     if( thresh == 0.0 ): deltat = lambda x,y : False
     else               : deltat = lambda x,y : np.abs(x-y)/np.abs(x) <= thresh
 
     nums   = len(bins)
     # Find bin above (or equal to) target
-    high = np.where( (target <= bins) | deltat(target,bins) )[0] 
+    high = np.where( (target <= bins) | deltat(target,bins) )[0]
     if( len(high) == 0 ): high = None
-    else: 
+    else:
         high = high[0]                                                                              # Select first bin above target
         dhi  = bins[high] - target
-        
+
 
     # Find bin below (or equal to) target
     low  = np.where( (target >= bins) | deltat(target,bins) )[0]
     if( len(low)  == 0 ): low  = None
-    else: 
+    else:
         low  = low[-1]                                                                              # Select  last bin below target
         dlo  = bins[low] - target
 
@@ -490,7 +520,7 @@ def findBins(target, bins, thresh=DT_THRESH):
 
 
     return [low,high,dlo,dhi]
- 
+
 
 
 
@@ -513,6 +543,8 @@ def guessNumsFromFilename(fname):
     return snap, run
 
 
+'''
+
 
 
 
@@ -527,9 +559,9 @@ def getFileSize(filename):
     while( size > mult ):
         size /= mult
         cnt  += 1
-        if( cnt > 3 ): 
+        if( cnt > 3 ):
             raise RuntimeError("Error, filesize too large!  '%d B'" % (os.path.getsize(filename)))
-    
+
 
     return "%.2f %s" % (size, prefs[cnt])
 
@@ -537,17 +569,17 @@ def getFileSize(filename):
 
 
 def checkDir(tdir):
-    '''
+    """
     Create the given directory if it doesn't already exist.
     return True if directory exists, false otherwise
-    '''
+    """
     if( not os.path.isdir(tdir) ): os.makedirs(tdir)
-    if( not os.path.isdir(tdir) ): raise RuntimeError("Directory '%s' does not exist!" % (tdir) ) 
+    if( not os.path.isdir(tdir) ): raise RuntimeError("Directory '%s' does not exist!" % (tdir) )
 
-    return 
+    return
 
 
-
+#
 
 
 
