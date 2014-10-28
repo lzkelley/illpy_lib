@@ -29,6 +29,7 @@ from datetime import datetime
 
 from Constants import *
 from ObjMergers import Mergers
+from ObjDetails import Details
 #import readsnapHDF5 as rs
 
 
@@ -70,11 +71,13 @@ def getIllustrisMergerFilenames(runNum, runsDir, verbose=-1):
 
 
 def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
-    vb = verbose
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
     if( verbose >= 0 ): verbosePrint(vb, "loadAllIllustrisMergers()")
     
     # Load list of merger filenames for this simulation run (runNum)
-    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, verbose=verbose+1)
+    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, verbose=vb)
     if( verbose >= 0 ): verbosePrint(vb+1,"Found %d illustris merger files" % (len(mergerFiles)) )  
 
     # Load Merger Data from Illutris Files
@@ -93,10 +96,14 @@ def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
 
 
 def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
-    vb = verbose
-    verbosePrint(vb, "loadMergers()")
-    verbosePrint(vb+1, "Loading Mergers from run %d" % (runNum))
 
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+    if( verbose >= 0 ): verbosePrint(vb, "loadMergers()")
+    if( verbose >= 0 ): verbosePrint(vb+1, "Loading Mergers from run %d" % (runNum))
+
+    load = False
+    save = False
     if( loadFile ): load = True
     if( saveFile ): save = True
 
@@ -114,12 +121,12 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
     # Load Mergers from Illustris merger files
     if( not load or len(mergers) == 0 ):
         verbosePrint(vb+1,"Loading mergers directly from Illustris Merger files")
-        mergers = loadAllIllustrisMergers(runNum, runsDir, verbose=verbose+1)
+        mergers = loadAllIllustrisMergers(runNum, runsDir, verbose=vb)
 
     if( verbose >= 0 ): verbosePrint(vb+1,"Loaded %d mergers." % (len(mergers)) )
 
     # Save Mergers to save-file if desired
-    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, verbose=verbose)
+    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, verbose=vb)
 
     return mergers
 
@@ -136,7 +143,7 @@ def parseIllustrisMergerLine(instr):
     return time, accretor_id, accretor_mass, accreted_id, accreted_mass
     '''
     args = instr.split()
-    return FLT(args[1]), INT(args[2]), FLT(args[3]), INT(args[4]), FLT(args[5])
+    return DBL(args[1]), LONG(args[2]), DBL(args[3]), LONG(args[4]), DBL(args[5])
 
 
 
@@ -148,7 +155,7 @@ def saveMergers(mergers, saveFilename, verbose=-1):
     they are created.
     '''
 
-    vb = verbose
+    if( verbose >= 0 ): vb = verbose+1
     if( verbose >= 0 ): verbosePrint(vb,"saveMergers()")
 
     # Make sure output directory exists
@@ -176,40 +183,198 @@ def loadMergersFromSave(loadFilename):
 
 
 
+###  =====================================  ###
+###  ==========  DETAILS FILES  ==========  ###
+###  =====================================  ###
+
+
+def getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=-1):
+    '''Get a list of 'blackhole_details' files for a target Illustris simulation'''                 
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+
+    verbosePrint(vb, "getIllustrisBHDetailsFilenames()")
+
+    detailsNames      = np.copy(runsDir).tostring()
+    if( not detailsNames.endswith('/') ): detailsNames += '/'
+    detailsNames += RUN_DIRS[runNum]
+    if( not detailsNames.endswith('/') ): detailsNames += '/'
+    detailsNames += BH_DETAILS_FILENAMES
+
+    verbosePrint(vb+1, "Searching '%s'" % detailsNames)
+    files        = sorted(glob(detailsNames))                                                       # Find and sort files
+    verbosePrint(vb+2, "Found %d files" % (len(files)) )
+
+    return files
+
+
+def loadAllIllustrisBHDetails(runNum, runsDir, verbose=-1):
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+    if( verbose >= 0 ): verbosePrint(vb, "loadAllIllustrisBHDetails()")
+    
+    # Load list of details filenames for this simulation run (runNum)
+    detailsFiles = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
+    if( verbose >= 0 ): verbosePrint(vb+1,"Found %d illustris details files" % (len(detailsFiles)))  
+
+    # Load details Data from Illutris Files
+    if( verbose >= 0 ): verbosePrint(vb+1,"Parsing details lines")
+    #tmpList = [ parseIllustrisBHDetailsLine(dline) for dfile in detailsFiles for dline in open(dfile) ]
+    tmpList = [ parseIllustrisBHDetailsLine(dline) for dline in open(detailsFiles[0]) ]
+    dnum = len(tmpList)
+
+    # Fill merger object with Merger Data
+    if( verbose >= 0 ): verbosePrint(vb+1,"Creating details object")
+    details = Details( dnum )
+    for ii, tmp in enumerate(tmpList):
+        details[ii] = tmp
+
+    return details
+
+
+
+def loadBHDetails(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+    if( verbose >= 0 ): verbosePrint(vb, "loadBHDetails()")
+    if( verbose >= 0 ): verbosePrint(vb+1, "Loading Details from run %d" % (runNum))
+
+    load = False
+    save = False
+    if( loadFile ): load = True
+    if( saveFile ): save = True
+
+    # Load an existing save file (NPZ)
+    if( load ):
+        if( verbose >= 0 ): verbosePrint(vb+1,"Trying to load details from '%s'" % (loadFile))
+        # Try to load save-file
+        try: details = loadBHDetailsFromSave(loadFile)
+        # Fall back to loading details from merger-files
+        except Exception, err:
+            if( verbose >= 0 ): verbosePrint(vb+2,"failed '%s'" % err.message)
+            load = False
+
+
+    # Load Details from Illustris merger files
+    if( not load or len(details) == 0 ):
+        verbosePrint(vb+1,"Loading details directly from Illustris Merger files")
+        details = loadAllIllustrisBHDetails(runNum, runsDir, verbose=vb)
+
+    if( verbose >= 0 ): verbosePrint(vb+1,"Loaded %d details." % (len(details)) )
+
+    # Save Details to save-file if desired
+    if( save and len(details) > 0 ): saveBHDetails(details, saveFile, verbose=vb)
+
+    return details
+
+
+
+def parseIllustrisBHDetailsLine(instr):
+    '''
+    Parse a line from an Illustris blachole_details_#.txt file
+
+    The line is formatted (in C) as:
+        "BH=%llu %g %g %g %g %g\n",
+        (long long) P[n].ID, All.Time, BPP(n).BH_Mass, mdot, rho, soundspeed
+
+    return ID, time, mass, mdot, rho, cs
+    '''
+    args = instr.split()
+
+    # First element is 'BH=########', trim to just the id number
+    args[0] = args[0].split("BH=")[-1]
+
+    return LONG(args[0]), DBL(args[1]), DBL(args[2]), DBL(args[3]), DBL(args[4]), DBL(args[5])
+
+
+
+def saveBHDetails(details, saveFilename, verbose=-1):
+    '''
+    Save details object using pickle.
+
+    Overwrites any existing file.  If directories along the path don't exist,
+    they are created.
+    '''
+
+    if( verbose >= 0 ): vb = verbose+1
+    if( verbose >= 0 ): verbosePrint(vb,"saveBHDetails()")
+
+    # Make sure output directory exists
+    saveDir, saveName = os.path.split(saveFilename)
+    checkDir(saveDir)
+
+    # Save binary pickle file
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saving details to '%s'" % (saveFilename))
+    saveFile = open(saveFilename, 'wb')
+    pickle.dump(details, saveFile)
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSize(saveFilename))
+    return
+
+
+
+def loadBHDetailsFromSave(loadFilename):
+    '''
+    Load details object from file.
+    '''
+    loadFile = open(loadFilename, 'rb')
+    details = pickle.load(loadFile)
+    return details
+
+
+
+def convertBHDetails(runNum, runsDir, verbose=-1):
+    if( verbose >= 0 ): vb = verbose + 1
+    else:               vb = -1
+    if( vb >= 0 ): verbosePrint(vb, "convertBHDetails()")
+
+    # Get file names
+    detFiles = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
+
+    # Get Snapshot Times
+
+
 ###  ======================================  ###
 ###  ==========  SNAPSHOT FILES  ==========  ###
 ###  ======================================  ###
 
 
-'''
-
-def getSnapshotFilename(snap, run=lyze.TARGET_RUN):
+def getSnapshotFilename(snapNum, runNum, runsDir, verbose=-1):
     """
     Given a run number and snapshot number, construct the approprirate snapshot filename.
 
     input
     -----
-    snap : IN [int] snapshot number,       i.e. 100 for snapdir_100
-    run  : IN [int] simulation run number, i.e. 3 for Illustris-3
+    snapNum : IN [int] snapshot number,       i.e. 100 for snapdir_100
+    runNum  : IN [int] simulation run number, i.e. 3 for Illustris-3
 
     output
     ------
     return     filename : [str]
     """
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
 
-    snapName = (lyze.SNAPSHOT_DIRS % snap) + (lyze.SNAPSHOT_FILENAMES % snap)
-    filename = lyze.RUN_DIRS[run] + snapName
-    return filename
+    verbosePrint(vb, "getSnapshotFilename()")
+
+    snapName      = np.copy(runsDir).tostring()
+    if( not snapName.endswith('/') ): snapName += '/'
+    snapName += RUN_DIRS[runNum]
+    if( not snapName.endswith('/') ): snapName += '/'
+    snapName += (SNAPSHOT_DIRS % (snapNum)) + (SNAPSHOT_FILENAMES % (snapNum))
+
+    return snapName
 
 
-
-def loadSnapshotTimes(run_num=lyze.TARGET_RUN, load=True, save=False):
+def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
     """
     Get the time (scale-factor) of each snapshot
 
     input
     -----
-    run_num  : [int] simulation run number, i.e. 3 for Illustris-3
+    runNum  : [int] simulation run number, i.e. 3 for Illustris-3
 
 
     output
@@ -218,34 +383,38 @@ def loadSnapshotTimes(run_num=lyze.TARGET_RUN, load=True, save=False):
 
     """
 
-    times             = np.zeros(lyze.NUM_SNAPS, dtype=np.float)
-    snapTimesFilename = SNAP_TIMES_FILE + "%d.npz" % (run_num)
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+
+    if( vb >= 0 ): verbosePrint("loadSnapshotTimes()")
+
+    times = np.zeros(NUM_SNAPS, dtype=DBL)
+    if( loadFile ): load = True
+    if( saveFile ): save = True
 
     # Load pre-existing times file
-    if( load and os.path.exists(snapTimesFilename) ):
-        if( VERBOSE ): print " - - - Loading snapshot times from '%s'" % ( snapTimesFilename )
-        snapTimesFile = np.load( snapTimesFilename )
-        times[:]      = snapTimesFile['times']
+    if( load ):
+        if( vb >= 0 ): verbosePrint(vb+1,"Loading snapshot times from '%s'" % (loadFile) )
+        timesFile = np.load( loadFile )
+        times[:]  = timesFile['times']
     # Re-extract times
     else:
-        if( VERBOSE ): print " - - - Extracting times from snapshots"
-        for snapNum in range(lyze.NUM_SNAPS):
-            snapFile       = getSnapshotFilename(snapNum, run=run_num)
+        if( vb >= 0 ): verbosePrint(vb+1,"Extracting times from snapshots")
+        for snapNum in range(NUM_SNAPS):
+            snapFile       = getSnapshotFilename(snapNum, runNum, runsDir)
             header         = rs.snapshot_header(snapFile)
             times[snapNum] = header.time
-            #redz     = header.redshift
 
 
     # Save snapshot times to NPZ file
     if( save ):
-        if( VERBOSE ): print " - - - Saving snapshot times to '%s'" % ( snapTimesFilename )
-        np.savez(snapTimesFilename, times=times)
-
+        if( vb >= 0 ): verbosePrint(vb+1, "Saving snapshot times to '%s'" % (saveFile) )
+        np.savez(saveFile, times=times)
 
 
     return times
 
-
+'''
 
 
 
@@ -399,10 +568,26 @@ def constructOffsetTables(gcat):
 
     return halo_offsets, subhalo_offsets, offset_table
 
+'''
 
 
 
 
+
+
+###  ======================================  ###
+###  =============  PHYSICS  ==============  ###
+###  ======================================  ###
+
+def aToZ(a, a0=1.0):
+    """ Convert a scale-factor to a redshift """
+    z = (a0/a) - 1.0
+    return z
+
+def zToA(z, a0=1.0):
+    """ Convert a redshift to a scale-factor """
+    a = a0/(1.0+z)
+    return a
 
 
 
@@ -421,6 +606,11 @@ def createFigures(nfigs=1):
 
     return figs
 
+
+def saveFigure(fname, fig, verbose=-1):
+    fig.savefig(fname)
+    if( verbose >= 0 ): verbosePrint(verbose+1, "Saved figure '%s'" % (fname))
+    return
 
 
 
@@ -523,7 +713,7 @@ def findBins(target, bins, thresh=DT_THRESH):
 
 
 
-
+'''
 
 ###  ====================================  ###
 ###  =============  OTHER  ==============  ###
@@ -573,8 +763,9 @@ def checkDir(tdir):
     Create the given directory if it doesn't already exist.
     return True if directory exists, false otherwise
     """
-    if( not os.path.isdir(tdir) ): os.makedirs(tdir)
-    if( not os.path.isdir(tdir) ): raise RuntimeError("Directory '%s' does not exist!" % (tdir) )
+    if( len(tdir) > 0 ):
+        if( not os.path.isdir(tdir) ): os.makedirs(tdir)
+        if( not os.path.isdir(tdir) ): raise RuntimeError("Directory '%s' does not exist!" % (tdir) )
 
     return
 
