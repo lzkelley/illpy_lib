@@ -30,7 +30,8 @@ from datetime import datetime
 from Constants import *
 from ObjMergers import Mergers
 from ObjDetails import Details
-#import readsnapHDF5 as rs
+
+import arepo
 
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
@@ -332,8 +333,13 @@ def convertBHDetails(runNum, runsDir, verbose=-1):
 
     # Get file names
     detFiles = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
+    if( vb >= 0 ): verbosePrint(vb+1, "Loaded %d details filenames" % (len(detFiles)) )
 
     # Get Snapshot Times
+    times = loadSnapshotTimes(runNum, runsDir, verbose=vb)
+    if( vb >= 0 ): verbosePrint(vb+1, "Loaded %d snapshot times" % (len(times)) )
+    
+
 
 
 ###  ======================================  ###
@@ -386,9 +392,11 @@ def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1)
     if( verbose >= 0 ): vb = verbose+1
     else:               vb = -1
 
-    if( vb >= 0 ): verbosePrint("loadSnapshotTimes()")
+    if( vb >= 0 ): verbosePrint(vb, "loadSnapshotTimes()")
 
     times = np.zeros(NUM_SNAPS, dtype=DBL)
+    load = False
+    save = False
     if( loadFile ): load = True
     if( saveFile ): save = True
 
@@ -401,9 +409,10 @@ def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1)
     else:
         if( vb >= 0 ): verbosePrint(vb+1,"Extracting times from snapshots")
         for snapNum in range(NUM_SNAPS):
-            snapFile       = getSnapshotFilename(snapNum, runNum, runsDir)
-            header         = rs.snapshot_header(snapFile)
-            times[snapNum] = header.time
+            snapFile = getSnapshotFilename(snapNum, runNum, runsDir)
+            # Load only the header from the given snapshot
+            snapHead = arepo.Snapshot(snapFile, onlyHeader=True)
+            times[snapNum] = snapHead.time
 
 
     # Save snapshot times to NPZ file
