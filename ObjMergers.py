@@ -20,7 +20,7 @@ class Mergers(object):
     ''' Class to store many mergers with components as simple arrays.
 
     Usage:
-      mergers = ManyMergers(NUM_MERGERS)
+      mergers = Mergers(NUM_MERGERS)
       mergers[i] = [ TIME, OUT_ID, OUT_MASS, IN_ID, IN_MASS ]
 
     This class is just a wrapper for 5 numpy arrays storing the time,
@@ -31,15 +31,20 @@ class Mergers(object):
     or the values for a single merger can be accessed, e.g.
       merger100 = mergers[100]
 
-    ManyMergers supports deletion by element, or series of elements,
+    Mergers supports deletion by element, or series of elements,
     e.g.
       del mergers[100]
       mergers.delete([100,200,221])
     
-    Individual mergers can be added using either the ManyMergers.add()
+    Individual mergers can be added using either the Mergers.add()
     method, or by accessing the last+1 memeber, e.g. if len(mergers) = N
       mergers[N+1] = [ TIME, IN_ID, ... ]
     will also work.
+
+
+    *** NOTE: MASS OF THE ACCRETOR IS *WRONG*, this is dynamical mass ***
+    ***       not the BH mass... must cross-check with details files. ***
+
 
     '''
 
