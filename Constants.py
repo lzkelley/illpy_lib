@@ -28,6 +28,13 @@ FLT = np.float32
 DBL = np.float64
 
 
+### Intermediate Files ###
+SAVE_SNAPSHOT_TIMES_FILENAME = "ill-%d_times.npz"
+BH_DETAILS_DIR               = "bh-details_ill-%d/"
+BH_DETAILS_ASCII_FILENAME    = "ill-%d_details_ascii_%03d.dat"
+BH_DETAILS_OBJ_FILENAME      = "ill-%d_details_obj_%03d.dat"
+
+
 ### Illustris Files ###
 
 NUM_SNAPS             = 136
