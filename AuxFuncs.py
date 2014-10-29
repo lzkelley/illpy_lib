@@ -20,6 +20,7 @@
 import numpy as np
 import warnings
 import os
+import sys
 import matplotlib                  as mpl
 import cPickle as pickle
 from matplotlib import pyplot      as plt
@@ -167,7 +168,8 @@ def saveMergers(mergers, saveFilename, verbose=-1):
     if( verbose >= 0 ): verbosePrint(vb+1,"Saving mergers to '%s'" % (saveFilename))
     saveFile = open(saveFilename, 'wb')
     pickle.dump(mergers, saveFile)
-    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSize(saveFilename))
+    saveFile.close()
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSizeString(saveFilename))
     return
 
 
@@ -210,32 +212,55 @@ def getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=-1):
     return files
 
 
-def loadAllIllustrisBHDetails(runNum, runsDir, verbose=-1):
+def getBHDetailsASCIIFilename(runNum, snapNum, workDir):
+    detsDir = workDir + (BH_DETAILS_DIR % (runNum))
+    checkDir(detsDir)                                                                               # Make sure directory exists
+    asciiFilename = detsDir + (BH_DETAILS_ASCII_FILENAME % (runNum, snapNum))
+    return asciiFilename
+
+
+def getBHDetailsObjFilename(runNum, snapNum, workDir):
+    detsDir = workDir + (BH_DETAILS_DIR % (runNum))
+    checkDir(detsDir)                                                                               # Make sure directory exists
+    asciiFilename = detsDir + (BH_DETAILS_OBJ_FILENAME % (runNum, snapNum))
+    return asciiFilename
+
+
+
+def loadIllustrisBHDetails(fileName, verbose=-1):
 
     if( verbose >= 0 ): vb = verbose+1
     else:               vb = -1
-    if( verbose >= 0 ): verbosePrint(vb, "loadAllIllustrisBHDetails()")
+    if( verbose >= 0 ): verbosePrint(vb, "loadIllustrisBHDetails()")
     
-    # Load list of details filenames for this simulation run (runNum)
-    detailsFiles = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
-    if( verbose >= 0 ): verbosePrint(vb+1,"Found %d illustris details files" % (len(detailsFiles)))  
-
     # Load details Data from Illutris Files
-    if( verbose >= 0 ): verbosePrint(vb+1,"Parsing details lines")
-    #tmpList = [ parseIllustrisBHDetailsLine(dline) for dfile in detailsFiles for dline in open(dfile) ]
-    tmpList = [ parseIllustrisBHDetailsLine(dline) for dline in open(detailsFiles[0]) ]
-    dnum = len(tmpList)
+    if( verbose >= 0 ): verbosePrint(vb+1,"Parsing details lines for '%s'" % (fileName) )
+    #tmpList = [ parseIllustrisBHDetailsLine(dline) for dline in open(fileName) ]
 
-    # Fill merger object with Merger Data
+    ### Files have some blank lines in them... Clean ###
+    ascLines = open(fileName).readlines()                                                           # Read all lines at once
+    tmpList = [ [] for ii in range(len(ascLines)) ]                                                 # Allocate space for all lines
+    num = 0
+    # Iterate over lines, storing only those with content
+    for aline in ascLines:
+        aline = aline.strip()
+        if( len(aline) > 0 ):
+            tmpList[num] = parseIllustrisBHDetailsLine(aline)
+            num += 1
+            
+    # Trim excess
+    del tmpList[num:]
+
+    ### Fill merger object with Merger Data ###
     if( verbose >= 0 ): verbosePrint(vb+1,"Creating details object")
-    details = Details( dnum )
+    details = Details( num )
     for ii, tmp in enumerate(tmpList):
         details[ii] = tmp
 
     return details
 
 
-
+'''
 def loadBHDetails(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
 
     if( verbose >= 0 ): vb = verbose+1
@@ -270,7 +295,7 @@ def loadBHDetails(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
     if( save and len(details) > 0 ): saveBHDetails(details, saveFile, verbose=vb)
 
     return details
-
+'''
 
 
 def parseIllustrisBHDetailsLine(instr):
@@ -311,9 +336,97 @@ def saveBHDetails(details, saveFilename, verbose=-1):
     if( verbose >= 0 ): verbosePrint(vb+1,"Saving details to '%s'" % (saveFilename))
     saveFile = open(saveFilename, 'wb')
     pickle.dump(details, saveFile)
-    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSize(saveFilename))
+    saveFile.close()
+    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSizeString(saveFilename))
     return
 
+
+
+def reorganizeBHDetails(oldFilenames, newFilenames, times, verbose=-1):
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+
+    if( vb >= 0 ): verbosePrint(vb, "reorganizeBHDetails()")
+    numNewFiles = len(newFilenames)
+    numOldFiles = len(oldFilenames)    
+
+    ### Open new ASCII details files ###
+    if( vb >= 0 ): verbosePrint(vb+1, "Opening %d New Files" % (numNewFiles) )
+    newFiles = [ open(dname, 'w') for dname in newFilenames ]
+
+
+    ### Iterate over all Illustris Details Files ###
+    if( vb >= 0 ): verbosePrint(vb+1, "Organizing data by Time")
+    start = datetime.now()
+    startOne = datetime.now()
+    for ii,oldname in enumerate(oldFilenames):
+        
+        # Iterate over each entry in file
+        for dline in open(oldname):
+            detTime = DBL( dline.split()[1] )
+            # Find the time bin given left edges (hence '-1'); include right-edges ('right=True')
+            snapNum = np.digitize([detTime], times, right=True) - 1
+            # Write line to apropriate file
+            newFiles[snapNum].write( dline )
+
+        # Print where we are, and duration
+        if( vb >= 0 ): 
+            now = datetime.now()
+            dur = str(now-start)
+            durOne = str(now-startOne)
+            verbosePrint(vb+2, "%d/%d after %s/%s" % (ii, numOldFiles, durOne, dur) )
+            startOne = now
+
+        # } for dline
+
+    # } for ii
+
+    if( vb >= 0 ): verbosePrint(vb+1, "Done after %s" % (str(datetime.now()-start)) )
+
+    # Close out details files.
+    aveSize = 0.0
+    for ii, newdf in enumerate(newFiles):
+        newdf.close()
+        aveSize += os.path.getsize(newdf.name)
+
+    aveSize = aveSize/(1.0*len(newFiles))
+    if( vb >= 0 ): 
+        sizeStr = convertDataSizeToString(aveSize)
+        verbosePrint(vb+1, "Closed new files.  Average size %s" % (sizeStr) )
+
+    return
+
+
+
+def convertDetailsASCIItoObj(ascFilenames, objFilenames, verbose=-1):
+
+    if( verbose >= 0 ): vb = verbose+1
+    else:               vb = -1
+
+    if( vb >= 0 ): verbosePrint(vb, "convertDetailsASCIItoObj()")
+    numFiles = len(ascFilenames)
+
+    if( vb >= 0 ): verbosePrint(vb+1, "Converting")
+    start = datetime.now()
+    startOne = datetime.now()
+    for ii, [ascName,objName] in enumerate( zip(ascFilenames,objFilenames) ):
+
+        details = loadIllustrisBHDetails( ascName, verbose=vb+1 )
+        saveBHDetails(details, objName, verbose=vb+1)
+
+        # Print where we are, and duration
+        if( vb >= 0 ): 
+            now = datetime.now()
+            dur = str(now-start)
+            durOne = str(now-startOne)
+            verbosePrint(vb+2, "%d/%d after %s/%s" % (ii, numFiles, durOne, dur) )
+            startOne = now
+
+    # } ii
+
+
+    return
 
 
 def loadBHDetailsFromSave(loadFilename):
@@ -326,18 +439,57 @@ def loadBHDetailsFromSave(loadFilename):
 
 
 
-def convertBHDetails(runNum, runsDir, verbose=-1):
+def convertBHDetails(runNum, runsDir, workDir, verbose=-1):
+    '''
+    Move details information from illustris files to new ones organized by time.
+
+    '''
+
     if( verbose >= 0 ): vb = verbose + 1
     else:               vb = -1
     if( vb >= 0 ): verbosePrint(vb, "convertBHDetails()")
 
+    if( len(workDir) > 0 and not workDir.endswith("/") ): workDir += "/"
+
+    
+    ### Initialize Variables ###
+
     # Get file names
-    detFiles = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
-    if( vb >= 0 ): verbosePrint(vb+1, "Loaded %d details filenames" % (len(detFiles)) )
+    if( vb >= 0 ): verbosePrint(vb+1, "Loading details filenames")
+    illDetFilenames = getIllustrisBHDetailsFilenames(runNum, runsDir, verbose=vb)
+    numIllDetFiles = len(illDetFilenames)
+    if( vb >= 0 ): verbosePrint(vb+2, "Loaded %d details filenames" % (numIllDetFiles))
 
     # Get Snapshot Times
-    times = loadSnapshotTimes(runNum, runsDir, verbose=vb)
-    if( vb >= 0 ): verbosePrint(vb+1, "Loaded %d snapshot times" % (len(times)) )
+    timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    if( vb >= 0 ): verbosePrint(vb+1, "Loading times ('%s')" % (timesFile) )
+    times = loadSnapshotTimes(runNum, runsDir, loadsave=timesFile, verbose=vb)
+    numTimes = len(times)
+    if( vb >= 0 ): verbosePrint(vb+2, "Loaded %d snapshot times" % (numTimes))
+
+    ### Create names for detail-snapshot files. ###
+    if( vb >= 0 ): verbosePrint(vb+1, "Constructing details filenames")
+    # ASCII Files
+    newDetASCIIFilenames = [ getBHDetailsASCIIFilename(runNum, ii, workDir) 
+                             for ii in range(numTimes) ]
+    if( vb >= 0 ): 
+        verbosePrint(vb+2, "[%s,%s]" % (newDetASCIIFilenames[0], newDetASCIIFilenames[-1]) )             
+
+    # Details Obj Files
+    newDetObjFilenames = [ getBHDetailsObjFilename(runNum, ii, workDir) 
+                           for ii in range(numTimes) ] 
+    if( vb >= 0 ): 
+        verbosePrint(vb+2, "[%s,%s]" % (newDetObjFilenames[0], newDetObjFilenames[-1]) )
+
+
+    ### Organize Details by Snapshot Time; create new ASCII Files ###
+    if( vb >= 0 ): verbosePrint(vb+1,"Reorganizing by time")
+    #reorganizeBHDetails(illDetFilenames, newDetASCIIFilenames, times, verbose=vb)
+
+
+    ### Convert New Details ASCII Files, to new Details object files ###
+    if( vb >= 0 ): verbosePrint(vb+1,"Converting from ASCII to Objects")
+    convertDetailsASCIItoObj(newDetASCIIFilenames, newDetObjFilenames, verbose=vb)
     
 
 
@@ -374,7 +526,7 @@ def getSnapshotFilename(snapNum, runNum, runsDir, verbose=-1):
     return snapName
 
 
-def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
+def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, loadsave=None, verbose=-1):
     """
     Get the time (scale-factor) of each snapshot
 
@@ -395,8 +547,19 @@ def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1)
     if( vb >= 0 ): verbosePrint(vb, "loadSnapshotTimes()")
 
     times = np.zeros(NUM_SNAPS, dtype=DBL)
+
     load = False
     save = False
+    ### If loadsave is specified: load if file exists, otherwise save
+    # Make sure 'loadFile'/'saveFile' are not specified along with 'loadsave'
+    if( (loadsave and loadFile) or (loadsave and saveFile) ):
+        raise RuntimeError("[AuxFuncs.loadSnapshotTimes()] Error: too many files!")
+    elif( loadsave ):
+        # If file already exists, load from it
+        if( os.path.exists(loadsave) ): loadFile = loadsave
+        # If file doesn't exist, save to it
+        else:                           saveFile = loadsave
+
     if( loadFile ): load = True
     if( saveFile ): save = True
 
@@ -749,21 +912,30 @@ def guessNumsFromFilename(fname):
 
 
 
-def getFileSize(filename):
-    size  = os.path.getsize(filename)
-    prefs = [ 'B', 'KB' , 'MB' , 'GB' ]
+def getFileSizeString(filename, asstr=True):
+    size = os.path.getsize(filename)
+    return convertDataSizeToString(size)
+
+
+def convertDataSizeToString(size):
+    prefSize, pref = getPrefixed(size)
+    unit = pref + 'B'
+    return "%.2f %s" % (prefSize, unit)
+    
+
+def getPrefixed(tval):
+    val = np.copy(tval)
+    prefs = [ '', 'K' , 'M' , 'G' ]
     mult  = 1000.0
 
     cnt = 0
-    while( size > mult ):
-        size /= mult
+    while( val > mult ):
+        val /= mult
         cnt  += 1
         if( cnt > 3 ):
-            raise RuntimeError("Error, filesize too large!  '%d B'" % (os.path.getsize(filename)))
-
-
-    return "%.2f %s" % (size, prefs[cnt])
-
+            raise RuntimeError("Error: value too large '%s'" % (str(val)) )
+    
+    return val, prefs[cnt]
 
 
 
