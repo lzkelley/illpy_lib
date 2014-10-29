@@ -60,6 +60,12 @@ class Details(object):
         self.__len = nums
 
 
+    @staticmethod
+    def keys():
+        return str([DETAIL_ID, DETAIL_TIME, DETAIL_MASS,
+                    DETAIL_MDOT, DETAIL_RHO, DETAIL_CS])
+
+
     def __len__(self): return self.__len
 
 
