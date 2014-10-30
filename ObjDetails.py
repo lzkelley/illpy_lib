@@ -41,13 +41,12 @@ class Details(object):
 
     '''
 
-    DETAIL_ID       = 'id'
-    DETAIL_TIME     = 'time'
-    DETAIL_MASS     = 'bh_mass'
-    DETAIL_MDOT     = 'mdot'
-    DETAIL_RHO      = 'rho'
-    DETAIL_CS       = 'soundspeed'
-
+    DETAIL_ID       = 0
+    DETAIL_TIME     = 1
+    DETAIL_MASS     = 2
+    DETAIL_MDOT     = 3
+    DETAIL_RHO      = 4
+    DETAIL_CS       = 5
     
     def __init__(self, nums):
         ''' Initialize object with empty arrays for 'nums' entries '''
@@ -60,10 +59,10 @@ class Details(object):
         self.__len = nums
 
 
-    @staticmethod
-    def keys():
-        return str([DETAIL_ID, DETAIL_TIME, DETAIL_MASS,
-                    DETAIL_MDOT, DETAIL_RHO, DETAIL_CS])
+    @classmethod
+    def keys(cls):
+        return str([cls.DETAIL_ID, cls.DETAIL_TIME, cls.DETAIL_MASS,
+                    cls.DETAIL_MDOT, cls.DETAIL_RHO, cls.DETAIL_CS])
 
 
     def __len__(self): return self.__len
@@ -78,16 +77,19 @@ class Details(object):
             e.g. DETAIL_TIME = 'time' for the time array
         '''
 
-        if(   type(key) == int ): 
+        # Convert to numpy key
+        if( type(key) == int ): key = np.int(key)
+
+        if( np.issubdtype(type(key),int) ): 
             return [ self.id[key], self.time[key], self.mass[key], 
                      self.mdot[key], self.rho[key], self.cs[key] ]
-        elif( key == DETAIL_ID   ): return self.id
-        elif( key == DETAIL_TIME ): return self.time
-        elif( key == DETAIL_MASS ): return self.mass
-        elif( key == DETAIL_MDOT ): return self.mdot
-        elif( key == DETAIL_RHO  ): return self.rho
-        elif( key == DETAIL_CS   ): return self.cs
-        else: raise KeyError("Unrecozgnized key '%s'!" % (str(key)) )
+        elif( key == Details.DETAIL_ID   ): return self.id
+        elif( key == Details.DETAIL_TIME ): return self.time
+        elif( key == Details.DETAIL_MASS ): return self.mass
+        elif( key == Details.DETAIL_MDOT ): return self.mdot
+        elif( key == Details.DETAIL_RHO  ): return self.rho
+        elif( key == Details.DETAIL_CS   ): return self.cs
+        else: raise KeyError("Unrecozgnized key '%s' type %s!" % (str(key), type(key)) )
 
 
     def __setitem__(self, key, vals):
@@ -101,12 +103,12 @@ class Details(object):
         if(   type(key) == int ): 
             if( key == self.__len ): self.add(vals)
             else: 
-                self.id[key]   = vals[0]
-                self.time[key] = vals[1]
-                self.mass[key] = vals[2]
-                self.mdot[key] = vals[3]
-                self.rho[key]  = vals[4]
-                self.cs[key]   = vals[5]
+                self.id[key]   = vals[Details.DETAIL_ID]
+                self.time[key] = vals[Details.DETAIL_TIME]
+                self.mass[key] = vals[Details.DETAIL_MASS]
+                self.mdot[key] = vals[Details.DETAIL_MDOT]
+                self.rho[key]  = vals[Details.DETAIL_RHO]
+                self.cs[key]   = vals[Details.DETAIL_CS]
         elif( key == DETAIL_ID   ): 
             self.id = vals
         elif( key == DETAIL_TIME ): 
@@ -149,12 +151,12 @@ class Details(object):
     def add(self, vals):
         ''' Append the given detail information as a new last element '''
 
-        self.id    = np.append(self.id,   vals[0])
-        self.time  = np.append(self.time, vals[1])
-        self.mass  = np.append(self.mass, vals[2])
-        self.mdot  = np.append(self.mdot, vals[3])
-        self.rho   = np.append(self.rho,  vals[4])
-        self.cs    = np.append(self.cs,   vals[5])
+        self.id    = np.append(self.id,   vals[Details.DETAIL_ID])
+        self.time  = np.append(self.time, vals[Details.DETAIL_TIME])
+        self.mass  = np.append(self.mass, vals[Details.DETAIL_MASS])
+        self.mdot  = np.append(self.mdot, vals[Details.DETAIL_MDOT])
+        self.rho   = np.append(self.rho,  vals[Details.DETAIL_RHO])
+        self.cs    = np.append(self.cs,   vals[Details.DETAIL_CS])
         self.__len = len(self.id)
 
     
