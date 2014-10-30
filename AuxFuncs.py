@@ -48,141 +48,6 @@ def verbosePrint(nv, arg):
     
 
 
-###  ====================================  ###
-###  ==========  MERGER FILES  ==========  ###
-###  ====================================  ###
-
-
-def getIllustrisMergerFilenames(runNum, runsDir, verbose=-1):
-    '''Get a list of 'blackhole_mergers' files for a target Illustris simulation'''
-
-    vb = verbose
-    verbosePrint(vb, "getIllustrisMergerFilenames()")
-
-    mergerNames      = np.copy(runsDir).tostring()
-    if( not mergerNames.endswith('/') ): mergerNames += '/'
-    mergerNames += RUN_DIRS[runNum]
-    if( not mergerNames.endswith('/') ): mergerNames += '/'
-    mergerNames += BH_MERGERS_FILENAMES
-
-    verbosePrint(vb+1, "Searching '%s'" % mergerNames)
-    files        = sorted(glob(mergerNames))                                                        # Find and sort files
-    verbosePrint(vb+2, "Found %d files" % (len(files)) )
-
-    return files
-
-
-def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
-
-    if( verbose >= 0 ): vb = verbose+1
-    else:               vb = -1
-    if( verbose >= 0 ): verbosePrint(vb, "loadAllIllustrisMergers()")
-    
-    # Load list of merger filenames for this simulation run (runNum)
-    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, verbose=vb)
-    if( verbose >= 0 ): verbosePrint(vb+1,"Found %d illustris merger files" % (len(mergerFiles)) )  
-
-    # Load Merger Data from Illutris Files
-    if( verbose >= 0 ): verbosePrint(vb+1,"Parsing merger lines")
-    tmpList = [ parseIllustrisMergerLine(mline) for mfile in mergerFiles for mline in open(mfile) ]
-    mnum = len(tmpList)
-
-    # Fill merger object with Merger Data
-    if( verbose >= 0 ): verbosePrint(vb+1,"Creating mergers object")
-    mergers = Mergers( mnum )
-    for ii, tmp in enumerate(tmpList):
-        mergers[ii] = tmp
-
-    return mergers
-
-
-
-def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
-
-    if( verbose >= 0 ): vb = verbose+1
-    else:               vb = -1
-    if( verbose >= 0 ): verbosePrint(vb, "loadMergers()")
-    if( verbose >= 0 ): verbosePrint(vb+1, "Loading Mergers from run %d" % (runNum))
-
-    load = False
-    save = False
-    if( loadFile ): load = True
-    if( saveFile ): save = True
-
-    # Load an existing save file (NPZ)
-    if( load ):
-        if( verbose >= 0 ): verbosePrint(vb+1,"Trying to load mergers from '%s'" % (loadFile))
-        # Try to load save-file
-        try: mergers = loadMergersFromSave(loadFile)
-        # Fall back to loading mergers from merger-files
-        except Exception, err:
-            if( verbose >= 0 ): verbosePrint(vb+2,"failed '%s'" % err.message)
-            load = False
-
-
-    # Load Mergers from Illustris merger files
-    if( not load or len(mergers) == 0 ):
-        verbosePrint(vb+1,"Loading mergers directly from Illustris Merger files")
-        mergers = loadAllIllustrisMergers(runNum, runsDir, verbose=vb)
-
-    if( verbose >= 0 ): verbosePrint(vb+1,"Loaded %d mergers." % (len(mergers)) )
-
-    # Save Mergers to save-file if desired
-    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, verbose=vb)
-
-    return mergers
-
-
-
-def parseIllustrisMergerLine(instr):
-    '''
-    Parse a line from an Illustris blachole_mergers_#.txt file
-
-    The line is formatted (in C) as:
-        '%d %g %llu %g %llu %g\n',
-        ThisTask, All.Time, (long long) id,  mass, (long long) P[no].ID, BPP(no).BH_Mass
-
-    return time, accretor_id, accretor_mass, accreted_id, accreted_mass
-    '''
-    args = instr.split()
-    return DBL(args[1]), LONG(args[2]), DBL(args[3]), LONG(args[4]), DBL(args[5])
-
-
-
-def saveMergers(mergers, saveFilename, verbose=-1):
-    '''
-    Save mergers object using pickle.
-
-    Overwrites any existing file.  If directories along the path don't exist,
-    they are created.
-    '''
-
-    if( verbose >= 0 ): vb = verbose+1
-    if( verbose >= 0 ): verbosePrint(vb,"saveMergers()")
-
-    # Make sure output directory exists
-    saveDir, saveName = os.path.split(saveFilename)
-    checkDir(saveDir)
-
-    # Save binary pickle file
-    if( verbose >= 0 ): verbosePrint(vb+1,"Saving mergers to '%s'" % (saveFilename))
-    saveFile = open(saveFilename, 'wb')
-    pickle.dump(mergers, saveFile)
-    saveFile.close()
-    if( verbose >= 0 ): verbosePrint(vb+1,"Saved, size %s" % getFileSizeString(saveFilename))
-    return
-
-
-
-def loadMergersFromSave(loadFilename):
-    '''
-    Load mergers object from file.
-    '''
-    loadFile = open(loadFilename, 'rb')
-    mergers = pickle.load(loadFile)
-    return mergers
-
-
 
 
 
@@ -260,12 +125,23 @@ def loadIllustrisBHDetails(fileName, verbose=-1):
     return details
 
 
-'''
-def loadBHDetails(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
+
+def loadBHDetails(runNum, snapNum, workDir, verbose=-1):
 
     if( verbose >= 0 ): vb = verbose+1
-    else:               vb = -1
-    if( verbose >= 0 ): verbosePrint(vb, "loadBHDetails()")
+    else:               vb = -10
+    
+    verbosePrint(vb, "loadBHDetails()")
+    
+    detsFilename = getBHDetailsObjFilename(runNum, snapNum, workDir)
+    verbosePrint(vb+1, 'File %s' % (detsFilename) )
+    if( not os.path.exists(detsFilename) ):
+        raise RuntimeError("NO file %s!" % (detsFilename) )
+
+    return loadBHDetailsFromSave(detsFilename)
+
+
+    '''
     if( verbose >= 0 ): verbosePrint(vb+1, "Loading Details from run %d" % (runNum))
 
     load = False
@@ -295,7 +171,9 @@ def loadBHDetails(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
     if( save and len(details) > 0 ): saveBHDetails(details, saveFile, verbose=vb)
 
     return details
-'''
+    '''
+
+
 
 
 def parseIllustrisBHDetailsLine(instr):
@@ -461,7 +339,7 @@ def convertBHDetails(runNum, runsDir, workDir, verbose=-1):
     if( vb >= 0 ): verbosePrint(vb+2, "Loaded %d details filenames" % (numIllDetFiles))
 
     # Get Snapshot Times
-    timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    timesFile = getSnapshotTimesFilename(runNum, workDir)
     if( vb >= 0 ): verbosePrint(vb+1, "Loading times ('%s')" % (timesFile) )
     times = loadSnapshotTimes(runNum, runsDir, loadsave=timesFile, verbose=vb)
     numTimes = len(times)
@@ -497,6 +375,11 @@ def convertBHDetails(runNum, runsDir, workDir, verbose=-1):
 ###  ======================================  ###
 ###  ==========  SNAPSHOT FILES  ==========  ###
 ###  ======================================  ###
+
+
+def getSnapshotTimesFilename(runNum, workDir):
+    timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    return timesFile
 
 
 def getSnapshotFilename(snapNum, runNum, runsDir, verbose=-1):
