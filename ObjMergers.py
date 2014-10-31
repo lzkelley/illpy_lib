@@ -12,7 +12,7 @@
 import numpy as np
 from glob import glob
 from datetime import datetime
-
+import cPickle as pickle
 from Constants import *
 
 import AuxFuncs as aux
@@ -163,11 +163,10 @@ class Mergers(object):
 
 
 
-def getIllustrisMergerFilenames(runNum, runsDir, verbose=-1):
+def getIllustrisMergerFilenames(runNum, runsDir, log=None):
     '''Get a list of 'blackhole_mergers' files for a target Illustris simulation'''
 
-    vb = verbose
-    aux.verbosePrint(vb, "getIllustrisMergerFilenames()")
+    if( log ): log.log("getIllustrisMergerFilenames()", 1)
 
     mergerNames      = np.copy(runsDir).tostring()
     if( not mergerNames.endswith('/') ): mergerNames += '/'
@@ -175,30 +174,33 @@ def getIllustrisMergerFilenames(runNum, runsDir, verbose=-1):
     if( not mergerNames.endswith('/') ): mergerNames += '/'
     mergerNames += BH_MERGERS_FILENAMES
 
-    aux.verbosePrint(vb+1, "Searching '%s'" % mergerNames)
-    files        = sorted(glob(mergerNames))                                                        # Find and sort files
-    aux.verbosePrint(vb+2, "Found %d files" % (len(files)) )
+    if( log ): log.log("Searching '%s'" % mergerNames, 2)
+    files = sorted(glob(mergerNames))                                                               # Find and sort files
+    if( log ): log.log("Found %d files" % (len(files)), 3)
 
     return files
 
 
-def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
+def loadAllIllustrisMergers(runNum, runsDir, log=None):
 
-    if( verbose >= 0 ): vb = verbose+1
-    else:               vb = -1
-    if( verbose >= 0 ): aux.verbosePrint(vb, "loadAllIllustrisMergers()")
+    if( log ): 
+        log += 1
+        log.log("loadAllIllustrisMergers()")
     
     # Load list of merger filenames for this simulation run (runNum)
-    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, verbose=vb)
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Found %d illustris merger files" % (len(mergerFiles)) )  
+    if( log ): log += 1
+    mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, log=log)
+    if( log ): 
+        log -= 1
+        log.log("Found %d illustris merger files" % (len(mergerFiles)), 1)
 
     # Load Merger Data from Illutris Files
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Parsing merger lines")
+    if( log ): log.log("Parsing merger lines", 1)
     tmpList = [ parseIllustrisMergerLine(mline) for mfile in mergerFiles for mline in open(mfile) ]
     mnum = len(tmpList)
 
     # Fill merger object with Merger Data
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Creating mergers object")
+    if( log ): log.log("Creating mergers object", 1)
     mergers = Mergers( mnum )
     for ii, tmp in enumerate(tmpList):
         mergers[ii] = tmp
@@ -207,12 +209,12 @@ def loadAllIllustrisMergers(runNum, runsDir, verbose=-1):
 
 
 
-def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
+def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
 
-    if( verbose >= 0 ): vb = verbose+1
-    else:               vb = -1
-    if( verbose >= 0 ): aux.verbosePrint(vb, "loadMergers()")
-    if( verbose >= 0 ): aux.verbosePrint(vb+1, "Loading Mergers from run %d" % (runNum))
+    if( log ): 
+        log += 1
+        log.log("loadMergers()")
+        log.log("Loading Mergers from run %d" % (runNum), 1)
 
     load = False
     save = False
@@ -221,24 +223,33 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, verbose=-1):
 
     # Load an existing save file (NPZ)
     if( load ):
-        if( verbose >= 0 ): aux.verbosePrint(vb+1,"Trying to load mergers from '%s'" % (loadFile))
+        if( log ): log.log("Trying to load mergers from '%s'" % (loadFile), 2)
         # Try to load save-file
         try: mergers = loadMergersFromSave(loadFile)
         # Fall back to loading mergers from merger-files
         except Exception, err:
-            if( verbose >= 0 ): aux.verbosePrint(vb+2,"failed '%s'" % err.message)
+            if( log ): log.log("FAILED '%s'" % err.message, 3)
             load = False
 
 
     # Load Mergers from Illustris merger files
     if( not load or len(mergers) == 0 ):
-        aux.verbosePrint(vb+1,"Loading mergers directly from Illustris Merger files")
-        mergers = loadAllIllustrisMergers(runNum, runsDir, verbose=vb)
+        if( log ):
+            log.log("Loading mergers directly from Illustris Merger files", 2)
+            log += 1
 
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Loaded %d mergers." % (len(mergers)) )
+        mergers = loadAllIllustrisMergers(runNum, runsDir, log=log)
 
+        if( log ): log -= 1
+
+
+    if( log ): 
+        log.log("Loaded %d mergers." % (len(mergers)), 2)
+        log += 1
+        
     # Save Mergers to save-file if desired
-    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, verbose=vb)
+    if( save and len(mergers) > 0 ): saveMergers(mergers, saveFile, log=log)
+    if( log ): log -= 2
 
     return mergers
 
@@ -259,7 +270,7 @@ def parseIllustrisMergerLine(instr):
 
 
 
-def saveMergers(mergers, saveFilename, verbose=-1):
+def saveMergers(mergers, saveFilename, log=None):
     '''
     Save mergers object using pickle.
 
@@ -267,19 +278,18 @@ def saveMergers(mergers, saveFilename, verbose=-1):
     they are created.
     '''
 
-    if( verbose >= 0 ): vb = verbose+1
-    if( verbose >= 0 ): aux.verbosePrint(vb,"saveMergers()")
+    if( log ): log.log("saveMergers()", 1)
 
     # Make sure output directory exists
     saveDir, saveName = os.path.split(saveFilename)
     checkDir(saveDir)
 
     # Save binary pickle file
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Saving mergers to '%s'" % (saveFilename))
+    if( log ): log.log("Saving mergers to '%s'" % (saveFilename), 2)
     saveFile = open(saveFilename, 'wb')
     pickle.dump(mergers, saveFile)
     saveFile.close()
-    if( verbose >= 0 ): aux.verbosePrint(vb+1,"Saved, size %s" % getFileSizeString(saveFilename))
+    if( log ): log.log("Saved, size %s" % getFileSizeString(saveFilename), 2)
     return
 
 
