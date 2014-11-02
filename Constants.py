@@ -36,7 +36,9 @@ PP_TIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_times.npz" % (x,x)
 PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR + 
                                     "Illustris-%d/bh-details/ill-%d_bh-details_%d.dat" % (x,x,y) )
 PP_MERGERS_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_mergers.dat" % (x,x)
+PP_MERGER_DETAILS_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_mergers-details.npz" % (x,x)
 
+PP_BH_LIFETIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/bh-lifetimes/ill-%d_bh-lifetimes.npz" % (x,x)
 
 #PP_BH_DETAILS_DIR            = "bh-details_ill-%d/"
 #BH_DETAILS_ASCII_FILENAME    = "ill-%d_details_ascii_%03d.dat"
