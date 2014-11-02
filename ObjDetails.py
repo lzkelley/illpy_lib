@@ -77,9 +77,10 @@ class Details(object):
             e.g. DETAIL_TIME = 'time' for the time array
         '''
 
-        # Convert to numpy key
+        # If normal int, Convert to numpy int
         if( type(key) == int ): key = np.int(key)
 
+        
         if( np.issubdtype(type(key),int) ): 
             return [ self.id[key], self.time[key], self.mass[key], 
                      self.mdot[key], self.rho[key], self.cs[key] ]
