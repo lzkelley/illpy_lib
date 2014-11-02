@@ -81,269 +81,13 @@ def getIllustrisBHDetailsFilenames(runNum, runsDir, log=None):
     return files
 
 
-def getBHDetailsASCIIFilename(runNum, snapNum, workDir):
-    detsDir = workDir + (BH_DETAILS_DIR % (runNum))
-    checkDir(detsDir)                                                                               # Make sure directory exists
-    asciiFilename = detsDir + (BH_DETAILS_ASCII_FILENAME % (runNum, snapNum))
-    return asciiFilename
 
 
-def getBHDetailsObjFilename(runNum, snapNum, workDir):
-    detsDir = workDir + (BH_DETAILS_DIR % (runNum))
-    checkDir(detsDir)                                                                               # Make sure directory exists
-    asciiFilename = detsDir + (BH_DETAILS_OBJ_FILENAME % (runNum, snapNum))
-    return asciiFilename
 
 
 
-def loadIllustrisBHDetails(fileName, log=None):
 
-    if( log ):
-        log += 1
-        log.log("loadIllustrisBHDetails()")
 
-    # Load details Data from Illutris Files
-    if( log ): log.log("Parsing details lines for '%s'" % (fileName), 1)
-    #tmpList = [ parseIllustrisBHDetailsLine(dline) for dline in open(fileName) ]
-
-    ### Files have some blank lines in them... Clean ###
-    ascLines = open(fileName).readlines()                                                           # Read all lines at once
-    tmpList = [ [] for ii in range(len(ascLines)) ]                                                 # Allocate space for all lines
-    num = 0
-    # Iterate over lines, storing only those with content
-    for aline in ascLines:
-        aline = aline.strip()
-        if( len(aline) > 0 ):
-            tmpList[num] = parseIllustrisBHDetailsLine(aline)
-            num += 1
-
-    # Trim excess
-    del tmpList[num:]
-
-    ### Fill merger object with Merger Data ###
-    if( log ): log.log("Creating details object", 1)
-    details = Details( num )
-    for ii, tmp in enumerate(tmpList):
-        details[ii] = tmp
-
-    if( log ): log -= 1
-
-    return details
-
-
-
-def loadBHDetails(runNum, snapNum, workDir, log=None):
-
-    if( log ): log.log("loadBHDetails()", 1)
-
-    detsFilename = getBHDetailsObjFilename(runNum, snapNum, workDir)
-    if( log ): log.log('File %s' % (detsFilename), 2)
-    if( not os.path.exists(detsFilename) ):
-        raise RuntimeError("NO file %s!" % (detsFilename) )
-
-    dets = loadBHDetailsFromSave(detsFilename)
-    if( log ): log.log('Loaded %d details' % (len(dets)) )
-
-    return dets
-
-
-
-
-def parseIllustrisBHDetailsLine(instr):
-    '''
-    Parse a line from an Illustris blachole_details_#.txt file
-
-    The line is formatted (in C) as:
-        "BH=%llu %g %g %g %g %g\n",
-        (long long) P[n].ID, All.Time, BPP(n).BH_Mass, mdot, rho, soundspeed
-
-    return ID, time, mass, mdot, rho, cs
-    '''
-    args = instr.split()
-
-    # First element is 'BH=########', trim to just the id number
-    args[0] = args[0].split("BH=")[-1]
-
-    return LONG(args[0]), DBL(args[1]), DBL(args[2]), DBL(args[3]), DBL(args[4]), DBL(args[5])
-
-
-
-def saveBHDetails(details, saveFilename, log=None):
-    '''
-    Save details object using pickle.
-
-    Overwrites any existing file.  If directories along the path don't exist,
-    they are created.
-    '''
-
-    if( log ): log.log("saveBHDetails()", 1)
-
-    # Make sure output directory exists
-    saveDir, saveName = os.path.split(saveFilename)
-    checkDir(saveDir)
-
-    # Save binary pickle file
-    if( log ): log.log("Saving details to '%s'" % (saveFilename), 2)
-    saveFile = open(saveFilename, 'wb')
-    pickle.dump(details, saveFile)
-    saveFile.close()
-    if( log ): log.log("Saved, size %s" % getFileSizeString(saveFilename), 2)
-
-    return
-
-
-
-def reorganizeBHDetails(oldFilenames, newFilenames, times, log=None):
-
-    if( log ):
-        log += 1
-        log.log("reorganizeBHDetails()")
-
-    numNewFiles = len(newFilenames)
-    numOldFiles = len(oldFilenames)
-
-    ### Open new ASCII details files ###
-    if( log ): log.log("Opening %d New Files" % (numNewFiles), 1)
-    newFiles = [ open(dname, 'w') for dname in newFilenames ]
-
-
-    ### Iterate over all Illustris Details Files ###
-    if( log ): log.log("Organizing data by Time", 1)
-    start = datetime.now()
-    startOne = datetime.now()
-    for ii,oldname in enumerate(oldFilenames):
-
-        # Iterate over each entry in file
-        for dline in open(oldname):
-            detTime = DBL( dline.split()[1] )
-            # Find the time bin given left edges (hence '-1'); include right-edges ('right=True')
-            snapNum = np.digitize([detTime], times, right=True) - 1
-            # Write line to apropriate file
-            newFiles[snapNum].write( dline )
-
-        # Print where we are, and duration
-
-            now = datetime.now()
-            dur = str(now-start)
-            durOne = str(now-startOne)
-            if( log ): log.log("%d/%d after %s/%s" % (ii, numOldFiles, durOne, dur), 2)
-            startOne = now
-
-        # } for dline
-
-    # } for ii
-
-    if( log ): log.log("Done after %s" % (str(datetime.now()-start)), 1)
-
-    # Close out details files.
-    aveSize = 0.0
-    for ii, newdf in enumerate(newFiles):
-        newdf.close()
-        aveSize += os.path.getsize(newdf.name)
-
-    aveSize = aveSize/(1.0*len(newFiles))
-
-    sizeStr = convertDataSizeToString(aveSize)
-    if( log ):
-        log.log("Closed new files.  Average size %s" % (sizeStr), 1)
-        log -= 1
-
-    return
-
-
-
-def convertDetailsASCIItoObj(ascFilenames, objFilenames, log=None):
-
-    if( log ): log.log("convertDetailsASCIItoObj()", 1)
-    numFiles = len(ascFilenames)
-
-    start = datetime.now()
-    startOne = datetime.now()
-    for ii, [ascName,objName] in enumerate( zip(ascFilenames,objFilenames) ):
-
-        log += 1
-        details = loadIllustrisBHDetails( ascName, log=log)
-        saveBHDetails(details, objName, log=log)
-        log -= 1
-
-        # Print where we are, and duration
-        now = datetime.now()
-        dur = str(now-start)
-        durOne = str(now-startOne)
-        if( log ): log.log("%d/%d after %s/%s" % (ii, numFiles, durOne, dur), 2)
-        startOne = now
-
-    # } ii
-
-    return
-
-
-def loadBHDetailsFromSave(loadFilename):
-    '''
-    Load details object from file.
-    '''
-    loadFile = open(loadFilename, 'rb')
-    details = pickle.load(loadFile)
-    return details
-
-
-
-def convertBHDetails(runNum, runsDir, workDir, log=None):
-    '''
-    Move details information from illustris files to new ones organized by time.
-
-    '''
-
-    if( log ):
-        log += 1
-        log.log("convertBHDetails()")
-
-    if( len(workDir) > 0 and not workDir.endswith("/") ): workDir += "/"
-
-
-    ### Initialize Variables ###
-
-    # Get file names
-    if( log ): log.log("Loading details filenames", 1)
-    illDetFilenames = getIllustrisBHDetailsFilenames(runNum, runsDir, log=log)
-    numIllDetFiles = len(illDetFilenames)
-    if( log ): log.log("Loaded %d details filenames" % (numIllDetFiles), 2)
-
-    # Get Snapshot Times
-    timesFile = getSnapshotTimesFilename(runNum, workDir)
-    if( log ): log.log("Loading times ('%s')" % (timesFile), 1)
-    times = loadSnapshotTimes(runNum, runsDir, loadsave=timesFile, log=log)
-    numTimes = len(times)
-    if( log ): log.log("Loaded %d snapshot times" % (numTimes), 2)
-
-    ### Create names for detail-snapshot files. ###
-    if( log ): log.log("Constructing details filenames", 1)
-    # ASCII Files
-    newDetASCIIFilenames = [ getBHDetailsASCIIFilename(runNum, ii, workDir)
-                             for ii in range(numTimes) ]
-
-    if( log ): log.log("[%s,%s]" % (newDetASCIIFilenames[0], newDetASCIIFilenames[-1]), 2)
-
-    # Details Obj Files
-    newDetObjFilenames = [ getBHDetailsObjFilename(runNum, ii, workDir)
-                           for ii in range(numTimes) ]
-
-    if( log ): log.log("[%s,%s]" % (newDetObjFilenames[0], newDetObjFilenames[-1]), 2)
-
-
-    ### Organize Details by Snapshot Time; create new ASCII Files ###
-    if( log ): log.log("Reorganizing by time", 1)
-    #reorganizeBHDetails(illDetFilenames, newDetASCIIFilenames, times, verbose=vb)
-
-
-    ### Convert New Details ASCII Files, to new Details object files ###
-    if( log ): 
-        log.log("Converting from ASCII to Objects", 1)
-        log += 1
-
-    convertDetailsASCIItoObj(newDetASCIIFilenames, newDetObjFilenames, log=log)
-    if( log ): log -= 2
-    return
 
 
 
@@ -792,16 +536,37 @@ def getPrefixed(tval):
 
 
 
+def checkFileDir(tpath):
+    """ 
+    For any given path make sure the 'head' portion (directories) exist. 
+
+    e.g. checkFileDir('one/two/three/file.txt') will make sure that
+         'one/two/three/' exists.  'file.txt' is ignored
+    """
+    head,tail = os.path.split(tpath)
+    if( len(head) > 0 ):
+        checkDir(head)
+
+    return
+
+
+
 def checkDir(tdir):
     """
     Create the given directory if it doesn't already exist.
-    return True if directory exists, false otherwise
-    """
-    if( len(tdir) > 0 ):
-        if( not os.path.isdir(tdir) ): os.makedirs(tdir)
-        if( not os.path.isdir(tdir) ): raise RuntimeError("Directory '%s' does not exist!" % (tdir) )
 
-    return
+    Return the same directory assuring it terminates with a '/'
+    """
+    ndir = str(tdir)
+    if( len(ndir) > 0 ):
+        # If directory doesn't exist, create it
+        if( not os.path.isdir(ndir) ): os.makedirs(ndir)
+        # If it still doesn't exist, error
+        if( not os.path.isdir(ndir) ): raise RuntimeError("Directory '%s' does not exist!" % (ndir) )
+        # Make sure pattern ends with '/'
+        if( not ndir.endswith('/') ): ndir += '/'
+        
+    return ndir
 
 
 #

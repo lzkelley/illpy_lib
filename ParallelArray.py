@@ -17,34 +17,66 @@ class ParallelArray(object):
     
     """
     
-    def __init__(self, num, names, types, keys=None, zero=True):
-        self.NUM = len(names)                                                                       # Number of arrays
+    def __init__(self, length, names, types, keys=None, zero=True):
+        self.num = len(names)                                                                       # Number of arrays
 
         # Make sure number of names matches number of types
-        if( self.NUM != len(types) ):
+        if( self.num != len(types) ):
             raise RuntimeError("Num names doesn't match num types!")
 
         # Make sure keys (if provided) match number of names
         if( keys != None ):
-            if( len(keys) != self.NUM ):
+            if( len(keys) != self.num ):
                 raise RuntimeError("Num keys doesn't match num names or types!")
 
         # Choose how to initialize arrays
         if( zero ): initFunc = np.zeros                                                             # Initialize arrays to zero  (clean)
-        else:       initFunc = np.array                                                             # Initialize arrays to empty (unclean)
+        else:       initFunc = np.empty                                                             # Initialize arrays to empty (unclean)
 
         # Create dictionary to store keys for each array (for later access)
         self.__keys = {}
         #self.__names = {}
 
         ### Initialize arrays ###
-        for ii in xrange(self.NUM):
+        for ii in xrange(self.num):
             # Add array as attribute
-            setattr(self, names[ii], initFunc(num, dtype=types[ii]) )
+            setattr(self, names[ii], initFunc(length, dtype=types[ii]) )
             # Establish an ordering for different arrays
             self.__keys[names[ii]] = ii
 
-        self.__len = num                                                                            # Set length to initial value
+        self.__len = length                                                                            # Set length to initial value
+
+
+    @classmethod
+    def initFromArrays(cls, names, arrs):
+        
+        # Get number of arrays
+        if( len(arrs) != len(names) ): raise RuntimeError("Names must match arrays in number!")
+
+        # Get length of each array
+        length = len(arrs[0])
+
+        print "num = ", length
+
+        # Get types from given arrays
+        types = [ type(ar[0]) for ar in arrs ]
+
+        print "TYPES = ", types
+
+        # Initialize object using default constructor
+        pararr = cls(length, names, types, zero=False)
+
+        print pararr
+        print pararr.num
+        print getattr(pararr, names[0])
+        print pararr[names[0]]
+        
+
+        # Set each array in object to given array
+        for name,ar in zip(names,arrs):
+            pararr[name] = ar
+
+        return pararr
 
 
 
@@ -76,6 +108,11 @@ class ParallelArray(object):
         else: 
             raise KeyError("Key must be a string or integer, not a %s!" % (str(type(key))) )
 
+    '''
+    def __getattr__(self, key):
+        if( hasattr(self, key) ): return getattr(self, key)
+        else: raise KeyError("Not attribute '%s'!" % (key))
+    '''
 
     def __setitem__(self, key, vals):
         """

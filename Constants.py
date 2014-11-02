@@ -28,11 +28,19 @@ FLT = np.float32
 DBL = np.float64
 
 
-### Intermediate Files ###
-SAVE_SNAPSHOT_TIMES_FILENAME = "ill-%d_times.npz"
-BH_DETAILS_DIR               = "bh-details_ill-%d/"
-BH_DETAILS_ASCII_FILENAME    = "ill-%d_details_ascii_%03d.dat"
-BH_DETAILS_OBJ_FILENAME      = "ill-%d_details_obj_%03d.dat"
+### Post-Process (PP) Intermediate Files ###
+PP_DIR = "/n/home00/lkelley/illustris/post-process/"
+PP_TEMP_DIR = PP_DIR + "temp/"
+
+PP_TIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_times.npz" % (x,x)
+PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR + 
+                                    "Illustris-%d/bh-details/ill-%d_bh-details_%d.dat" % (x,x,y) )
+PP_MERGERS_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_mergers.dat" % (x,x)
+
+
+#PP_BH_DETAILS_DIR            = "bh-details_ill-%d/"
+#BH_DETAILS_ASCII_FILENAME    = "ill-%d_details_ascii_%03d.dat"
+#BH_DETAILS_OBJ_FILENAME      = "ill-%d_details_obj_%03d.dat"
 
 
 ### Illustris Files ###
@@ -48,11 +56,6 @@ PARTICLE_TYPE_BH      = 5
 
 # File Names and Directories
 
-RUN_DIRS = {
-    1:'Illustris-1/' ,                                                                       # 3x1820^3 particles
-    2:'Illustris-2/' ,                                                                       # 3x910 ^3    "
-    3:'Illustris-3/'                                                                         # 3x455 ^3    "
-    }
 
 BH_MERGERS_FILENAMES  = 'output/blackhole_mergers/blackhole_mergers_*.txt'
 BH_DETAILS_FILENAMES  = 'output/blackhole_details/blackhole_details_*.txt'
@@ -63,6 +66,10 @@ SNAPSHOT_FILENAMES    = 'snap_%03d'
 
 GROUP_CAT_DIRS        = 'output/groups_%03d/'
 GROUP_CAT_FILENAMES   = 'fof_subhalo_tab_%03d'
+
+
+
+
 
 
 ### Plotting Parameters ###
