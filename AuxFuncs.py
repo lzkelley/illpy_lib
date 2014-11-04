@@ -41,18 +41,6 @@ import arepo
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
 
-'''
-def verbosePrint(nv, arg, log=None):
-    if( nv >= 0 ):
-        prep = " -"*nv
-        if( nv > 0 ): prep += " "
-        print prep + arg
-
-        if( type(log) == file ):
-            if( not log.closed ): log.write(prep + arg + "\n")
-'''
-
-
 
 
 ###  =====================================  ###
@@ -97,7 +85,8 @@ def getIllustrisBHDetailsFilenames(runNum, runsDir, log=None):
 
 
 def getSnapshotTimesFilename(runNum, workDir):
-    timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    #timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    timesFile = PP_TIMES_FILENAME(runNum)
     return timesFile
 
 
@@ -115,13 +104,17 @@ def getSnapshotFilename(snapNum, runNum, runsDir, log=None):
     return     filename : [str]
     """
 
-    if( log ): log.log("getSnapshotFilename()", 1)
+    if( log ): log.log("getSnapshotFilename()")
 
+    '''
     snapName      = np.copy(runsDir).tostring()
     if( not snapName.endswith('/') ): snapName += '/'
     snapName += RUN_DIRS[runNum]
     if( not snapName.endswith('/') ): snapName += '/'
     snapName += (SNAPSHOT_DIRS % (snapNum)) + (SNAPSHOT_FILENAMES % (snapNum))
+    '''
+    snapName = SNAPSHOT_NAMES(runNum, snapNum)
+    
 
     return snapName
 
@@ -378,7 +371,7 @@ def createFigures(nfigs=1):
 
 def saveFigure(fname, fig, log=None):
     fig.savefig(fname)
-    if( log ): log.log("Saved figure '%s'" % (fname), 1)
+    if( log ): log.log("Saved figure '%s'" % (fname) )
     return
 
 
