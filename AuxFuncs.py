@@ -23,6 +23,7 @@ import os
 import sys
 import matplotlib                  as mpl
 import cPickle as pickle
+import matplotlib                  as mpl
 from matplotlib import pyplot      as plt
 
 from glob import glob
@@ -380,6 +381,48 @@ def saveFigure(fname, fig, log=None):
     fig.savefig(fname)
     if( log ): log.log("Saved figure '%s'" % (fname), 1)
     return
+
+
+def setColorCycle(num, ax=None, cmap=plt.cm.spectral):
+    if(ax == None): ax = plt.gca()
+    cols = [cmap(it) for it in np.linspace(0, 0.9, num)]
+    ax.set_color_cycle(cols[::-1])
+    return cols
+
+
+def plotRect(ax, loc):
+    rect = mpl.patches.Rectangle((loc[0], loc[1]), loc[2], loc[3], 
+                                 alpha=0.4, facecolor='None', ls='dashed', lw=1.0, transform=ax.transData)
+    ax.add_patch(rect)
+    return
+
+
+def plotVLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
+    ylo,yhi = ax.get_ylim()
+    ll, = ax.plot([pos,pos], [ylo,yhi], style, color=col, lw=lw)
+    ax.set_ylim(ylo,yhi)
+
+    if( text != None ):
+        if( tpos == None ): tpos = 0.99*yhi
+        ax.text(pos, tpos, text, horizontalalignment='center', verticalalignment='top',
+                transform = ax.transData, bbox=dict(facecolor='white', alpha=0.7), color=col )
+
+
+    return ax, ll
+
+
+def plotHLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
+    xlo,xhi = ax.get_xlim()
+    ll, = ax.plot([xlo,xhi], [pos,pos], style, color=col, lw=lw)
+    ax.set_xlim(xlo,xhi)
+
+    if( text != None ):
+        if( tpos == None ): tpos = 0.99*xhi
+        ax.text(tpos, pos, text, horizontalalignment='right', verticalalignment='center',
+                transform = ax.transData, bbox=dict(facecolor='white', alpha=0.7), color=col )
+
+    return ax, ll
+
 
 
 
