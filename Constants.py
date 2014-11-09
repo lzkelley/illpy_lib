@@ -18,10 +18,12 @@ import numpy as np
 HPAR                  = 0.704                                                                       # Hubble parameter little h
 KPC                   = 3.085678e+21                                                                # 1 kpc in cm
 MSOL                  = 1.989e+33                                                                   # 1 M_sol in g
+MPRT                  = 1.673e-24                                                                   # 1 proton mass in g
 MASS_CONV             = 1.0e10/HPAR                                                                 # Convert from e10 Msol to [Msol]
 MDOT_CONV             = 10.22                                                                       # Multiply by this to get [Msol/yr]
-DENS_CONV             = 6.77025e-22                                                                 # (1e10 Msol/h)/(ckpc/h)^3 in g/cm^3 *COMOVING*
+DENS_CONV             = 6.77025e-22                                                                 # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
 BOX_LENGTH            = 75000                                                                       # [ckpc/h]
+FTPI                  = 4.0*np.pi/3.0                                                               # (4.0/3.0)*Pi
 
 
 ### Numerical Constants ###
