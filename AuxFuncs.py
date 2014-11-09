@@ -375,7 +375,7 @@ def plotRect(ax, loc):
     return
 
 
-def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=False, label=None):
+def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=False, scale=None, label=None):
     """
     Manually plot a histogram.
 
@@ -411,6 +411,10 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
     color : str, optional
         color of line to plot with
 
+    scale : scalar or array of scalars
+        Rescale the resulting histogram by this/these values
+        (e.g. 1/binVol will convert to density)
+
     label : str, optional
         label to associate with plotted histogram line
 
@@ -419,6 +423,9 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
     ll : object, matplotlib.lines.Line2D
         Line object which was plotted to axes `ax`
         (can then be used to make a legend, etc)
+
+    hist : array, scalar
+        The histogram which is plotted
 
     """
 
@@ -429,10 +436,15 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
         hist = [ hh/nn if nn > 0 else 0.0 
                  for hh,nn in zip(hist,np.histogram( values, bins=bins)[0]) ]
 
-    hist = np.concatenate([ [hh,hh] for hh in hist ])
+    # Rescale the bin values
+    if( scale != None ):
+        hist *= scale
+
+    yval = np.concatenate([ [hh,hh] for hh in hist ])
     xval = np.concatenate([ [edge[jj],edge[jj+1]] for jj in range(len(edge)-1) ])
-    ll, = ax.plot( xval, hist, ls, lw=lw, color=color, label=label)
-    return ll
+    ll, = ax.plot( xval, yval, ls, lw=lw, color=color, label=label)
+
+    return ll, hist
 
 
 def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False, grid=True,
