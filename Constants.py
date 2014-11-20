@@ -24,6 +24,10 @@ MDOT_CONV             = 10.22                                                   
 DENS_CONV             = 6.77025e-22                                                                 # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
 BOX_LENGTH            = 75000                                                                       # [ckpc/h]
 FTPI                  = 4.0*np.pi/3.0                                                               # (4.0/3.0)*Pi
+NWTG                  = 6.673840e-08                                                                # Newton's Gravitational  Constant
+YEAR                  = 3.156e+07                                                                   # Year in seconds
+SPLC                  = 2.997925e+10                                                                # Speed of light [cm/s]
+H0                    = 2.268546e-18                                                                # Hubble constant at z=0.0   in [1/s]
 
 
 ### Numerical Constants ###
@@ -33,12 +37,13 @@ FLT = np.float32
 DBL = np.float64
 
 
+
 ### Post-Process (PP) Intermediate Files ###
 PP_DIR = "/n/home00/lkelley/illustris/post-process/"
 PP_TEMP_DIR = PP_DIR + "temp/"
 
 PP_TIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_times.npz" % (x,x)
-PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR + 
+PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR +
                                     "Illustris-%d/bh-details/ill-%d_bh-details_%d.dat" % (x,x,y) )
 PP_MERGERS_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_mergers.dat" % (x,x)
 PP_MERGER_DETAILS_FILENAME = lambda x: PP_DIR + "Illustris-%d/bh-mergers/ill-%d_bh-mergers-details.npz" % (x,x)
@@ -96,7 +101,7 @@ GRY3 = '0.75'                                                                   
 TYPE_COLS = [ 'r', 'b', GRY1, GRY2, 'g', 'k' ]
 
 FIG_SIZE = [10,8]
-AX_SIZE  = [ [0.84, 0.83] ]
+AX_SIZE  = [ [0.84, 0.75] ]
 AX_POS   = [ [0.08, 0.12] ]
 
 LEG_POS  = [0.50, 0.01]
