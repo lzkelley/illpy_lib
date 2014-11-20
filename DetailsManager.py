@@ -39,7 +39,7 @@ sys.path.append(*LIB_PATHS)
 from Constants import *
 
 # Import local project files and objects
-from ObjDetails import Details
+#from ObjDetails import Details
 import AuxFuncs as aux
 
 
@@ -212,7 +212,7 @@ def convertDetailsASCIItoObj(ascFilenames, objFilenames, log=None):
     return
 
 
-
+'''
 def loadIllustrisBHDetails(fileName, log=None):
 
     if( log ): log.log("loadIllustrisBHDetails()")
@@ -241,7 +241,7 @@ def loadIllustrisBHDetails(fileName, log=None):
         details[ii] = tmp
 
     return details
-
+'''
 
 
 
