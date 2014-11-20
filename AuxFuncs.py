@@ -31,7 +31,7 @@ from datetime import datetime
 
 from Constants import *
 #from ObjMergers import Mergers
-from ObjDetails import Details
+#from ObjDetails import Details
 
 import ObjLog
 from ObjLog import Log
