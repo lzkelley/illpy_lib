@@ -42,18 +42,6 @@ import arepo
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
 
-'''
-def verbosePrint(nv, arg, log=None):
-    if( nv >= 0 ):
-        prep = " -"*nv
-        if( nv > 0 ): prep += " "
-        print prep + arg
-
-        if( type(log) == file ):
-            if( not log.closed ): log.write(prep + arg + "\n")
-'''
-
-
 
 
 ###  =====================================  ###
@@ -86,23 +74,18 @@ def getIllustrisBHDetailsFilenames(runNum, runsDir, log=None):
 
 
 
-
-
-
-
-
-
 ###  ======================================  ###
 ###  ==========  SNAPSHOT FILES  ==========  ###
 ###  ======================================  ###
 
 
 def getSnapshotTimesFilename(runNum, workDir):
-    timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    #timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
+    timesFile = PP_TIMES_FILENAME(runNum)
     return timesFile
 
 
-def getSnapshotFilename(snapNum, runNum, runsDir, log=None):
+def getSnapshotFilename(snapNum, runNum, log=None):
     """
     Given a run number and snapshot number, construct the approprirate snapshot filename.
 
@@ -116,13 +99,8 @@ def getSnapshotFilename(snapNum, runNum, runsDir, log=None):
     return     filename : [str]
     """
 
-    if( log ): log.log("getSnapshotFilename()", 1)
-
-    snapName      = np.copy(runsDir).tostring()
-    if( not snapName.endswith('/') ): snapName += '/'
-    snapName += RUN_DIRS[runNum]
-    if( not snapName.endswith('/') ): snapName += '/'
-    snapName += (SNAPSHOT_DIRS % (snapNum)) + (SNAPSHOT_FILENAMES % (snapNum))
+    if( log ): log.log("getSnapshotFilename()")
+    snapName = SNAPSHOT_NAMES(runNum, snapNum)
 
     return snapName
 
@@ -379,24 +357,119 @@ def createFigures(nfigs=1):
 
 def saveFigure(fname, fig, log=None):
     fig.savefig(fname)
-    if( log ): log.log("Saved figure '%s'" % (fname), 1)
+    if( log ): log.log("Saved figure '%s'" % (fname) )
     return
 
 
-def setColorCycle(num, ax=None, cmap=plt.cm.spectral):
+def setColorCycle(num, ax=None, cmap=plt.cm.spectral, left=0.1, right=0.9):
     if(ax == None): ax = plt.gca()
-    cols = [cmap(it) for it in np.linspace(0, 0.9, num)]
+    cols = [cmap(it) for it in np.linspace(left, right, num)]
     ax.set_color_cycle(cols[::-1])
     return cols
 
 
 def plotRect(ax, loc):
-    rect = mpl.patches.Rectangle((loc[0], loc[1]), loc[2], loc[3], 
+    rect = mpl.patches.Rectangle((loc[0], loc[1]), loc[2], loc[3],
                                  alpha=0.4, facecolor='None', ls='dashed', lw=1.0, transform=ax.transData)
     ax.add_patch(rect)
     return
 
 
+def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=False, scale=None, label=None):
+    """
+    Manually plot a histogram.
+
+    Uses numpy.histogram to obtain binned values, then plots them manually
+    as connected lines with the given parameters.  If `weights` are provided,
+    they are the values summed for each bin instead of 1.0 for each entry in
+    `values`.
+
+    Parameters
+    ----------
+    ax : object, matplotlib.axes
+        Axes on which to make plot
+
+    values : array_like, scalar
+        Array of values to be binned and plotted.  Each entry which belongs in
+        a bin, increments that bin by 1.0 or the corresponding entry in
+        `weights` if it is provived.
+
+    bins : array_like, scalar
+        Edges of bins to use for histogram, with both left and right edges.
+        If `bins` has length N, there will be N-1 bins.
+
+    weights : array_like, scalar, optional
+        Array of the same length as `values` which contains the weights to be
+        added to each bin.
+
+    ls : str, optional
+        linestyle to plot with
+
+    lw : scalar, optional
+        lineweight to plot with
+
+    color : str, optional
+        color of line to plot with
+
+    scale : scalar or array of scalars
+        Rescale the resulting histogram by this/these values
+        (e.g. 1/binVol will convert to density)
+
+    label : str, optional
+        label to associate with plotted histogram line
+
+    Returns
+    -------
+    ll : object, matplotlib.lines.Line2D
+        Line object which was plotted to axes `ax`
+        (can then be used to make a legend, etc)
+
+    hist : array, scalar
+        The histogram which is plotted
+
+    """
+
+    hist,edge = np.histogram( values, bins=bins, weights=weights )
+
+    # Find the average of each weighed bin instead.
+    if( ave and weights != None ): 
+        hist = [ hh/nn if nn > 0 else 0.0 
+                 for hh,nn in zip(hist,np.histogram( values, bins=bins)[0]) ]
+
+    # Rescale the bin values
+    if( scale != None ):
+        hist *= scale
+
+    yval = np.concatenate([ [hh,hh] for hh in hist ])
+    xval = np.concatenate([ [edge[jj],edge[jj+1]] for jj in range(len(edge)-1) ])
+    ll, = ax.plot( xval, yval, ls, lw=lw, color=color, label=label)
+
+    return ll, hist
+
+
+def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False, grid=True,
+               symlogx=0.0, symlogy=0.0):
+    """ Configure an axis object with the given settings. """
+
+    # Set Labels
+    if( xlabel ): ax.set_xlabel(xlabel)
+    if( ylabel ): ax.set_ylabel(ylabel)
+    if( title  ): ax.set_title(title)
+
+    # Grid
+    ax.grid(grid)
+
+    # Axis Scales
+    if( symlogx != 0.0 ): ax.set_xscale('symlog', linthreshx=symlogx)
+    elif( logx ):         ax.set_xscale('log')
+    if( symlogy != 0.0 ): ax.set_yscale('symlog', linthreshy=symlogy)
+    elif( logy ):         ax.set_yscale('log')
+
+    return
+
+
+
+'''
 def plotVLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
     ylo,yhi = ax.get_ylim()
     ll, = ax.plot([pos,pos], [ylo,yhi], style, color=col, lw=lw)
@@ -422,7 +495,7 @@ def plotHLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
                 transform = ax.transData, bbox=dict(facecolor='white', alpha=0.7), color=col )
 
     return ax, ll
-
+'''
 
 
 
@@ -463,8 +536,39 @@ def finishRollingStats(avevar, count):
 
 def getMagnitude(vect):
     """ Get the magnitude of a vector of arbitrary length """
-    return np.sqrt( np.sum([np.square(vv) for vv in vect]) )
+    return np.sqrt( np.sum([vv*vv for vv in vect]) )
 
+
+def isApprox(v1, v2, TOL=1.0e-6):
+    """
+    Check if two scalars are eqeual to within some tolerance.
+
+    Parameters
+    ----------
+    v1 : scalar
+        first value
+    v2 : scalar
+        second value
+    TOL : scalar
+        Fractional tolerance within which to return True
+
+    Returns
+    -------
+    retval : bool
+        True if the (conservative) fractional difference between `v1` and `v2`
+        is less than or equal to the tolerance.
+
+    """
+
+    # Find the lesser value to find conservative fraction
+    less = np.min([v1,v2])
+    # Compute fractional difference
+    diff = np.fabs((v1-v2)/less)
+
+    # Compare fractional difference to tolerance
+    retval = (diff <= TOL)
+
+    return retval
 
 
 
@@ -549,6 +653,10 @@ def guessNumsFromFilename(fname):
 
 
 
+def stringArray(arr, format='%.2f'):
+    out = [ format % elem for elem in arr ]
+    out = "[ " + " ".join(out) + " ]"
+    return out
 
 
 
@@ -580,8 +688,8 @@ def getPrefixed(tval):
 
 
 def checkFileDir(tpath):
-    """ 
-    For any given path make sure the 'head' portion (directories) exist. 
+    """
+    For any given path make sure the 'head' portion (directories) exist.
 
     e.g. checkFileDir('one/two/three/file.txt') will make sure that
          'one/two/three/' exists.  'file.txt' is ignored
@@ -608,7 +716,7 @@ def checkDir(tdir):
         if( not os.path.isdir(ndir) ): raise RuntimeError("Directory '%s' does not exist!" % (ndir) )
         # Make sure pattern ends with '/'
         if( not ndir.endswith('/') ): ndir += '/'
-        
+
     return ndir
 
 
