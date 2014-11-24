@@ -447,6 +447,45 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
     return ll, hist
 
 
+
+def plotHistLine(ax, bins, values, ls='-', lw=1.0, color='k'):
+    """
+    Manually plot a histogrammed data.
+
+
+    Parameters
+    ----------
+    ax : object matplotlib.axes
+        Axes on which to make plot
+    bins : array_like, scalar
+        Edges of bins to use for histogram, with both left and right edges.
+        If `bins` has length N, there will be N-1 bins.
+    values : array_like, scalar
+        Array of binned values
+    (ls : str, optional)
+        linestyle to plot with
+    (lw : scalar, optional)
+        lineweight to plot with
+    (color : str, optional)
+        color of line to plot with
+
+    Returns
+    -------
+    ll : object, matplotlib.lines.Line2D
+        Line object which was plotted to axes `ax`
+        (can then be used to make a legend, etc)
+
+    """
+
+    yval = np.concatenate([ [vv,vv] for vv in values ])
+    xval = np.concatenate([ [bins[jj],bins[jj+1]] for jj in range(len(bins)-1) ])
+    ll, = ax.plot( xval, yval, ls, lw=lw, color=color)
+
+    return ll
+
+
+
+
 def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False, grid=True,
                symlogx=0.0, symlogy=0.0):
     """ Configure an axis object with the given settings. """
