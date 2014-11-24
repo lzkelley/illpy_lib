@@ -39,6 +39,8 @@ DBL = np.float64
 
 
 ### Post-Process (PP) Intermediate Files ###
+#SYNC_DIR = "../sync-dir/"
+
 PP_DIR = "/n/home00/lkelley/illustris/post-process/"
 PP_TEMP_DIR = PP_DIR + "temp/"
 
