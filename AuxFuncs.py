@@ -41,7 +41,10 @@ import arepo
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
-
+AX_LEFT   = 0.08
+AX_RIGHT  = 0.08
+AX_BOTTOM = 0.12
+AX_TOP    = 0.13
 
 
 ###  =====================================  ###
@@ -353,6 +356,17 @@ def createFigures(nfigs=1):
             ff.add_axes(axpos + axsize)
 
     return figs
+
+
+def createFigure(left=AX_LEFT, right=AX_RIGHT, bottom=AX_BOTTOM, top=AX_TOP):
+
+    fig = plt.figure(figsize=FIG_SIZE)
+    pos = [left, bottom]
+    size = [1.0-left-right, 1.0-bottom-top]
+    fig.add_axes(pos + size)
+
+    return fig
+
 
 
 def saveFigure(fname, fig, log=None):
