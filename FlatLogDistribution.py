@@ -39,16 +39,16 @@ class FlatLogDistribution(object):
 
         
     @staticmethod    
-    def flatlog(min, max, num=1):
+    def flatlog(dmin, dmax, num=1):
         """
-        Draw samples from a flat log distribution (~1/x) between `min`, `max`.
+        Draw samples from a flat log distribution (~1/x) between `dmin`, `dmax`.
 
         Parameters
         ----------
-        min : scalar
+        dmin : scalar
             minimum value of distribution
 
-        max : scalar
+        dmax : scalar
             maximum value of distribution
 
         num : scalar, optional, default = 1
@@ -60,8 +60,8 @@ class FlatLogDistribution(object):
             Samples from a 1/x distribution function.
 
         """
-        norm = np.log(max/min)
-        inv = lambda x: min*np.exp(x*norm)
+        norm = np.log(dmax/dmin)
+        inv = lambda x: dmin*np.exp(x*norm)
         
         samps = np.random.random(size=num)
         flats = np.array( map(inv, samps) )
