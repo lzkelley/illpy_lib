@@ -22,6 +22,7 @@ MPRT                  = 1.673e-24                                               
 MASS_CONV             = 1.0e10/HPAR                                                                 # Convert from e10 Msol to [Msol]
 MDOT_CONV             = 10.22                                                                       # Multiply by this to get [Msol/yr]
 DENS_CONV             = 6.77025e-22                                                                 # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
+CS_CONV               = 1.0                                                                         # ??????? FIX
 BOX_LENGTH            = 75000                                                                       # [ckpc/h]
 FTPI                  = 4.0*np.pi/3.0                                                               # (4.0/3.0)*Pi
 NWTG                  = 6.673840e-08                                                                # Newton's Gravitational  Constant
@@ -45,12 +46,14 @@ PP_DIR = "/n/home00/lkelley/illustris/post-process/"
 PP_TEMP_DIR = PP_DIR + "temp/"
 
 PP_TIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_times.npz" % (x,x)
-PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR +
-                                    "Illustris-%d/bh-details/ill-%d_bh-details_%d.dat" % (x,x,y) )
+#PP_DETAILS_FILENAME = lambda x,y: ( PP_DIR +
+#                                    "Illustris-%d/bh-details/ill-%d_bh-details_%d.dat" % (x,x,y) )
 PP_MERGERS_FILENAME = lambda x: PP_DIR + "Illustris-%d/ill-%d_mergers.dat" % (x,x)
 PP_MERGER_DETAILS_FILENAME = lambda x: PP_DIR + "Illustris-%d/bh-mergers/ill-%d_bh-mergers-details.npz" % (x,x)
 
 PP_BH_LIFETIMES_FILENAME = lambda x: PP_DIR + "Illustris-%d/bh-lifetimes/ill-%d_bh-lifetimes.npz" % (x,x)
+
+#PP_BH_DETAILS_DIR = lambda x: PP_DIR + "Illustris-%d/bh-details/" % (x)
 
 #PP_BH_DETAILS_DIR            = "bh-details_ill-%d/"
 #BH_DETAILS_ASCII_FILENAME    = "ill-%d_details_ascii_%03d.dat"
@@ -71,9 +74,11 @@ PARTICLE_TYPE_BH      = 5
 PARTICLE_NAMES        = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
 
 # File Names and Directories
-BH_MERGERS_FILENAMES  = 'output/blackhole_mergers/blackhole_mergers_*.txt'
-BH_DETAILS_FILENAMES  = 'output/blackhole_details/blackhole_details_*.txt'
-BH_SUMMARY_FILENAME   = 'output/blackholes.txt'
+
+ILL_RUN_DIRS = lambda x: "/n/hernquistfs1/Illustris/Runs/Illustris-%d/" % (x)
+ILL_BH_MERGERS_FILENAMES  = 'output/blackhole_mergers/blackhole_mergers_*.txt'
+ILL_BH_DETAILS_FILENAMES  = 'output/blackhole_details/blackhole_details_*.txt'
+ILL_BH_SUMMARY_FILENAME   = 'output/blackholes.txt'
 
 SNAPSHOT_DIRS         = 'output/snapdir_%03d/'
 SNAPSHOT_FILENAMES    = 'snap_%03d'
