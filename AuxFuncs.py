@@ -52,24 +52,11 @@ AX_TOP    = 0.13
 ###  =====================================  ###
 
 
-def getIllustrisBHDetailsFilenames(runNum, runsDir, log=None):
+def getFilenames_Illustris_BHDetails(runNum):
     '''Get a list of 'blackhole_details' files for a target Illustris simulation'''
 
-    if( log ):
-        log += 1
-        if( log ): log.log("getIllustrisBHDetailsFilenames()")
-
-    detailsNames      = np.copy(runsDir).tostring()
-    if( not detailsNames.endswith('/') ): detailsNames += '/'
-    detailsNames += RUN_DIRS[runNum]
-    if( not detailsNames.endswith('/') ): detailsNames += '/'
-    detailsNames += BH_DETAILS_FILENAMES
-
-    if( log ): log.log("Searching '%s'" % detailsNames, 1)
-    files        = sorted(glob(detailsNames))                                                       # Find and sort files
-    if( log ): log.log("Found %d files" % (len(files)), 2)
-
-    if( log ): log -= 1
+    detFiles = ILL_RUN_DIRS(runNum) + ILL_BH_DETAILS_FILENAMES
+    files    = sorted(glob(detailsNames))
     return files
 
 
@@ -81,11 +68,6 @@ def getIllustrisBHDetailsFilenames(runNum, runsDir, log=None):
 ###  ==========  SNAPSHOT FILES  ==========  ###
 ###  ======================================  ###
 
-
-def getSnapshotTimesFilename(runNum, workDir):
-    #timesFile = workDir + (SAVE_SNAPSHOT_TIMES_FILENAME % (runNum))
-    timesFile = PP_TIMES_FILENAME(runNum)
-    return timesFile
 
 
 def getSnapshotFilename(snapNum, runNum, log=None):
@@ -108,14 +90,13 @@ def getSnapshotFilename(snapNum, runNum, log=None):
     return snapName
 
 
-def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, loadsave=None, log=None):
+def loadSnapshotTimes(run, log=None):
     """
     Get the time (scale-factor) of each snapshot
 
     input
     -----
     runNum  : [int] simulation run number, i.e. 3 for Illustris-3
-
 
     output
     ------
@@ -127,29 +108,29 @@ def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, loadsave=No
 
     times = np.zeros(NUM_SNAPS, dtype=DBL)
 
+    loadsave = PP_TIMES_FILENAME(run)
+
     load = False
     save = False
-    ### If loadsave is specified: load if file exists, otherwise save
-    # Make sure 'loadFile'/'saveFile' are not specified along with 'loadsave'
-    if( (loadsave and loadFile) or (loadsave and saveFile) ):
-        raise RuntimeError("[AuxFuncs.loadSnapshotTimes()] Error: too many files!")
-    elif( loadsave ):
-        # If file already exists, load from it
-        if( os.path.exists(loadsave) ): loadFile = loadsave
-        # If file doesn't exist, save to it
-        else:                           saveFile = loadsave
+    loadFile = None
+    saveFile = None
+
+    # If file already exists, load from it
+    if( os.path.exists(loadsave) ): loadFile = loadsave
+    # If file doesn't exist, save to it
+    else:                           saveFile = loadsave
 
     if( loadFile ): load = True
     if( saveFile ): save = True
 
     # Load pre-existing times file
     if( load ):
-        if( log ): log.log("Loading snapshot times from '%s'" % (loadFile), 2)
+        if( log ): log.log("Loading snapshot times from '%s'" % (loadFile))
         timesFile = np.load( loadFile )
         times[:]  = timesFile['times']
     # Re-extract times
     else:
-        if( log ): log.log("Extracting times from snapshots", 2)
+        if( log ): log.log("Extracting times directly from snapshots")
         for snapNum in range(NUM_SNAPS):
             snapFile = getSnapshotFilename(snapNum, runNum, runsDir)
             # Load only the header from the given snapshot
@@ -159,9 +140,8 @@ def loadSnapshotTimes(runNum, runsDir, loadFile=None, saveFile=None, loadsave=No
 
     # Save snapshot times to NPZ file
     if( save ):
-        if( log ): log.log("Saving snapshot times to '%s'" % (saveFile), 2)
+        if( log ): log.log("Saving snapshot times to '%s'" % (saveFile) )
         np.savez(saveFile, times=times)
-
 
     return times
 
