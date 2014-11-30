@@ -35,12 +35,6 @@ import Basics
 import AuxFuncs as aux
 import DetailsManager as DetMan
 
-# Cython
-import pyximport
-pyximport.install(setup_args={"include_dirs":np.get_include()})
-import MatchDetails
-
-
 
 ID_FILE = "/n/home00/lkelley/illustris/pta-mergers/ill-3_bh-merger_ids-scales.npz"
 SCALES_FILE = "/n/home00/lkelley/illustris/pta-mergers/ill-3_snapshot-scales.npz"
@@ -157,6 +151,10 @@ def findBinaryDetails(run, snap, snapScale, ids, scales):
 
     """
 
+    import pyximport
+    pyximport.install(setup_args={"include_dirs":np.get_include()})
+    import MatchDetails
+
     # Select binaries which have already formed, 'active' binaries
     #    i.e. their merger scalefactor is <= that of this snapshot
     actInds = np.where( scales <= snapScale )[0]
@@ -235,6 +233,48 @@ def findBinaryDetails(run, snap, snapScale, ids, scales):
     print " - - - - Saved to '%s' " % (filename)
     
     return numGood, numBad, numFixed
+
+
+
+def loadSavedMergerDetails(run, snap):
+    """
+    Load the BH Details associated with Mergers saved by 'findBinaryDetails()'.
+
+    Parameters
+    ----------
+    run : int
+        Number of the illustris simulation {1,3}
+    snap : int
+        Number of the illustris snapshot {0,135}
+
+    Returns
+    -------
+    targs : array, long
+        ID numbers for each merger 'out' BH
+    scale : array, double
+        Scale-factor for each detail entry
+    mass  : array, double
+        Mass of each detail dentry
+    mdot  : array, double
+        Mass accretion rate
+    rho   : array, double
+        Local gas density
+    cs    : array, double
+        Local sound speed
+
+    """
+    
+    filename = SAVE_DIR(run) + SAVE_NAME(run,snap)
+    dat = np.load(filename)
+
+    targs = dat['ids'][:,0]
+    scale = dat['scale']
+    mass  = dat['mass']
+    mdot  = dat['mdot']
+    rho   = dat['rho']
+    cs    = dat['cs']
+
+    return targs, scale, mass, mdot, rho, cs
 
 
 
