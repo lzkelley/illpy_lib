@@ -46,7 +46,7 @@ AX_RIGHT  = 0.08
 AX_BOTTOM = 0.12
 AX_TOP    = 0.13
 
-SNAPSHOT_TIMES_FILENAME = lamda x: "../sync-dir/ill-%d_times.npz" % (x)
+SNAPSHOT_TIMES_FILENAME = lambda x: "../sync-dir/ill-%d_times.npz" % (x)
 
 ###  =====================================  ###
 ###  ==========  DETAILS FILES  ==========  ###
