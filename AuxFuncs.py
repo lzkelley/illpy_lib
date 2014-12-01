@@ -438,7 +438,7 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
     hist,edge = np.histogram( values, bins=bins, weights=weights )
 
     # Find the average of each weighed bin instead.
-    if( ave and weights != None ): 
+    if( ave and weights is not None ): 
         hist = [ hh/nn if nn > 0 else 0.0 
                  for hh,nn in zip(hist,np.histogram( values, bins=bins)[0]) ]
 
