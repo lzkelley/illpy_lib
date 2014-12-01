@@ -46,6 +46,7 @@ AX_RIGHT  = 0.08
 AX_BOTTOM = 0.12
 AX_TOP    = 0.13
 
+SNAPSHOT_TIMES_FILENAME = lamda x: "../sync-dir/ill-%d_times.npz" % (x)
 
 ###  =====================================  ###
 ###  ==========  DETAILS FILES  ==========  ###
@@ -108,7 +109,8 @@ def loadSnapshotTimes(run, log=None):
 
     times = np.zeros(NUM_SNAPS, dtype=DBL)
 
-    loadsave = PP_TIMES_FILENAME(run)
+    loadsave = SNAPSHOT_TIMES_FILENAME(run)
+    if( not os.path.exists(loadsave) ): loadsave = PP_TIMES_FILENAME(run)
 
     load = False
     save = False
