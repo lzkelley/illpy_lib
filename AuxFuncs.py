@@ -328,12 +328,22 @@ def zToA(z, a0=1.0):
 
 
 
-def createFigures(nfigs=1):
+def createFigures(nfigs=1, figsize=None, axsize=None, axpos=None):
 
-    figs = [ plt.figure(figsize=FIG_SIZE) for ii in range(nfigs) ]
+    # Set unset parameters to defaults
+    if( figsize == None ): figsize = FIG_SIZE
+    if( axsize == None ): axsize = AX_SIZE
+    if( axpos == None ): axpos = AX_POS
+
+    # Make parameters iterable
+    if( not np.iterable(axsize) ): axsize = [ axsize ]
+    if( not np.iterable(axpos) ): axpos = [ axpos ]
+
+    # Create figures, add axes
+    figs = [ plt.figure(figsize=figsize) for ii in range(nfigs) ]
     for ff in figs:
-        for axpos,axsize in zip(AX_POS,AX_SIZE):
-            ff.add_axes(axpos + axsize)
+        for axp,axs in zip(axpos, axsize):
+            ff.add_axes(axp + axs)
 
     return figs
 
