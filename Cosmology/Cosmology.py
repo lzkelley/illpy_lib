@@ -15,10 +15,11 @@ import scipy as sp
 from scipy import interpolate
 import sys
 
-from Constants import BOX_LENGTH, HPAR, H0, SPLC
+from ..Constants import * #BOX_LENGTH, HPAR, H0, SPLC
 
 
-TIMES_FILE = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
+#TIMES_FILE = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
+TIMES_FILE = "/n/home00/lkelley/illustris/library-code/Cosmology/data/illustris-snapshot-cosmology-data.npz"
 INTERP = "quadratic"                                                                                # Type of interpolation for scipy
 FLT_TYPE = np.float32
 
