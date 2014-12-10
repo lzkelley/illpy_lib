@@ -14,22 +14,17 @@ import numpy as np
 import scipy as sp
 from scipy import interpolate
 import sys
-import os
 
-TIMES_FILE = "../sync-dir/illustris-snapshot-cosmology-data.npz"
-BACK_TIMES_FILE = "./data/cosmology/illustris-snapshot-cosmology-data.npz"
+from Constants import BOX_LENGTH, HPAR, H0, SPLC
 
+
+TIMES_FILE = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
 INTERP = "quadratic"                                                                                # Type of interpolation for scipy
-
-from Settings import LIB_PATHS
-sys.path.append(*LIB_PATHS)
-from Constants import BOX_LENGTH, HPAR, H0, SPLC, KPC
-
-
+FLT_TYPE = np.float32
 
 
 class Cosmology(object):
-    """
+    '''
     Class to access cosmological parameters over Illustris simulation times.
 
     Cosmology loads a preformatted data file which contains cosmological
@@ -48,156 +43,177 @@ class Cosmology(object):
     lookbackTime(sf) : lookback time [s]               for given scale-factor
     age(sf)          : age of the universe [s]         for given scale-factor
     distMod(sf)      : distance modulus []             for given scale-factor
+    hubbleConstant(sf) : hubble constant [km/s/Mpc] 
+    hubbleFunction(sf) : hubble function []
 
     Additionally, `Cosmology` supports the `len()` function, which returns the
-    number of snapshots.  All cosmological parameters can be accessed for an
-    inidividual snapshot using the standard array accessor `[i]`
+    number of snapshots.  The scale-factor for an individual snapshot can be
+    retrieved using the standard array accessor `[i]`
 
 
-    Usage
-    -----
-    import Cosmology
+    Examples
+    --------
+    >> import Cosmology
+    >> cosmo = Cosmology.Cosmology()
 
-    cosmo = Cosmology.Cosmology()
+    >> # Get the number of snapshots
+    >> numSnaps = len(cosmo)
 
-    # Get the number of snapshots
-    numSnaps = len(cosmo)
+    >> # Get the scale-factor for the 10th from last snapshot
+    >> print cosmo[numSnaps-10]
 
-    # Get all cosmological parameters for 10th to last snapshot
-    print cosmo[numSnaps-10]
-
-    # Find the luminosity distance at a scale factor of a=0.5
-    lumDist = cosmo.lumDist(0.5)
+    >> # Find the luminosity distance at a scale factor of a=0.5
+    >> lumDist = cosmo.lumDist(0.5)
     
-    """
+    '''
+
+    __REDSHIFT  = 'redshift'
+    __SCALEFACT = 'scale'
+    __HUB_CONST = 'H'
+    __HUB_FUNC  = 'E'
+    __COM_DIST  = 'comDist'
+    __LUM_DIST  = 'lumDist'
+    __ANG_DIST  = 'angDist'
+    __ARC_SIZE  = 'arcsec'
+    __LB_TIME   = 'lookTime'
+    __AGE       = 'age'
+    __DIST_MOD  = 'distMod'
+
+    __NUM       = 'num'
 
 
-    __REDSHIFT  = 0
-    __SCALEFACT = 1
-    __HUB_CONST = 2
-    __HUB_FUNC  = 3
-    __COM_DIST  = 4
-    __LUM_DIST  = 5
-    __ANG_DIST  = 6
-    __ARC_SIZE  = 7
-    __LB_TIME   = 8
-    __AGE       = 9
-    __DIST_MOD  = 10
-    
-    __NPARS     = 11
-
-
-    def __init__(self, fname=None): 
+    def __init__(self, fname=None):
 
         # Load Cosmological Parameters from Data File
         if( fname == None ): fname = TIMES_FILE
-        if( not os.path.exists(fname) ): fname = BACK_TIMES_FILE
-
-        self.__loadCosmology(fname)
-
-        # Initialize interpolation functions to None
-        self.__redshift = None
-        self.__hubbleConstant = None
-        self.__hubbleFunction = None
-        self.__lumDist  = None
-        self.__comDist  = None
-        self.__angDist  = None
-        self.__arcSize  = None
-        self.__lbTime   = None
-        self.__age      = None
-        self.__distMod  = None
+        self.cosmo = np.load(fname)
+        self.filename = fname
+        self.__num = len(self.cosmo[self.__NUM])
 
         return
 
     
     def __getitem__(self, it):
-        """ Get all cosmological parameters for snapshit `it` """
-        return self.cosmo[it,:]
+        ''' Get scalefactor for a given snapshot number '''
+        return self.cosmo[self.__SCALEFACT][it]
 
-    def __len__(self): return self.__num
+
+    def __len__(self): 
+        ''' Return number of snapshots '''
+        return self.__num
     
 
     def __initInterp(self, key):
-        """ Initialize an interpolation function """
-        return sp.interpolate.interp1d( self.cosmo[:, Cosmology.__SCALEFACT], self.cosmo[:, key], kind=INTERP )
+        ''' Initialize an interpolation function '''
+        return sp.interpolate.interp1d(self.cosmo[self.__SCALEFACT], self.cosmo[key], kind=INTERP)
+
+
+    def __validSnap(self, snap):
+        """
+        Check if the given scalar is a valid snapshot number.
+
+        If argument ``snap`` is an integer, 
+        """
+
+        # Make sure we can get the numpy dtype
+        nsnap = np.array(snap)
+
+        # If this is not an integer, false
+        if( not np.issubdtype(nsnap.dtype, int) ):
+            return False
+        # If this is within number of snapshots, true
+        elif( nsnap >= 0 and nsnap <= self.__num ):
+            return True
+        # outside range, false
+        else:
+            return False
 
 
     def redshift(self, sf):
-        """ Calculate redshift analytically from given scalefactor """
+        ''' Calculate redshift analytically from the given scalefactor '''
         return (1.0/sf) - 1.0
 
+
+    def __parameter(self, sf, key):
+        ''' 
+        Retrieve a target parameter at a certain snapshot or scalefactor
+
+        Arguments
+        ---------
+        sf : int or float
+            If `int`, interpreted as a snapshot number
+            otherwise interpreted as a (`float`) scalefactor
+            
+        key : str
+            string key for ``self.cosmo`` dictionary of cosmological values
+
+
+        Returns
+        -------
+        float, the value of the target parameter
+
+
+        Raises
+        ------
+            ValueError: if ``sf`` is outside of the scalefactor range
+            KeyError: if ``key`` is not in the ``self.cosmo`` dictionary
+
+        '''
+
+        # If this is a snapshot number, return value from that snapshot
+        if( self.__validSnap(sf) ): 
+            return self.cosmo[key][sf]
+        # Otherwise, interpolate to given scale-factor
+        else:
+            # If interpolation function for this parameter hasn't been
+            #     initialized, initialize it now
+            if( not hasattr(self, key) ): 
+                setattr(self, key, self.__initInterp(key))
+
+            # Return interpolated value
+            return getattr(self, key)(sf)
+
+
     def hubbleConstant(self, sf):
-        """ Interpolate Hubble Constant to the given scalefactor """
-        if( self.__hubbleConstant == None ): self.__hubbleConstant = self.__initInterp(Cosmology.__HUB_CONST)
-        return self.__hubbleConstant(sf)
+        ''' Get Hubble Constant for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__HUB_CONST)
 
     def hubbleFunction(self, sf):
-        """ Interpolate Hubble Function [E(z)] to the given scalefactor """
-        if( self.__hubbleFunction == None ): self.__hubbleFunction = self.__initInterp(Cosmology.__HUB_FUNC)
-        return self.__hubbleFunction(sf)
+        ''' Get Hubble Function [E(z)] for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__HUB_FUNC)
 
     def lumDist(self, sf):
-        """ Interpolate luminosity distance to the given scalefactor """
-        if( self.__lumDist == None ): self.__lumDist = self.__initInterp(Cosmology.__LUM_DIST)
-        return self.__lumDist(sf)
+        ''' Get luminosity distance for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__LUM_DIST)
 
     def comDist(self, sf):
-        """ Interpolate comoving distance to the given scalefactor """
-        if( self.__comDist == None ): self.__comDist = self.__initInterp(Cosmology.__COM_DIST)
-        return self.__comDist(sf)
+        ''' Get comoving distance for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__COM_DIST)
 
     def angDist(self, sf):
-        """ Interpolate angular-diameter distance to the given scalefactor """
-        if( self.__angDist == None ): self.__angDist = self.__initInterp(Cosmology.__ANG_DIST)
-        return self.__angDist(sf)
+        ''' Get angular-diameter distance for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__ANG_DIST)
 
     def arcSize(self, sf):
-        """ Interpolate arcsecond size to the given scalefactor """
-        if( self.__arcSize == None ): self.__arcSize = self.__initInterp(Cosmology.__ARC_SIZE)
-        return self.__arcSize(sf)
+        ''' Get arcsecond size for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__ARC_SIZE)
 
     def lookbackTime(self, sf):
-        """ Interpolate lookback time to the given scalefactor """
-        if( self.__lbTime == None ): self.__lbTime = self.__initInterp(Cosmology.__LB_TIME)
-        return self.__lbTime(sf)
+        ''' Get lookback time for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__LB_TIME)
 
     def age(self, sf):
-        """ Interpolate age of the universe to the given scalefactor """
-        if( self.__age == None ): self.__age = self.__initInterp(Cosmology.__AGE)
-        return self.__age(sf)
+        ''' Get age of the universe for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__AGE)
 
     def distMod(self, sf):
-        """ Interpolate distance modulus to the given scalefactor """
-        if( self.__distMod == None ): self.__distMod = self.__initInterp(Cosmology.__DIST_MOD)
-        return self.__distMod(sf)
+        ''' Get distance modulus for given snapshot or scalefactor '''
+        return self.__parameter(sf, self.__DIST_MOD)
 
 
-    def __loadCosmology(self, fname=TIMES_FILE):
-        dat = np.load(fname)
-        self.filename = fname
-        self.__num = len(dat['num'])
 
-        self.cosmo = np.zeros([self.__num, Cosmology.__NPARS], dtype=np.float32)
-
-        self.cosmo[:, Cosmology.__REDSHIFT]  = dat['redshift']
-        self.cosmo[:, Cosmology.__SCALEFACT] = dat['scale']
-        self.cosmo[:, Cosmology.__HUB_CONST] = dat['H']
-        self.cosmo[:, Cosmology.__HUB_FUNC]  = dat['E']
-        self.cosmo[:, Cosmology.__COM_DIST]  = dat['comDist']
-        self.cosmo[:, Cosmology.__LUM_DIST]  = dat['lumDist']
-        self.cosmo[:, Cosmology.__ANG_DIST]  = dat['angDist']
-        self.cosmo[:, Cosmology.__ARC_SIZE]  = dat['arcsec']
-        self.cosmo[:, Cosmology.__LB_TIME]   = dat['lookTime']
-        self.cosmo[:, Cosmology.__AGE]       = dat['age']
-        self.cosmo[:, Cosmology.__DIST_MOD]  = dat['distMod']
-
-        return
-
-
-    @staticmethod
-    def cosmologicalCorrection(base):
-        """
-
+    def cosmologicalCorrection(self, sf):
+        '''
         Simulations only sample a small volume, must compensate and extrapolate to
         actual cosmological event rates.
         For a number per comoving-volume 'R(z)'; the detected rate per redshift is
@@ -211,26 +227,32 @@ class Cosmology(object):
 
         Returns
         -------
-
-        """
+        '''
+        
+        # Generalize argument to always be iterable
+        if( not np.iterable(sf) ): sf = np.array([sf])
 
         ### Get Cosmological Parameters ###
+        nums = len(sf)
+        comDist = np.zeros(nums, dtype=FLT_TYPE)
+        redz    = np.zeros(nums, dtype=FLT_TYPE)
+        hfunc   = np.zeros(nums, dtype=FLT_TYPE)
 
-        # Get Comoving Distances
-        # comDist = getComDist(cosmo, scales)
-        comDist = base.comDist
-        # Get redshifts
-        # redz = cosmo.redshift(scales)                                                                   # It's okay if redshift is zero here!
-        redz = base.redz
-        # Get Hubble Function
-        #hfunc = cosmo.hubbleFunction(scales)
-        hfunc = base.hfunc
+        # For each input scale factor
+        for ii,scale in enumerate(sf):
+            # Get Comoving Distances
+            comDist[ii] = self.comDist(scale)
+            # Get redshifts
+            redz[ii] = self.redshift(scale)
+            # Get Hubble Function
+            hfunc[ii] = self.hubbleFunction(scale)
+
 
         # Get difference in redshift (0th doesn't matter because there are never
         #     mergers there; but assume it is same size as 1st)
         dz = np.ones(len(redz), dtype=np.dtype(redz[0]))
-        dz[1:] = redz[:-1]-redz[1:]                                                                     # Remember redshifts are decreasing
-        dz[0] = dz[1]
+        dz[1:] = redz[:-1]-redz[1:]                                                                 # Remember redshifts are decreasing in value
+        dz[0] = dz[1]                                                                               
 
         # Calculate the spatial density of events/objects by dividing by simulation volume
         density = 1.0/np.power(BOX_LENGTH/HPAR, 3.0)
@@ -244,3 +266,4 @@ class Cosmology(object):
 
         return cosmoFactor
 
+    
