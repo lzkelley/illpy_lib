@@ -54,7 +54,8 @@ class Log(object):
 
         #usenum = self.num + add
         tbLen = len(tb.extract_stack()) - 1                                                         # Subtract one to discount this function
-        usenum = tbLen-self.num                                                                     # Get length of stack traceback
+        #usenum = tbLen-self.num                                                                     # Get length of stack traceback
+        usenum = tbLen-self.num+add                                                                 # Get length of stack traceback
         prep = " -"*usenum
         if( usenum > 0 ): prep += " "
 
@@ -72,19 +73,6 @@ class Log(object):
         if( num > 0 ): timeStr = "  " + timeStr + "  "
         timeStr = timeStr.center(2*num + len(timeStr), '=')
         self.__log.write(timeStr + "\n")
-
-
-
-    def __iadd__(self, other): 
-        """ Impliment '+=' to increment self.num """
-        #self.num = self.num + other
-        return self
-
-    def __isub__(self, other):
-        """ Implement '-=' to decrement self.num """
-        #self.num = self.num - other
-        return self
-
 
 
     def __del__(self):
