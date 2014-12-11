@@ -14,14 +14,22 @@ import numpy as np
 import scipy as sp
 from scipy import interpolate
 import sys
+import os
 
-from ..Constants import * #BOX_LENGTH, HPAR, H0, SPLC
+from ..Constants import BOX_LENGTH, HPAR, H0, SPLC, KPC
 
 
-#TIMES_FILE = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
-TIMES_FILE = "/n/home00/lkelley/illustris/library-code/Cosmology/data/illustris-snapshot-cosmology-data.npz"
+#TIMES_FILE_LOCAL = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
+#TIMES_FILE = "/n/home00/lkelley/illustris/illustris_library_code/Cosmology/data/illustris-snapshot-cosmology-data.npz"
+TIMES_FILE = "data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
+
+
 INTERP = "quadratic"                                                                                # Type of interpolation for scipy
 FLT_TYPE = np.float32
+
+IMPOSE_FLOOR = True                                                                                 # Enforce a minimum for certain parameters (e.g. comDist)
+MAXIMUM_SCALE_FACTOR = 0.9999                                                                       # Scalefactor for minimum of certain parameters (e.g. comDist)
+
 
 
 class Cosmology(object):
@@ -83,20 +91,22 @@ class Cosmology(object):
     __NUM       = 'num'
 
 
-    def __init__(self, fname=None):
+    def __init__(self):
+
+        # Construct path to data file
+        fname = os.path.join(os.path.dirname(__file__), TIMES_FILE)
 
         # Load Cosmological Parameters from Data File
-        if( fname == None ): fname = TIMES_FILE
-        self.cosmo = np.load(fname)
+        self.__cosmo = np.load(fname)
         self.filename = fname
-        self.__num = len(self.cosmo[self.__NUM])
+        self.__num = len(self.__cosmo[self.__NUM])
 
         return
 
     
     def __getitem__(self, it):
         ''' Get scalefactor for a given snapshot number '''
-        return self.cosmo[self.__SCALEFACT][it]
+        return self.__cosmo[self.__SCALEFACT][it]
 
 
     def __len__(self): 
@@ -106,7 +116,7 @@ class Cosmology(object):
 
     def __initInterp(self, key):
         ''' Initialize an interpolation function '''
-        return sp.interpolate.interp1d(self.cosmo[self.__SCALEFACT], self.cosmo[key], kind=INTERP)
+        return sp.interpolate.interp1d(self.__cosmo[self.__SCALEFACT], self.__cosmo[key], kind=INTERP)
 
 
     def __validSnap(self, snap):
@@ -146,7 +156,7 @@ class Cosmology(object):
             otherwise interpreted as a (`float`) scalefactor
             
         key : str
-            string key for ``self.cosmo`` dictionary of cosmological values
+            string key for ``self.__cosmo`` dictionary of cosmological values
 
 
         Returns
@@ -157,22 +167,24 @@ class Cosmology(object):
         Raises
         ------
             ValueError: if ``sf`` is outside of the scalefactor range
-            KeyError: if ``key`` is not in the ``self.cosmo`` dictionary
+            KeyError: if ``key`` is not in the ``self.__cosmo`` dictionary
 
         '''
 
         # If this is a snapshot number, return value from that snapshot
         if( self.__validSnap(sf) ): 
-            return self.cosmo[key][sf]
+            return self.__cosmo[key][sf]
         # Otherwise, interpolate to given scale-factor
         else:
             # If interpolation function for this parameter hasn't been
-            #     initialized, initialize it now
-            if( not hasattr(self, key) ): 
-                setattr(self, key, self.__initInterp(key))
+            #     initialized, initialize it now.
+            #     Use uppercase attributes
+            attrKey = "__" + key.upper()
+            if( not hasattr(self, attrKey) ): 
+                setattr(self, attrKey, self.__initInterp(key))
 
             # Return interpolated value
-            return getattr(self, key)(sf)
+            return getattr(self, attrKey)(sf)
 
 
     def hubbleConstant(self, sf):
