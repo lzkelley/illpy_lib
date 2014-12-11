@@ -448,7 +448,11 @@ def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=Fals
 
     yval = np.concatenate([ [hh,hh] for hh in hist ])
     xval = np.concatenate([ [edge[jj],edge[jj+1]] for jj in range(len(edge)-1) ])
-    ll, = ax.plot( xval, yval, ls, lw=lw, color=color, label=label)
+
+    if( ax == None ): 
+        ll = None
+    else:         
+        ll, = ax.plot( xval, yval, ls, lw=lw, color=color, label=label)
 
     return ll, hist
 
