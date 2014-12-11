@@ -22,18 +22,16 @@ import numpy as np
 from glob import glob
 from datetime import datetime
 
-
-### Custom Modules and Files ###
-# Import Global Settings
+### Import Local Parameters ###
 from Settings import *
-sys.path.append(*LIB_PATHS)
-
-from Constants import *
 import Basics
 
-# Import local project files and objects
-import AuxFuncs as aux
-import DetailsManager as DetMan
+### Import Library Parameters/Functions ###
+import ill_lib
+from ill_lib import AuxFuncs as aux
+from ill_lib.Constants import *
+from ill_lib import DetailsManager as DetMan
+
 
 
 ID_FILE = "/n/home00/lkelley/illustris/pta-mergers/ill-3_bh-merger_ids-scales.npz"
