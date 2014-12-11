@@ -31,14 +31,14 @@ from glob import glob
 from datetime import datetime
 
 
-### Custom Modules and Files ###
-# Import Global Settings
+### Import Local Parameters ###
 from Settings import *
-sys.path.append(*LIB_PATHS)
-from Constants import *
 
-# Import local project files and objects
-import AuxFuncs as aux
+
+### Import Library Classes/Functions ###
+import ill_lib
+from ill_lib import AuxFuncs as aux
+from ill_lib.Constants import *
 
 
 PP_BH_DETAILS_DIR = "/n/home00/lkelley/illustris/post-process/Illustris-%d/bh-details/"
