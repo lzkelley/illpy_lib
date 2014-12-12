@@ -22,7 +22,7 @@ from Constants import *
 
 
 
-def calculateStrain(masses, dist, freq, log=None):
+def calculateStrain(masses, dist, freq):
     """
     Calculate the Gravitational Wave strain from a binary.
 
@@ -41,14 +41,9 @@ def calculateStrain(masses, dist, freq, log=None):
     -------
 
     """
-
-    if( log ): log.log("calculateStrain()")
-
     const = 8.0*np.sqrt(2.0/15.0)*np.power(NWTG, 5.0/3.0)/np.power(SPLC, 4.0)
     mterm = np.product(masses, axis=1)/np.power(np.sum(masses,axis=1), 1.0/3.0)
-
     hc = np.power(2.0*np.pi*freq, 2.0/3.0)*const*mterm/dist
-
     return hc
 
 
