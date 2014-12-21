@@ -8,4 +8,5 @@ __email__ = "lkelley@cfa.harvard.edu"
 __status__ = "Development"
 
 
-#from Fig1_BinaryActivity import plotFig1_BinaryActivity
+import BHMergers
+
