@@ -45,7 +45,7 @@ from glob import glob
 from datetime import datetime
 
 import numpy as np
-import Funcs
+import ..AuxFuncs as aux
 
 
 __all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR', 
@@ -228,7 +228,7 @@ def __saveMergers(mergers, run=RUN, verbose=VERBOSE):
 
     np.savez(savefile, **subDict)
     if( verbose ): print " - - Saved Mergers dictionary to '%s'" % (savefile)
-    if( verbose ): print " - - - Size '%s'" % ( Funcs.getFileSize(savefile) )
+    if( verbose ): print " - - - Size '%s'" % ( aux.getFileSize(savefile) )
     return
 
 
