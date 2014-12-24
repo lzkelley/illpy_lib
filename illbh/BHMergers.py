@@ -45,8 +45,7 @@ from glob import glob
 from datetime import datetime
 
 import numpy as np
-import ..AuxFuncs as aux
-
+from .. import AuxFuncs as aux
 
 __all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR', 
             'MERGERS_RUN', 'MERGERS_CREATED', 'MERGERS_NUM', 
@@ -58,7 +57,7 @@ RUN = 3                                                                         
 VERBOSE = True                                                                                      # Print verbose output during execution
 
 ### Internal Parameters ###
-_VERSION = 0.1
+_VERSION = 0.1                                                                                      # This doesn't actually do anything currently
 
 # Where to find the 'raw' Illustris Merger files
 _MERGERS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/' }
@@ -80,7 +79,7 @@ MERGERS_CREATED  = 'created'
 MERGERS_NUM      = 'num'
 
 # Intermediate Dictionary key
-__DICT_KEY = 'dict'
+_DICT_KEY = 'dict'
 
 # Data Types
 _DOUBLE = np.float64
@@ -103,9 +102,9 @@ def main(run=RUN, verbose=VERBOSE):
     if( verbose ): print " - Run '%d'" % (run)
 
     if( verbose ): print " - Importing Mergers"
-    mergers = __importMergers(run, verbose)
+    mergers = _importMergers(run, verbose)
     if( verbose ): print " - Saving Mergers"
-    __saveMergers(mergers, run, verbose)
+    _saveMergers(mergers, run, verbose)
 
     return
 
@@ -133,43 +132,44 @@ def loadMergers(run=RUN, verbose=VERBOSE):
 
     
     if( verbose ): print " - Loading mergers from save file"
-    mergers = __loadMergersFromSave(run, verbose)
+    mergers = _loadMergersFromSave(run, verbose)
 
     if( mergers == None ): 
         if( verbose ): print " - Loading mergers directory from Illustris"
-        mergers = __importMergers(run, verbose)
+        mergers = _importMergers(run, verbose)
         if( verbose ): print " - Saving Mergers"
-        __saveMergers(mergers, run, verbose)
+        _saveMergers(mergers, run, verbose)
 
 
     return mergers
 
 
 
-def __loadMergersFromSave(run=RUN, verbose=VERBOSE):
+def _loadMergersFromSave(run=RUN, verbose=VERBOSE):
 
-    savefile = __getMergersSaveFilename(run)
+    savefile = _getMergersSaveFilename(run)
     # Return None if no save-file exists
     if( not os.path.exists(savefile) ): 
         if( verbose ): print " - - No savefile '%s' exists!" % (savefile)
         return None
 
     # Load mergers and basic properties
-    mergers = np.load(savefile)[__DICT_KEY]
-    nums    = mergers[MERGERS_NUM]
-    mergRun = mergers[MERGERS_RUN]
-    created = mergers[MERGERS_CREATED]
+
+    mergers = np.load(savefile)
 
     if( verbose ): 
+        nums    = mergers[MERGERS_NUM]
+        mergRun = mergers[MERGERS_RUN]
+        created = mergers[MERGERS_CREATED]
         print " - - Loaded %d Mergers from '%s'" % (nums, savefile)
         print " - - - Run %d, saved at '%s'" % (mergRun, created)
-        print " - - - File size = "
+        print " - - - File size '%s'" % ( aux.getFileSize(savefile) )
     
     return mergers
 
 
 
-def __importMergers(run=RUN, verbose=VERBOSE):
+def _importMergers(run=RUN, verbose=VERBOSE):
 
     ### Get Illustris Merger Filenames ###
     if( verbose ): print " - - Searching for merger Files"
@@ -181,7 +181,7 @@ def __importMergers(run=RUN, verbose=VERBOSE):
 
 
     ### Count Mergers and Prepare Storage for Data ###
-    numLines = __countLines(mergerFiles)
+    numLines = aux.countLines(mergerFiles)
     times = np.zeros(numLines, dtype=_DOUBLE)
     ids = np.zeros([numLines,2], dtype=_LONG)
     masses = np.zeros([numLines,2], dtype=_DOUBLE)
@@ -189,7 +189,7 @@ def __importMergers(run=RUN, verbose=VERBOSE):
 
     ### Load Raw Data from Merger Files ###
     if( verbose ): print " - - Loading Merger Data"
-    __loadMergersFromIllustris(times, ids, masses, mergerFiles, verbose=verbose)
+    _loadMergersFromIllustris(times, ids, masses, mergerFiles, verbose=verbose)
     if( verbose ): print " - - - Loaded %d entries" % (numLines)
 
 
@@ -219,14 +219,14 @@ def __importMergers(run=RUN, verbose=VERBOSE):
 
 
 
-def __saveMergers(mergers, run=RUN, verbose=VERBOSE):
+def _saveMergers(mergers, run=RUN, verbose=VERBOSE):
     """ Save the given mergers dictionary to the standard save path npz file """
 
-    savefile = __getMergersSaveFilename(run)
-    # np.savez(savefile, **mergers)
-    subDict = { __DICT_KEY : mergers }
+    savefile = _getMergersSaveFilename(run)
+    np.savez(savefile, **mergers)
+    if( not os.path.exists(savefile) ): 
+        raise RuntimeError("Could not save to file '%s'!!" % (savefile) )
 
-    np.savez(savefile, **subDict)
     if( verbose ): print " - - Saved Mergers dictionary to '%s'" % (savefile)
     if( verbose ): print " - - - Size '%s'" % ( aux.getFileSize(savefile) )
     return
@@ -234,7 +234,7 @@ def __saveMergers(mergers, run=RUN, verbose=VERBOSE):
 
 
 
-def __getMergersSaveFilename(run=RUN):
+def _getMergersSaveFilename(run=RUN):
     """
     Construct the NPZ filename to save/load mergers from. 
 
@@ -248,7 +248,6 @@ def __getMergersSaveFilename(run=RUN):
     -------
     savefile : str, name of the save file
     """
-    
 
     savefile = _POST_PROCESS_PATH
     if( savefile[-1] != '/' ): savefile += '/'
@@ -258,7 +257,7 @@ def __getMergersSaveFilename(run=RUN):
 
 
 
-def __loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
+def _loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
     """
     Fill the given arrays with merger data from the given target files.
 
@@ -284,7 +283,7 @@ def __loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
     for fil in files:
         for line in open(fil):
             # Get target elements from each line of file
-            time, id0, mass0, id1, mass1 = __parseMergerLine(line)
+            time, id0, mass0, id1, mass1 = _parseMergerLine(line)
             # Store values
             times[count] = time
             ids[count,0] = id0
@@ -308,7 +307,7 @@ def __loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
 
 
 
-def __parseMergerLine(line):
+def _parseMergerLine(line):
     """
     Get target quantities from each line of the merger files.
 
@@ -322,17 +321,6 @@ def __parseMergerLine(line):
     strs = line.split()
     return _DOUBLE(strs[1]), _LONG(strs[2]), _DOUBLE(strs[3]), _LONG(strs[2]), _DOUBLE(strs[3])
 
-
-def __countLines(files):
-    """ Count the number of lines in the given file """
-
-    nums = 0
-    # Iterate over each file
-    for fil in files:
-        # Count number of lines
-        nums += sum(1 for line in open(fil))
-
-    return nums
 
 
 
