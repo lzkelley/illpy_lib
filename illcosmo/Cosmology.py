@@ -97,7 +97,6 @@ class Cosmology(object):
 
         # Construct path to data file
         fname = os.path.join(_DATA_PATH, _TIMES_FILENAME)
-        print "fname = '%s'" % (fname)
 
         # Load Cosmological Parameters from Data File
         self.__cosmo = np.load(fname)
