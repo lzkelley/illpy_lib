@@ -17,6 +17,7 @@
 # LKelley@cfa.harvard.edu
 # ==================================================================================================
 
+from __future__ import division
 import numpy as np
 import warnings
 import os
@@ -764,6 +765,7 @@ def bytesString(bytes, precision=1):
     for factor, suffix in abbrevs:
         if bytes >= factor: break
 
+    # NOTE: for this to work right, must "from __future__ import division" else integer
     return '%.*f %s' % (precision, bytes / factor, suffix)
 
 
@@ -795,6 +797,24 @@ def getPrefixed(tval):
 
     return val, prefs[cnt]
 '''
+
+
+def countLines(files):
+    """ Count the number of lines in the given file """
+
+    if( not np.iterable(files) ): files = [files]
+
+    nums = 0
+    # Iterate over each file
+    for fil in files:
+        # Count number of lines
+        nums += sum(1 for line in open(fil))
+
+    return nums
+
+
+
+
 
 
 def checkFileDir(tpath):
