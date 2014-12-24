@@ -19,9 +19,8 @@ import os
 from ..Constants import BOX_LENGTH, HPAR, H0, SPLC, KPC
 
 
-#TIMES_FILE_LOCAL = "./data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
-#TIMES_FILE = "/n/home00/lkelley/illustris/illustris_library_code/Cosmology/data/illustris-snapshot-cosmology-data.npz"
-TIMES_FILE = "data/illustris-snapshot-cosmology-data.npz"                                         # Contains cosmological values for each snapshot
+#_DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))                                # Get local path, and data directory
+_TIMES_FILENAME = "/data/illustris-snapshot-cosmology-data.npz"                                     # Contains cosmological values for each snapshot
 
 
 INTERP = "quadratic"                                                                                # Type of interpolation for scipy
@@ -44,7 +43,7 @@ class Cosmology(object):
 
     Functions
     ---------
-    redshift(sf)     : redshift [] (analytically)      for given scale-factor 
+    redshift(sf)     : redshift [] (analytically)      for given scale-factor
     lumDist(sf)      : luminosity distance [cm]        for given scale-factor
     comDist(sf)      : comoving distance [cm]          for given scale-factor
     angDist(sf)      : angular diameter distance [cm]  for given scale-factor
@@ -52,12 +51,15 @@ class Cosmology(object):
     lookbackTime(sf) : lookback time [s]               for given scale-factor
     age(sf)          : age of the universe [s]         for given scale-factor
     distMod(sf)      : distance modulus []             for given scale-factor
-    hubbleConstant(sf) : hubble constant [km/s/Mpc] 
+    hubbleConstant(sf) : hubble constant [km/s/Mpc]
     hubbleFunction(sf) : hubble function []
+
+    snapshot(num)    : scale-factor of the given snapshot number
 
     Additionally, `Cosmology` supports the `len()` function, which returns the
     number of snapshots.  The scale-factor for an individual snapshot can be
-    retrieved using the standard array accessor `[i]`
+    retrieved using the standard array accessor `[i]`.  This is equivalent to
+    the `snapshot()` method.
 
 
     Examples
@@ -73,7 +75,7 @@ class Cosmology(object):
 
     >> # Find the luminosity distance at a scale factor of a=0.5
     >> lumDist = cosmo.lumDist(0.5)
-    
+
     '''
 
     __REDSHIFT  = 'redshift'
@@ -94,7 +96,7 @@ class Cosmology(object):
     def __init__(self):
 
         # Construct path to data file
-        fname = os.path.join(os.path.dirname(__file__), TIMES_FILE)
+        fname = os.path.join(os.path.dirname(__file__), _TIMES_FILENAME)
 
         # Load Cosmological Parameters from Data File
         self.__cosmo = np.load(fname)
@@ -103,16 +105,21 @@ class Cosmology(object):
 
         return
 
-    
+
     def __getitem__(self, it):
+        ''' Get scalefactor for a given snapshot number '''
+        return self.snapshot(it)
+
+
+    def snapshot(self, num):
         ''' Get scalefactor for a given snapshot number '''
         return self.__cosmo[self.__SCALEFACT][it]
 
 
-    def __len__(self): 
+    def __len__(self):
         ''' Return number of snapshots '''
         return self.__num
-    
+
 
     def __initInterp(self, key):
         ''' Initialize an interpolation function '''
@@ -123,7 +130,7 @@ class Cosmology(object):
         """
         Check if the given scalar is a valid snapshot number.
 
-        If argument ``snap`` is an integer, 
+        If argument ``snap`` is an integer,
         """
 
         # Make sure we can get the numpy dtype
@@ -146,7 +153,7 @@ class Cosmology(object):
 
 
     def __parameter(self, sf, key):
-        ''' 
+        '''
         Retrieve a target parameter at a certain snapshot or scalefactor
 
         Arguments
@@ -154,7 +161,7 @@ class Cosmology(object):
         sf : int or float
             If `int`, interpreted as a snapshot number
             otherwise interpreted as a (`float`) scalefactor
-            
+
         key : str
             string key for ``self.__cosmo`` dictionary of cosmological values
 
@@ -172,7 +179,7 @@ class Cosmology(object):
         '''
 
         # If this is a snapshot number, return value from that snapshot
-        if( self.__validSnap(sf) ): 
+        if( self.__validSnap(sf) ):
             return self.__cosmo[key][sf]
         # Otherwise, interpolate to given scale-factor
         else:
@@ -180,7 +187,7 @@ class Cosmology(object):
             #     initialized, initialize it now.
             #     Use uppercase attributes
             attrKey = "__" + key.upper()
-            if( not hasattr(self, attrKey) ): 
+            if( not hasattr(self, attrKey) ):
                 setattr(self, attrKey, self.__initInterp(key))
 
             # Return interpolated value
@@ -241,7 +248,7 @@ class Cosmology(object):
         Returns
         -------
         '''
-        
+
         # Generalize argument to always be iterable
         if( not np.iterable(sf) ): sf = np.array([sf])
 
@@ -265,7 +272,7 @@ class Cosmology(object):
         #     mergers there; but assume it is same size as 1st)
         dz = np.ones(len(redz), dtype=np.dtype(redz[0]))
         dz[1:] = redz[:-1]-redz[1:]                                                                 # Remember redshifts are decreasing in value
-        dz[0] = dz[1]                                                                               
+        dz[0] = dz[1]
 
         # Calculate the spatial density of events/objects by dividing by simulation volume
         density = 1.0/np.power(BOX_LENGTH/HPAR, 3.0)
@@ -279,4 +286,4 @@ class Cosmology(object):
 
         return cosmoFactor
 
-    
+
