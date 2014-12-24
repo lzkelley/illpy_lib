@@ -19,8 +19,8 @@ import os
 from ..Constants import BOX_LENGTH, HPAR, H0, SPLC, KPC
 
 
-#_DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))                                # Get local path, and data directory
-_TIMES_FILENAME = "/data/illustris-snapshot-cosmology-data.npz"                                     # Contains cosmological values for each snapshot
+_DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))                                # Get local path, and data directory
+_TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"                                     # Contains cosmological values for each snapshot
 
 
 INTERP = "quadratic"                                                                                # Type of interpolation for scipy
@@ -96,7 +96,8 @@ class Cosmology(object):
     def __init__(self):
 
         # Construct path to data file
-        fname = os.path.join(os.path.dirname(__file__), _TIMES_FILENAME)
+        fname = os.path.join(_DATA_PATH, _TIMES_FILENAME)
+        print "fname = '%s'" % (fname)
 
         # Load Cosmological Parameters from Data File
         self.__cosmo = np.load(fname)
@@ -113,7 +114,7 @@ class Cosmology(object):
 
     def snapshot(self, num):
         ''' Get scalefactor for a given snapshot number '''
-        return self.__cosmo[self.__SCALEFACT][it]
+        return self.__cosmo[self.__SCALEFACT][num]
 
 
     def __len__(self):
