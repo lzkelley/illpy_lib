@@ -101,24 +101,25 @@ class Cosmology(object):
         # Load Cosmological Parameters from Data File
         self.__cosmo = np.load(fname)
         self.filename = fname
-        self.__num = len(self.__cosmo[self.__NUM])
+        self.num = len(self.__cosmo[self.__NUM])
 
         return
 
 
     def __getitem__(self, it):
         ''' Get scalefactor for a given snapshot number '''
-        return self.snapshot(it)
+        return self.snapshotTimes(it)
 
 
-    def snapshot(self, num):
-        ''' Get scalefactor for a given snapshot number '''
-        return self.__cosmo[self.__SCALEFACT][num]
+    def snapshotTimes(self, num=None):
+        ''' Get scalefactor for all snapshots, or given snapshot number '''
+        if( num == None ): return self.__cosmo[self.__SCALEFACT]
+        else:              return self.__cosmo[self.__SCALEFACT][num]
 
 
     def __len__(self):
         ''' Return number of snapshots '''
-        return self.__num
+        return self.num
 
 
     def __initInterp(self, key):
@@ -140,7 +141,7 @@ class Cosmology(object):
         if( not np.issubdtype(nsnap.dtype, int) ):
             return False
         # If this is within number of snapshots, true
-        elif( nsnap >= 0 and nsnap <= self.__num ):
+        elif( nsnap >= 0 and nsnap <= self.num ):
             return True
         # outside range, false
         else:
