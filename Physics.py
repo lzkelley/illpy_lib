@@ -49,7 +49,7 @@ def calculateStrain(masses, dist, freq):
 
 
 
-def criticalSeparation(m1, m2):
+def criticalSeparation(m1, m2=None):
     """
     Find the critical BH separation when coalescence occurs.
 
@@ -71,8 +71,11 @@ def criticalSeparation(m1, m2):
 
     """
 
+    if( m2 == None ): useMass = np.sum(m1, axis=1)
+    else:             useMass = m1+m2
+
     const = 2.0*NWTG/np.power(SPLC,2.0)
-    lso = 3.0*const*(m1+m2)
+    lso = 3.0*const*(useMass)
 
     return lso
 
