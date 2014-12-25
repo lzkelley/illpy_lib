@@ -22,22 +22,22 @@ import numpy as np
 import warnings
 import os
 import sys
+import datetime
 import matplotlib                  as mpl
-import cPickle as pickle
-import matplotlib                  as mpl
+#import cPickle as pickle
 from matplotlib import pyplot      as plt
 
 from glob import glob
-from datetime import datetime
+import datetime
 
 from Constants import *
 #from ObjMergers import Mergers
 #from ObjDetails import Details
 
-import ObjLog
-from ObjLog import Log
+#import ObjLog
+#from ObjLog import Log
 
-import arepo
+#import arepo
 
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
@@ -47,22 +47,23 @@ AX_RIGHT  = 0.08
 AX_BOTTOM = 0.12
 AX_TOP    = 0.13
 
+
+'''
 SNAPSHOT_TIMES_FILENAME = lambda x: "../sync-dir/ill-%d_times.npz" % (x)
 
 ###  =====================================  ###
 ###  ==========  DETAILS FILES  ==========  ###
 ###  =====================================  ###
 
-
 def getFilenames_Illustris_BHDetails(runNum):
-    '''Get a list of 'blackhole_details' files for a target Illustris simulation'''
+    """Get a list of 'blackhole_details' files for a target Illustris simulation"""
 
     detFiles = ILL_RUN_DIRS(runNum) + ILL_BH_DETAILS_FILENAMES
     files    = sorted(glob(detailsNames))
     return files
 
 
-
+'''
 
 
 
@@ -71,7 +72,7 @@ def getFilenames_Illustris_BHDetails(runNum):
 ###  ======================================  ###
 
 
-
+'''
 def getSnapshotFilename(snapNum, runNum, log=None):
     """
     Given a run number and snapshot number, construct the approprirate snapshot filename.
@@ -147,6 +148,11 @@ def loadSnapshotTimes(run, log=None):
         np.savez(saveFile, times=times)
 
     return times
+
+
+
+'''
+
 
 '''
 
@@ -730,6 +736,42 @@ def stringArray(arr, format='%.2f'):
     out = "[ " + " ".join(out) + " ]"
     return out
 
+def statusString(count, total, durat=None):
+    """ 
+    Return a description of the status and completion of an iteration. 
+
+    If ``durat`` is provided it is used as the duration of time that the
+    iterations have been going.  This time is used to estimate the time
+    to completion.  ``durat`` can either be a `datetime.timedelta` object
+    of if it is a scalar (int or float) then it will be converted to
+    a `datetime.timedelta` object for string formatting purposes.
+    
+    Parameters
+    ----------
+    count : int, number of iterations completed (e.g. [0...9])
+    total : int, total number of iterations (e.g. 10)
+    durat : datetime.timedelta OR scalar, (optional, default=None)
+    """
+
+    # Calculate Percentage completed
+    frac = 1.0*count/(total-1)
+    stat = '%.2f%%' % (100*frac)
+    
+    if( durat != None ):
+        # Make sure `durat` is a datetime.timedelta object
+        if( type(durat) is not datetime.timedelta ): durat = datetime.timedelta(seconds=durat)
+
+        # Calculate time left
+        timeLeft = 1.0*durat.total_seconds()/frac
+        timeLeft = datetime.timedelta(seconds=timeLeft)
+
+        # Append to status string
+        stat += ' after %s, completion in ~ %s' % (str(durat), str(timeLeft))
+
+
+    return stat
+
+
 
 
 def getFileSize(fname, precision=1):
@@ -814,6 +856,44 @@ def countLines(files):
 
 
 
+def estimateLines(files):
+    """ Count the number of lines in the given file """
+
+    if( not np.iterable(files) ): files = [files]
+
+    lineSize = 0.0
+    count = 0
+    AVE_OVER = 20                                                                                   
+    with open(files[0], 'rb') as file:
+        # Average size of `AVE_OVER` lines
+        for line in file:
+            # Count number of bytes in line
+            thisLine = len(line) // line.count(b'\n')
+            lineSize += thisLine
+            count += 1
+            if( count >= AVE_OVER ): break
+
+    # Convert to average line size
+    lineSize /= count
+    # Get total size of all files
+    totalSize = sum( os.path.getsize(fil) for fil in files )
+    # Estimate total number of lines
+    numLines = totalSize // lineSize
+
+    return numLines
+
+
+def filesExist(files):
+
+    # Assume all files exist
+    allExist = True
+    # Iterate over each, if any dont exist, break
+    for fil in files:
+        if( not os.path.exists(fil) ):
+            allExist = False
+            break
+
+    return allExist
 
 
 
@@ -837,6 +917,7 @@ def checkDir(tdir):
     Create the given directory if it doesn't already exist.
 
     Return the same directory assuring it terminates with a '/'
+
     """
     ndir = str(tdir)
     if( len(ndir) > 0 ):
