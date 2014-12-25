@@ -7,7 +7,7 @@ __version__ = "0.1"
 __email__ = "lkelley@cfa.harvard.edu"
 __status__ = "Development"
 
-from Cosmology import Cosmology
+import illcosmo
 import Constants
 import Physics
 import AuxFuncs
