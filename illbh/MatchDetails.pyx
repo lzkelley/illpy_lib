@@ -10,20 +10,28 @@
 # =================================================================================================
 
 
-
-
 import numpy as np
 cimport numpy as np
-
-
-
-
 
 
 def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long, ndim=1] inid, 
                                np.ndarray[long, ndim=1] outid, np.ndarray[long, ndim=1] detid ):
     """
     Match merger BHs to details entries for a particular snapshot.
+
+    'Details' are entries written by Illustris for each active BH at each
+    timestep, which includes info like mass and mdot, etc.
+    'Mergers' are pairs ('in' and 'out') of BHs which merge into a single 'out'
+    BH.  This function finds the index (line number) of the first 'details'
+    entry to match the merger-remnant (the surviving BH: 'out').
+
+    The array ``detid`` gives the BH ID for each details entry in this snapshot
+    (i.e. between the start and end times corresponding to this snapshot).
+    The arrays ``inid`` and ``outid`` give the BH ID numbers for each BH in
+    each merger event (all mergers, not just during this snapshot).
+    The ``active`` array gives the Mergers which are 'active' in this snapshot,
+    i.e. mergers which have occured before the time of this snapshot.
+    
 
     This function takes as input the indices of active BH mergers as
     ``active``.  The in and out BH indices for *all* mergers are given in
