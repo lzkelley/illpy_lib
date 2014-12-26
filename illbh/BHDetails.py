@@ -38,6 +38,7 @@ RUN = 3                                                                         
 VERBOSE = True                                                                                      # Print verbose output during execution
 
 REDO_TEMP = False                                                                                   # Re-create temporary files
+CLEAN_TEMP = False                                                                                  # Delete temporary files after NPZ are created
 
 # Where to find the 'raw' Illustris Merger files
 _DETAILS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/' }
@@ -105,7 +106,13 @@ def main(run=RUN, verbose=VERBOSE):
         _reorganizeBHDetails(detailsFiles, snapTimes, run, verbose=verbose)
 
     else:
-        if( verbose ): print " - All temporary files already exist."
+        if( verbose ): 
+            print " - All temporary files already exist."
+            note = ("   NOTE: if you would like to RE-create the temprary files, using the raw\n"
+                    "         Illustris `blackhole_details_#` files, then rerun BHDetails.py\n"
+                    "         with the ``REDO_TEMP`` flag set to ``True``.")
+            print note
+
 
     # Confirm all temp files exist
     tempExist = aux.filesExist(tempFiles)
@@ -197,10 +204,10 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
     start = datetime.datetime.now()
     filesSize = 0.0
     numFiles = len(saves)
-    for ii in enumerate(zip(temps,saves)):
+    for snap in xrange(numSnaps):
 
-        tmp = details_temp_filename(run, ii)
-        sav = details_save_filename(run, ii)
+        tmp = details_temp_filename(run, snap)
+        sav = details_save_filename(run, snap)
 
         # Load details from ASCII File
         ids, times, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
@@ -228,11 +235,11 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
             now = datetime.datetime.now()
             dur = now-start
 
-            statStr = aux.statusString(ii+1, numFiles, dur)
+            statStr = aux.statusString(snap+1, numFiles, dur)
             sys.stdout.write('\r - - - %s' % (statStr))
             sys.stdout.flush()
 
-    # } ii
+    # } snap
 
     if( verbose ): 
         aveFileSize = filesSize / numFiles
@@ -241,6 +248,14 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
         print " - - - Saved Details NPZ files.  Total size = %s, Ave Size = %s" % (totSize, aveSize)
         print " - - - - First: '%s'" % (saves[0])
         print " - - - - Last : '%s'" % (saves[-1])
+
+    if( CLEAN_TEMP ):
+        if( verbose ): print " - - - Removing temporary files"
+        for snap in range(numSnaps):
+            os.remove( details_temp_filename(run, snap) )
+    else:
+        if( verbose ): print " - - - Temporary files are NOT being removed."
+
 
     return
 
