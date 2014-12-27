@@ -43,13 +43,16 @@ Raises
 import os, sys
 from glob import glob
 from datetime import datetime
-
 import numpy as np
+
+import BHDetails
+from .. import illcosmo
 from .. import AuxFuncs as aux
 
-__all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR', 
-            'MERGERS_RUN', 'MERGERS_CREATED', 'MERGERS_NUM', 
+__all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR',
+            'MERGERS_RUN', 'MERGERS_CREATED', 'MERGERS_NUM',
             'loadMergers', 'main', 'RUN', 'VERBOSE' ]
+
 
 
 ### Default Runtime Parameters ###
@@ -64,22 +67,37 @@ _MERGERS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhol
 _MERGERS_FILE_NAMES = "blackhole_mergers_*.txt"
 
 # Where to save intermediate files
-_POST_PROCESS_PATH = "%s/post-process/" % os.path.dirname(os.path.abspath(__file__))
-_MERGERS_SAVE_FILENAME = "ill-%d_mergers_v%.1f.npz"
+_SAVE_PATH = "%s/post-process/" % os.path.dirname(os.path.abspath(__file__))
+_MERGERS_RAW_SAVE_FILENAME = "ill-%d_raw-mergers_v%.1f.npz"
+_MERGERS_FIXED_SAVE_FILENAME = "ill-%d_fixed-mergers_v%.1f.npz"
 
-_PRINT_INTERVAL = 200                                                                               # When loading raw files, status interval
+
+
+### Internal / Operational Parameters ###
+# Should not be changed during norma usage
+
+savedMergers_rawFilename = lambda x: _SAVE_PATH + (_MERGERS_RAW_SAVE_FILENAME % (x, _VERSION))
+savedMergers_fixedFilename = lambda x: _SAVE_PATH + (_MERGERS_FIXED_SAVE_FILENAME % (x, _VERSION))
+
+_PRINT_INTERVAL_1 = 200                                                                             # When loading raw files, status interval
+_PRINT_INTERVAL_2 = 20                                                                              # When fixing mergers, status interval
 
 # Key Names for Mergers Dictionary
-MERGERS_TIMES    = 'times'
-MERGERS_IDS      = 'ids'
-MERGERS_MASSES   = 'masses'
-MERGERS_DIR      = 'dir'
-MERGERS_RUN      = 'run'
-MERGERS_CREATED  = 'created'
-MERGERS_NUM      = 'num'
+MERGERS_TIMES     = 'times'
+MERGERS_IDS       = 'ids'
+MERGERS_MASSES    = 'masses'
+MERGERS_DIR       = 'dir'
+MERGERS_RUN       = 'run'
+MERGERS_CREATED   = 'created'
+MERGERS_NUM       = 'num'
+MERGERS_MAP_STOM  = 's2m'
+MERGERS_MAP_MTOS  = 'm2s'
+MERGERS_MAP_ONTOP = 'ontop'
 
-# Intermediate Dictionary key
-_DICT_KEY = 'dict'
+# Index of [N,2] arrays corresponding to each BH
+IN_BH  = 0
+OUT_BH = 1
+
 
 # Data Types
 _DOUBLE = np.float64
@@ -90,7 +108,7 @@ _LONG = np.int64
 def main(run=RUN, verbose=VERBOSE):
     """
     Load mergers from raw illustris files, save to intermediate npz files.
-    
+
     Arguments
     ---------
     run : int, Illustris simulation number {1,3}; default: `RUN`
@@ -101,12 +119,50 @@ def main(run=RUN, verbose=VERBOSE):
     if( verbose ): print "\nBHMergers.py\n"
     if( verbose ): print " - Run '%d'" % (run)
 
-    if( verbose ): print " - Importing Mergers"
-    mergers = _importMergers(run, verbose)
-    if( verbose ): print " - Saving Mergers"
-    _saveMergers(mergers, run, verbose)
+    mergers = processMergers(run, verbose)
 
     return
+
+
+
+def processMergers(run=RUN, verbose=VERBOSE, loadRaw=False):
+
+    ### Load Mergers from Illustris Files ###
+    if( verbose ): print " - Importing Mergers"
+    savefile = savedMergers_rawFilename(run)
+    # Load mergers directly from Illustris Files
+    if( not loadRaw or not os.path.exists(savefile) ):
+        if( verbose ): print " - - Directly from Illustris files..."
+        mergers = _importMergers(run, verbose)
+
+    # Load from 'raw' save file
+    else:
+        if( verbose ): print " - - From previous 'raw' save"
+        merg = np.load(savefile)
+        mergers = { key: merg[key] for key in merg.keys() }
+
+
+    ### Create Mapping Between Mergers and Snapshots ###
+    mapM2S, mapS2M, ontop = _mapToSnapshots(mergers)
+    # Store mappings
+    mergers[MERGERS_MAP_MTOS]  = mapM2S
+    mergers[MERGERS_MAP_STOM]  = mapS2M
+    mergers[MERGERS_MAP_ONTOP] = ontop
+
+    ### Save 'Raw' Mergers ###
+    if( verbose ): print " - Saving Raw Mergers"
+    _saveRawMergers(mergers, run, verbose)
+
+    ### Fix 'out' BH Mass in Mergers ###
+    if( verbose ): print " - Fixing Mergers (using 'details')"
+    _fixMergers(mergers, run, verbose)
+
+    ### Save Fixed Mergers ###
+    if( verbose ): print " - Saving Fixed Mergers"
+    _saveFixedMergers(mergers, run, verbose)
+
+    return mergers
+
 
 
 
@@ -130,16 +186,12 @@ def loadMergers(run=RUN, verbose=VERBOSE):
 
     """
 
-    
+
     if( verbose ): print " - Loading mergers from save file"
     mergers = _loadMergersFromSave(run, verbose)
 
-    if( mergers == None ): 
-        if( verbose ): print " - Loading mergers directory from Illustris"
-        mergers = _importMergers(run, verbose)
-        if( verbose ): print " - Saving Mergers"
-        _saveMergers(mergers, run, verbose)
-
+    # If mergers don't already exist, create them from raw illustris files
+    if( mergers == None ): mergers = processMergers(run, verbose)
 
     return mergers
 
@@ -147,9 +199,10 @@ def loadMergers(run=RUN, verbose=VERBOSE):
 
 def _loadMergersFromSave(run=RUN, verbose=VERBOSE):
 
-    savefile = _getMergersSaveFilename(run)
+    savefile = savedMergers_fixedFilename(run)
+
     # Return None if no save-file exists
-    if( not os.path.exists(savefile) ): 
+    if( not os.path.exists(savefile) ):
         if( verbose ): print " - - No savefile '%s' exists!" % (savefile)
         return None
 
@@ -157,14 +210,14 @@ def _loadMergersFromSave(run=RUN, verbose=VERBOSE):
 
     mergers = np.load(savefile)
 
-    if( verbose ): 
+    if( verbose ):
         nums    = mergers[MERGERS_NUM]
         mergRun = mergers[MERGERS_RUN]
         created = mergers[MERGERS_CREATED]
         print " - - Loaded %d Mergers from '%s'" % (nums, savefile)
         print " - - - Run %d, saved at '%s'" % (mergRun, created)
         print " - - - File size '%s'" % ( aux.getFileSize(savefile) )
-    
+
     return mergers
 
 
@@ -219,12 +272,109 @@ def _importMergers(run=RUN, verbose=VERBOSE):
 
 
 
-def _saveMergers(mergers, run=RUN, verbose=VERBOSE):
-    """ Save the given mergers dictionary to the standard save path npz file """
+def _fixMergers(mergers, run, verbose=VERBOSE):
+    """
+    Fix the accretor/'out' BH Mass using the blackhole details files.
 
-    savefile = _getMergersSaveFilename(run)
+    Merger files have an error in their output: the accretor BH (the 'out' BH
+    which survives the merger process) mass is the 'dynamical' mass instead of
+    the BH mass itself, see:
+    http://www.illustris-project.org/w/index.php/Blackhole_Files
+
+    This method finds the last entry in the Details files for the 'out' BH
+    before the merger event, to 'fix' the recorded mass (i.e. to get the value
+    from a different source).
+    """
+
+
+    if( verbose ): print " - - _fixMergers()"
+
+    # Import MatchDetails cython file
+    import pyximport
+    pyximport.install(setup_args={"include_dirs":np.get_include()})
+    import MatchDetails
+
+    outIDs = mergers[MERGERS_IDS][:,OUT_BH]
+    outMasses = mergers[MERGERS_MASSES][:,OUT_BH]
+    numMergers = mergers[MERGERS_NUM]
+
+    # Iterate over each snapshot, with list of mergers in each `s2m`
+    count = 0
+    missing = 0
+    fracDiff = 0.0
+    start = datetime.now()
+    for snap,s2m in enumerate(mergers[MERGERS_MAP_STOM]):
+
+        # If there are no mergers in this snapshot, continue to next iteration
+        if( len(s2m) <= 0 ): continue
+
+        # Get the details for this snapshot
+        dets = BHDetails.loadBHDetails_NPZ(run, snap)
+        detIDs = dets[BHDetails.DETAIL_IDS]
+        detTimes = dets[BHDetails.DETAIL_TIMES]
+
+        # Get the BH IDs for this snapshot
+        bhids = outIDs[s2m]
+        bhmasses = outMasses[s2m]
+
+        # Find Details indices to match these BHs
+        detInds = MatchDetails.getDetailIndicesForBlackholes(bhids, detIDs, detTimes)
+        missing += np.count_nonzero( detInds == -1 )
+
+        # Find valid matches
+        inds = np.where( detInds >= 0 )[0]
+        if( len(inds) > 0 ):
+            fixMasses = dets[BHDetails.DETAIL_MASSES][detInds[inds]]
+            fracDiff += np.sum( np.fabs(bhmasses[inds] - fixMasses)/bhmasses[inds] )
+            mergers[MERGERS_MASSES][inds,OUT_BH] = fixMasses
+
+        # Print progress
+        count += len(bhids)
+        if( verbose ):
+            now = datetime.now()        
+            statStr = aux.statusString(count, numMergers, now-start)
+            sys.stdout.write('\r - - - %s' % (statStr))
+            sys.stdout.flush()
+
+            if( count == numMergers ):
+                sys.stdout.write('\n')
+
+    # } snap
+
+    if( verbose ): 
+        print " - - - %d Fixed, %d missing." % (count-missing, missing)
+        fracDiff /= (count-missing)
+        print " - - - Average fractional mass difference = %.3e" % (fracDiff)
+
+    return
+
+
+
+
+def _saveRawMergers(mergers, run, verbose=VERBOSE):
+    savefile = savedMergers_rawFilename(run)
+    _saveMergers(mergers, savefile, verbose)
+    return
+
+def _saveFixedMergers(mergers, run, verbose=VERBOSE):
+    savefile = savedMergers_fixedFilename(run)
+    _saveMergers(mergers, savefile, verbose)
+    return
+
+def _saveMergers(mergers, savefile, verbose=VERBOSE):
+    """
+    Save the given mergers dictionary to the given file.
+
+    If the path to the given filename doesn't already exist, it is created.
+    If ``verbose`` is True, the saved file size is printed out.
+    """
+
+    # Make sure path to file exists
+    aux.checkPath(savefile)
+
+    # Save and confirm
     np.savez(savefile, **mergers)
-    if( not os.path.exists(savefile) ): 
+    if( not os.path.exists(savefile) ):
         raise RuntimeError("Could not save to file '%s'!!" % (savefile) )
 
     if( verbose ): print " - - Saved Mergers dictionary to '%s'" % (savefile)
@@ -232,34 +382,15 @@ def _saveMergers(mergers, run=RUN, verbose=VERBOSE):
     return
 
 
-
-
-def _getMergersSaveFilename(run=RUN):
-    """
-    Construct the NPZ filename to save/load mergers from. 
-
-    If the directory doesn't exist, it is created.
-
-    Arguments
-    ---------
-    run : int, illustris run number {1,3}
-
-    Returns
-    -------
-    savefile : str, name of the save file
-    """
-
-    savefile = _POST_PROCESS_PATH
-    if( savefile[-1] != '/' ): savefile += '/'
-    if( not os.path.isdir(savefile) ): os.makedirs(savefile)
-    savefile += _MERGERS_SAVE_FILENAME % (run, _VERSION)
-    return savefile
-
-
-
 def _loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
     """
     Fill the given arrays with merger data from the given target files.
+
+    Arrays ``ids`` and ``masses`` are shaped [N, 2], for ``N`` total mergers.
+    By convention the
+        'in'  (accreted) BH is index ``IN_BH`` (0?)
+        'out' (accretor) BH is index ``OUT_BH`` (1?)
+
 
     Arguments
     ---------
@@ -283,19 +414,19 @@ def _loadMergersFromIllustris(times, ids, masses, files, verbose=VERBOSE):
     for fil in files:
         for line in open(fil):
             # Get target elements from each line of file
-            time, id0, mass0, id1, mass1 = _parseMergerLine(line)
+            time, out_id, out_mass, in_id, in_mass = _parseMergerLine(line)
             # Store values
             times[count] = time
-            ids[count,0] = id0
-            ids[count,1] = id1
-            masses[count,0] = mass0
-            masses[count,1] = mass1
+            ids[count,IN_BH] = in_id
+            ids[count,OUT_BH] = out_id
+            masses[count,IN_BH] = in_mass
+            masses[count,OUT_BH] = out_mass
             # Increment Counter
             count += 1
 
             # Print Progress
             if( verbose ):
-                if( count % _PRINT_INTERVAL == 0 or count == nums):
+                if( count % _PRINT_INTERVAL_1 == 0 or count == nums):
                     sys.stdout.write('\r - - %.2f%% Complete' % (100.0*count/nums))
 
                 if( count == nums ):
@@ -316,15 +447,89 @@ def _parseMergerLine(line):
 
     The format of each line is:
         "PROC-NUM  TIME  ID1  MASS1  ID2  MASS2"
+        see: http://www.illustris-project.org/w/index.php/Blackhole_Files
+        where
+            '1' corresponds to the 'out'/'accretor'/surviving BH
+            '2' corresponds to the 'in' /'accreted'/eliminated BH
+        NOTE: that MASS1 is INCORRECT (dynamical mass, instead of BH)
+
     """
 
     strs = line.split()
-    return _DOUBLE(strs[1]), _LONG(strs[2]), _DOUBLE(strs[3]), _LONG(strs[2]), _DOUBLE(strs[3])
+    return _DOUBLE(strs[1]), _LONG(strs[2]), _DOUBLE(strs[3]), _LONG(strs[4]), _DOUBLE(strs[5])
 
+
+
+
+def _mapToSnapshots(mergers, verbose=VERBOSE):
+    """
+    Find the snapshot during which, or preceding each merger.
+
+    mergers   : IN <ObjMergers.Mergers> all 'N' mergers
+    snTimes   : IN < [float] > times of each snapshot
+    (verbose) : IN <int> verbose output flag, >= 0 for true
+
+    return
+
+    mapS2M    : < [[int]] > length M, list of mergers for each snapshot
+    ontop     : < [bool] > length N, true if merger happened ontop of snapshot
+    """
+
+    if( verbose ): print " - - _mapToSnapshots()"
+
+
+    ### Initialize Variables ###
+    if( verbose ): print " - - - Initializing parameters and Cosmology"
+    nums = mergers[MERGERS_NUM]                                                                     # Total number of mergers
+
+    # Load Cosmology
+    cosmo = illcosmo.Cosmology()
+    snapTimes = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot  
+
+    # Map Mergers-2-Snapshots: snapshot before (or ontop) of each merger
+    mapM2S = np.zeros(nums, dtype=_LONG)
+    # Map Snapshots-2-Mergers: list of mergers just-after (or ontop) of each snapshot
+    mapS2M = [ [] for ii in range(cosmo.num) ]
+    # Flags if merger happens exactly on a snapshot (init to False=0)
+    ontop  = np.zeros(nums, dtype=bool)
+
+
+    ### Find snapshots on each side of merger time ###
+
+    # Find the snapshot just below and above each merger.
+    #     each entry (returned) is [ low, high, dist-low, dist-high ]
+    #     low==high if the times match (within function's default uncertainty)
+    snapBins = [ aux.findBins(mtime, snapTimes) for mtime in mergers[MERGERS_TIMES] ]
+
+
+    ### Create Mappings ###
+
+    if( verbose ): print " - - - Creating mappings"
+    for ii, bins in enumerate(snapBins):
+        tsnap = bins[0]                                                                             # Set snapshot to lower bin
+        mapM2S[ii] = tsnap                                                                          # Set snapshot for this merger
+        mapS2M[tsnap].append(ii)                                                                    # Add merger to this snapshot
+        # If this merger takes place ontop of snapshot, set flag
+        if( bins[0] == bins[1] ): ontop[ii] = True
+
+
+    # Find the most mergers in a snapshot
+    numPerSnap = np.array([len(s2m) for s2m in mapS2M ])
+    mostMergers = np.max( numPerSnap )
+    mostIndex = np.where( mostMergers == numPerSnap )[0]
+    # Find the number of ontop mergers
+    numOntop = np.count_nonzero(ontop)
+    if( verbose ): print " - - - Most is %d mergers at snapshot %d" % (mostMergers, mostIndex)
+    if( verbose ): print " - - - %d (%.2f) ontop mergers" % (numOntop, 1.0*numOntop/nums)
+
+    return mapM2S, mapS2M, ontop
 
 
 
 
 
 if __name__ == "__main__": main()
+
+#if __name__ == "__main__" and __package__ is None:
+ #   __package__ = "ill_lib.illbh.BHMergers"
 
