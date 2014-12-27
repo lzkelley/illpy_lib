@@ -762,7 +762,7 @@ def statusString(count, total, durat=None):
         if( type(durat) is not datetime.timedelta ): durat = datetime.timedelta(seconds=durat)
 
         # Calculate time left
-        timeLeft = 1.0*durat.total_seconds()/frac
+        timeLeft = 1.0*durat.total_seconds()*(1.0/frac - 1.0)
         timeLeft = datetime.timedelta(seconds=timeLeft)
 
         # Append to status string
@@ -910,6 +910,13 @@ def checkFileDir(tpath):
 
     return
 
+
+def checkPath(tpath):
+    path,name = os.path.split(tpath)
+    if( len(path) > 0 ):
+        if( not os.path.isdir(path) ): os.makedirs(path)
+        
+    return
 
 
 def checkDir(tdir):
