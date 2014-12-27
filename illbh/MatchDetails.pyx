@@ -171,3 +171,57 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 
 
 
+
+
+
+
+
+def getDetailIndicesForBlackholes(np.ndarray[long, ndim=1] bhids, np.ndarray[long, ndim=1] detIDs,
+                                  np.ndarray[double, ndim=1] detTimes):
+    """
+    Match merger BHs to details entries for a particular snapshot.
+    """
+    
+    
+    # Get the lengths of all input arrays
+    cdef int nums = bhids.shape[0]                                                                    # Length of target IDs
+
+    # Sort details first by ID, then by time in reverse
+    cdef np.ndarray sort_det = np.lexsort( (-detTimes, detIDs) )
+
+    # Sort target BH IDs
+    cdef np.ndarray sort_bh = np.argsort(bhids)
+
+    cdef long ind, target, found
+    cdef int MAX_COUNT = 100
+
+    # Initialize arrays to store results; default to '-1'
+    cdef np.ndarray retinds = -1*np.ones(nums, dtype=long)
+
+    ### Iterate over Each Active Merger Binary System ###
+    jj = 0
+    for ii in xrange(nums):
+
+        # Get the sorted index
+        ind = sort_bh[ii]
+        # Get the sorted BH ID
+        bh = bhids[ind]
+
+        # Find Match
+        # ind = np.searchsorted( detid, target, 'left', sorter=sort_detid )
+        while( detIDs[sort_det[jj]] < bh ): jj += 1
+        # If this is a match, store result
+        if( detIDs[sort_det[jj]] == bh ): 
+            # Store entry at sorted index (corresponding to current BH)
+            retinds[ind] = sort_det[jj]
+
+    # } ii
+
+    return retinds
+
+
+
+
+
+
+
