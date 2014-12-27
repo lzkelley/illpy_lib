@@ -1,6 +1,6 @@
 # ==================================================================================================
-# DetailsManager.py
-# -----------------
+# BHDetails.py
+# ------------
 #
 #
 #
@@ -58,15 +58,19 @@ details_save_filename = lambda x,y: (_POST_PROCESS_PATH % (x)) + (_DETAILS_SAVE_
 
 
 ### Dictionary Keys for Details Parametesr ###
-_DETAIL_IDS     = 'id'
-_DETAIL_TIMES   = 'times'
-_DETAIL_MASSES  = 'masses'
-_DETAIL_MDOTS   = 'mdots'
-_DETAIL_RHOS    = 'rhos'
-_DETAIL_CS      = 'cs'
-_DETAIL_RUN     = 'run'
-_DETAIL_NUM     = 'num'
-_DETAIL_CREATED = 'created'
+DETAIL_IDS     = 'id'
+DETAIL_TIMES   = 'times'
+DETAIL_MASSES  = 'masses'
+DETAIL_MDOTS   = 'mdots'
+DETAIL_RHOS    = 'rhos'
+DETAIL_CS      = 'cs'
+DETAIL_RUN     = 'run'
+DETAIL_SNAP    = 'snap'
+DETAIL_NUM     = 'num'
+DETAIL_CREATED = 'created'
+
+
+
 
 
 
@@ -87,7 +91,6 @@ def main(run=RUN, verbose=VERBOSE):
     cosmo = illcosmo.Cosmology()
     snapTimes = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot
 
-
     ### Organize Details by Snapshot Time; create new, temporary ASCII Files ###
 
     # See if all temp files already exist
@@ -106,7 +109,7 @@ def main(run=RUN, verbose=VERBOSE):
         _reorganizeBHDetails(detailsFiles, snapTimes, run, verbose=verbose)
 
     else:
-        if( verbose ): 
+        if( verbose ):
             print " - All temporary files already exist."
             note = ("   NOTE: if you would like to RE-create the temprary files, using the raw\n"
                     "         Illustris `blackhole_details_#` files, then rerun BHDetails.py\n"
@@ -131,6 +134,16 @@ def main(run=RUN, verbose=VERBOSE):
 
     return
 
+# main()
+
+
+
+
+
+
+###  =====================================================  ###
+###  ===========  PREPARE INTERMEDIATE FILES  ============  ###
+###  =====================================================  ###
 
 
 
@@ -138,7 +151,7 @@ def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
 
     numOldFiles = len(detFiles)
 
-    if( verbose ): 
+    if( verbose ):
         print " - - Counting lines in Illustris Details files"
         numLines = aux.estimateLines(detFiles)
         print " - - - Estimate %d (%.1e) lines in %d files" % (numLines, numLines, numOldFiles)
@@ -173,7 +186,7 @@ def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
                     dur = now-start                                                                 # 'timedelta' object
 
                     # Print status and time to completion
-                    statStr = statusString(count, numLines, dur)
+                    statStr = aux.statusString(count, numLines, dur)
                     sys.stdout.write('\r - - - %s' % (statStr))
                     sys.stdout.flush()
 
@@ -213,15 +226,16 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
         ids, times, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
         # Store details in dictionary
-        details = { _DETAIL_NUM : len(ids),
-                    _DETAIL_RUN : run,
-                    _DETAIL_CREATED : datetime.datetime.now().ctime(),
-                    _DETAIL_IDS    : ids,
-                    _DETAIL_TIMES  : times,
-                    _DETAIL_MASSES : masses,
-                    _DETAIL_MDOTS  : mdots,
-                    _DETAIL_RHOS   : rhos,
-                    _DETAIL_CS     : cs }
+        details = { DETAIL_NUM : len(ids),
+                    DETAIL_RUN : run,
+                    DETAIL_SNAP : snap,
+                    DETAIL_CREATED : datetime.datetime.now().ctime(),
+                    DETAIL_IDS    : ids,
+                    DETAIL_TIMES  : times,
+                    DETAIL_MASSES : masses,
+                    DETAIL_MDOTS  : mdots,
+                    DETAIL_RHOS   : rhos,
+                    DETAIL_CS     : cs }
 
         np.savez(sav, **details)
         if( not os.path.exists(sav) ):
@@ -241,7 +255,7 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
 
     # } snap
 
-    if( verbose ): 
+    if( verbose ):
         aveFileSize = filesSize / numFiles
         totSize = aux.bytesString(filesSize)
         aveSize = aux.bytesString(filesSize)
@@ -266,7 +280,7 @@ def _loadBHDetails_ASCII(asciiFile, verbose=VERBOSE):
     ### Files have some blank lines in them... Clean ###
     lines = open(asciiFile).readlines()                                                             # Read all lines at once
     nums = len(lines)
-    
+
     # Allocate storage
     ids    = np.zeros(nums, dtype=_LONG)
     times  = np.zeros(nums, dtype=_DOUBLE)
@@ -335,36 +349,45 @@ def _getIllustrisDetailsFilenames(run=RUN, verbose=VERBOSE):
 
 
 
+
+
+
+
+
+
+
+###  ==============================================================  ###
+###  =============  BH / MERGER - DETAILS MATCHING  ===============  ###
+###  ==============================================================  ###
+
+
+
 def loadBHDetails_NPZ(run, snap):
     detsName = details_save_filename(run,snap)
     dat = np.load(detsName)
     return dat
 
 
-
-
-###  =====================================================  ###
-###  =============  BH / DETAILS MATCHING  ===============  ###
-###  =====================================================  ###
-
-
-
-def detailsForBH(bhid, snapDets, side=None, log=None):
+def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     """
     Retrieve the details entry for a particular BH at a target snapshot.
-
 
     Parameters
     ----------
     bhid : int
         ID of the target BH
-    snapDets :
-    side : {'left', 'right', default=None}, optional
+    run : int
+        Number of this Illustris run {1,3}
+    snap : int
+        Number of snapshot in which top find details
+    details : dictionary (npz file)
+        BH Details in a given snapshot (optional, default: None)
+        If `None` these are reloaded
+    side : {'left', 'right', None}, (optional, default: None)
         Which matching elements to return.
         None : return all matches
         'left' : return the earliest match
         'right' : return the latest match
-    log : class ObjLog, optional
 
 
     Returns
@@ -386,26 +409,42 @@ def detailsForBH(bhid, snapDets, side=None, log=None):
 
     """
 
-    if( log ): log.log("detailsForBH()")
-    retErr = [None]*5
+    if( verbose ): print " - - detailsForBH()"
 
-    '''
-    ### Load Details for this Snapshot ###
-    snapDets = loadBHDetails_NPZ(run, snap)
-    '''
+    # Details keys which should be returned
+    returnKeys = [ DETAIL_TIMES, DETAIL_MASSES, DETAIL_MDOTS, DETAIL_RHOS, DETAIL_CS ]
+    # If no match is found, return all values as this:
+    missingValue = -1.0
+
+    ### Make sure Details are Loaded and Appropriate ###
+
+    # If details not provided for this snapshot, load them
+    if( details == None ):
+        if( verbose ): print " - - - No details provided, loading for snapshot %d" % (snap)
+        details = loadBHDetails_NPZ(run, snap)
+        if( verbose ): print " - - - - Loaded %d details" % (details[DETAIL_NUM])
+
+    # Make sure these details match target snapshot and run
+    assert details[DETAIL_RUN] == run, \
+        "Details run %d does not match target %d!" % (details[DETAIL_RUN], run)
+
+    """
+    assert details[DETAIL_SNAP] == snap, \
+        "Details snap %d does not match target %d!" % (details[DETAIL_SNAP], snap)
+    """
 
     ### Find the Details index which matched ID and Nearest in Time ###
 
     # Find details indices with BH ID match
-    inds = np.where( bhid == snapDets[DET_ID] )[0]
+    inds = np.where( bhid == details[DETAIL_IDS] )[0]
 
-    # If there are no matches, return None
+    # If there are no matches, return None array
     if( len(inds) == 0 ):
-        if( log ): log.log("No matches in snap %d for ID %d" % (snap, bhid) )
-        return retErr
+        if( verbose ): print "No matches in snap %d for ID %d" % (snap, bhid)
+        return { key : missingValue for key in returnKeys }
 
     # Get times for matching details
-    detTimes = snapDets[DET_SCALE][inds]
+    detTimes = details[DETAIL_TIMES][inds]
     # Get indices to sort times
     sortInds = np.argsort(detTimes)
 
@@ -430,14 +469,35 @@ def detailsForBH(bhid, snapDets, side=None, log=None):
 
     # Convert indices to global array
     retInds = inds[retInds]
-    # Create output arrays/value
-    scale = snapDets[DET_SCALE][retInds]
-    mass  = snapDets[DET_MASS ][retInds]
-    mdot  = snapDets[DET_MDOT ][retInds]
-    rho   = snapDets[DET_RHO  ][retInds]
-    cs    = snapDets[DET_CS   ][retInds]
+    # Create output dictionary with same keys as `details`
+    bhDets = { key : details[key][retInds] for key in returnKeys }
 
-    return scale, mass, mdot, rho, cs
+    return details, bhDets
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
