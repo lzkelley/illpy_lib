@@ -14,7 +14,7 @@ import numpy as np
 cimport numpy as np
 
 
-def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long, ndim=1] inid, 
+def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long, ndim=1] inid,
                                np.ndarray[long, ndim=1] outid, np.ndarray[long, ndim=1] detid ):
     """
     Match merger BHs to details entries for a particular snapshot.
@@ -31,7 +31,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
     each merger event (all mergers, not just during this snapshot).
     The ``active`` array gives the Mergers which are 'active' in this snapshot,
     i.e. mergers which have occured before the time of this snapshot.
-    
+
 
     This function takes as input the indices of active BH mergers as
     ``active``.  The in and out BH indices for *all* mergers are given in
@@ -84,8 +84,8 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
         Indices of the Details entries which correspond to each Merger.
 
     """
-    
-    
+
+
     # Get the lengths of all input arrays
     cdef int numMergers = inid.shape[0]                                                             # Length of both 'inid' and 'outid'
     cdef int numDetails = detid.shape[0]
@@ -121,7 +121,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
         # If search failed; see if this 'out' bh merged again, update 'out' id to that
         count = 0
         while( ind < 0 ):
-            
+
             # Check if we are stuck, if so, break
             if( count >= MAX_COUNT ):
                 ind = -1
@@ -142,7 +142,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 
             # Set new 'out id' to match partner of 'in id'
             found = outid[sort_inid[ind]]
-            
+
             # Redo search
             ind = np.searchsorted( detid, found, 'left', sorter=sort_detid )
 
@@ -155,7 +155,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
         # } while
 
         # If we have a match, store results
-        if( ind >= 0 ): 
+        if( ind >= 0 ):
             # Store matching Details index
             retinds[mm] = sort_detid[ind]
             # Store the ID which was eventually matched
@@ -176,27 +176,27 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 
 
 
-def getDetailIndicesForBlackholes(np.ndarray[long, ndim=1] bhids, np.ndarray[long, ndim=1] detIDs,
-                                  np.ndarray[double, ndim=1] detTimes):
+def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim=1] bhTimes,
+                         np.ndarray[long, ndim=1] detIDs, np.ndarray[double, ndim=1] detTimes):
     """
     Match merger BHs to details entries for a particular snapshot.
     """
-    
-    
-    # Get the lengths of all input arrays
-    cdef int nums = bhids.shape[0]                                                                    # Length of target IDs
+
+
+    # Get the number of target BHs
+    cdef int nums = bhIDs.shape[0]
 
     # Sort details first by ID, then by time in reverse
     cdef np.ndarray sort_det = np.lexsort( (-detTimes, detIDs) )
 
     # Sort target BH IDs
-    cdef np.ndarray sort_bh = np.argsort(bhids)
+    cdef np.ndarray sort_bh = np.argsort(bhIDs)
 
-    cdef long ind, target, found
-    cdef int MAX_COUNT = 100
+    cdef int ii,jj
 
     # Initialize arrays to store results; default to '-1'
     cdef np.ndarray retinds = -1*np.ones(nums, dtype=long)
+    cdef np.ndarray remnants = -1*np.ones(nums, dtype=long)
 
     ### Iterate over Each Active Merger Binary System ###
     jj = 0
@@ -204,20 +204,41 @@ def getDetailIndicesForBlackholes(np.ndarray[long, ndim=1] bhids, np.ndarray[lon
 
         # Get the sorted index
         ind = sort_bh[ii]
-        # Get the sorted BH ID
-        bh = bhids[ind]
+        # Get the sorted BH ID and time
+        bh = bhIDs[ind]
+        bhtime = bhTimes[ind]
 
-        # Find Match
-        # ind = np.searchsorted( detid, target, 'left', sorter=sort_detid )
+        # Find Matching IDs
         while( detIDs[sort_det[jj]] < bh ): jj += 1
-        # If this is a match, store result
-        if( detIDs[sort_det[jj]] == bh ): 
+        # Once match is found; find times before merger
+        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime ): jj += 1
+
+        '''
+        # Once match is found; find times before merger
+        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] > bhtime ): jj += 1
+        
+        # If this is a match, but the time is *the same* as merger time,
+        #     then this details entry is for the total (combined) merger product
+        if( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] == bhtime ):
+            # If there are no earlier entries, store this match to a special list
+            if( detIDs[sort_det[jj+1]] != bh ):
+                remnants[ind] = sort_det[jj]
+
+            # Don't let it be stored to the normal list.  Move to next
+            jj += 1
+        '''
+
+        # If this is still a match, store result
+        if( detIDs[sort_det[jj]] == bh ):
             # Store entry at sorted index (corresponding to current BH)
             retinds[ind] = sort_det[jj]
+        # Otherwise, if we had a match only *after* the merger, add this to a special list
+        elif( detIDs[sort_det[jj-1]] == bh ):
+            remnants[ind] = sort_det[jj-1]
 
     # } ii
 
-    return retinds
+    return retinds, remnants
 
 
 
