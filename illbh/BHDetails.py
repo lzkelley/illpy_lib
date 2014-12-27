@@ -81,7 +81,7 @@ DETAIL_CREATED = 'created'
 
 
 
-def main(run=RUN, verbose=VERBOSE):
+def main(run=RUN, verbose=VERBOSE, redo=REDO_TEMP):
 
     if( verbose ): print "\nBHDetails.py\n"
 
@@ -94,10 +94,11 @@ def main(run=RUN, verbose=VERBOSE):
     ### Organize Details by Snapshot Time; create new, temporary ASCII Files ###
 
     # See if all temp files already exist
+    tempFiles = [ details_temp_filename(run, snap) for snap in xrange(cosmo.num) ]
     tempExist = aux.filesExist(tempFiles)
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
-    if( not tempExist or REDO_TEMP ):
+    if( not tempExist or redo ):
 
         # Get Illustris BH Details Filenames
         if( verbose ): print " - Finding Illustris BH Details files"
@@ -159,7 +160,10 @@ def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
 
     ### Open new ASCII, Temp details files ###
     if( verbose ): print " - - Opening new files"
-    tempFiles = [ open(details_temp_filename(run,snap), 'w') for snap in len(times) ]
+    tempFiles = [ details_temp_filename(run,snap) for snap in xrange(len(times)) ]
+    # Make sure path is okay
+    aux.checkPath(tempFiles[0])
+    tempFiles = [ open(tfil, 'w') for tfil in tempFiles ]
 
     ### Iterate over all Illustris Details Files ###
     if( verbose ): print " - - Sorting details into times of snapshots"
@@ -172,6 +176,7 @@ def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
             detTime = _DOUBLE( dline.split()[1] )
             # Find the time bin given left edges (hence '-1'); include right-edges ('right=True')
             snapNum = np.digitize([detTime], times, right=True) - 1
+
             # Write line to apropriate file
             tempFiles[snapNum].write( dline )
 
@@ -216,7 +221,8 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
 
     start = datetime.datetime.now()
     filesSize = 0.0
-    numFiles = len(saves)
+    sav = None
+
     for snap in xrange(numSnaps):
 
         tmp = details_temp_filename(run, snap)
@@ -249,19 +255,19 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
             now = datetime.datetime.now()
             dur = now-start
 
-            statStr = aux.statusString(snap+1, numFiles, dur)
+            statStr = aux.statusString(snap+1, numSnaps, dur)
             sys.stdout.write('\r - - - %s' % (statStr))
             sys.stdout.flush()
+            if( snap+1 == numSnaps ): sys.stdout.write('\n')
 
     # } snap
 
     if( verbose ):
-        aveFileSize = filesSize / numFiles
+        aveFileSize = filesSize / numSnaps
         totSize = aux.bytesString(filesSize)
-        aveSize = aux.bytesString(filesSize)
+        aveSize = aux.bytesString(aveFileSize)
         print " - - - Saved Details NPZ files.  Total size = %s, Ave Size = %s" % (totSize, aveSize)
-        print " - - - - First: '%s'" % (saves[0])
-        print " - - - - Last : '%s'" % (saves[-1])
+        print " - - - - Last : '%s'" % (sav)
 
     if( CLEAN_TEMP ):
         if( verbose ): print " - - - Removing temporary files"
@@ -428,10 +434,8 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     assert details[DETAIL_RUN] == run, \
         "Details run %d does not match target %d!" % (details[DETAIL_RUN], run)
 
-    """
     assert details[DETAIL_SNAP] == snap, \
         "Details snap %d does not match target %d!" % (details[DETAIL_SNAP], snap)
-    """
 
     ### Find the Details index which matched ID and Nearest in Time ###
 
