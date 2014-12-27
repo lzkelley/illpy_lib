@@ -763,6 +763,7 @@ def statusString(count, total, durat=None):
 
         # Calculate time left
         timeLeft = 1.0*durat.total_seconds()*(1.0/frac - 1.0)
+        timeLeft = np.max([timeLeft, 0.0])
         timeLeft = datetime.timedelta(seconds=timeLeft)
 
         # Append to status string
