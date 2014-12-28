@@ -27,11 +27,13 @@ from Settings import *
 import Basics
 
 ### Import Library Parameters/Functions ###
-import ill_lib
-from ill_lib import AuxFuncs as aux
-from ill_lib.Constants import *
-from ill_lib import DetailsManager as DetMan
+#import ill_lib
+#from ill_lib import AuxFuncs as aux
+#from ill_lib.Constants import *
+#from ill_lib import DetailsManager as DetMan
 
+from .. import AuxFuncs as aux
+from .. Constants import *
 
 
 ID_FILE = "/n/home00/lkelley/illustris/pta-mergers/ill-3_bh-merger_ids-scales.npz"
