@@ -31,14 +31,6 @@ from glob import glob
 import datetime
 
 from Constants import *
-#from ObjMergers import Mergers
-#from ObjDetails import Details
-
-#import ObjLog
-#from ObjLog import Log
-
-#import arepo
-
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
@@ -48,110 +40,12 @@ AX_BOTTOM = 0.12
 AX_TOP    = 0.13
 
 
-'''
-SNAPSHOT_TIMES_FILENAME = lambda x: "../sync-dir/ill-%d_times.npz" % (x)
-
-###  =====================================  ###
-###  ==========  DETAILS FILES  ==========  ###
-###  =====================================  ###
-
-def getFilenames_Illustris_BHDetails(runNum):
-    """Get a list of 'blackhole_details' files for a target Illustris simulation"""
-
-    detFiles = ILL_RUN_DIRS(runNum) + ILL_BH_DETAILS_FILENAMES
-    files    = sorted(glob(detailsNames))
-    return files
-
-
-'''
-
 
 
 ###  ======================================  ###
 ###  ==========  SNAPSHOT FILES  ==========  ###
 ###  ======================================  ###
 
-
-'''
-def getSnapshotFilename(snapNum, runNum, log=None):
-    """
-    Given a run number and snapshot number, construct the approprirate snapshot filename.
-
-    input
-    -----
-    snapNum : IN [int] snapshot number,       i.e. 100 for snapdir_100
-    runNum  : IN [int] simulation run number, i.e. 3 for Illustris-3
-
-    output
-    ------
-    return     filename : [str]
-    """
-
-    if( log ): log.log("getSnapshotFilename()")
-    snapName = SNAPSHOT_NAMES(runNum, snapNum)
-
-    return snapName
-
-
-def loadSnapshotTimes(run, log=None):
-    """
-    Get the time (scale-factor) of each snapshot
-
-    input
-    -----
-    runNum  : [int] simulation run number, i.e. 3 for Illustris-3
-
-    output
-    ------
-    return   times : list of [float]   simulation times (scale-factors)
-
-    """
-
-    if( log ): log.log("loadSnapshotTimes()", 1)
-
-    times = np.zeros(NUM_SNAPS, dtype=DBL)
-
-    loadsave = SNAPSHOT_TIMES_FILENAME(run)
-    if( not os.path.exists(loadsave) ): loadsave = PP_TIMES_FILENAME(run)
-
-    load = False
-    save = False
-    loadFile = None
-    saveFile = None
-
-    # If file already exists, load from it
-    if( os.path.exists(loadsave) ): loadFile = loadsave
-    # If file doesn't exist, save to it
-    else:                           saveFile = loadsave
-
-    if( loadFile ): load = True
-    if( saveFile ): save = True
-
-    # Load pre-existing times file
-    if( load ):
-        if( log ): log.log("Loading snapshot times from '%s'" % (loadFile))
-        timesFile = np.load( loadFile )
-        times[:]  = timesFile['times']
-    # Re-extract times
-    else:
-        if( log ): log.log("Extracting times directly from snapshots")
-        for snapNum in range(NUM_SNAPS):
-            snapFile = getSnapshotFilename(snapNum, runNum, runsDir)
-            # Load only the header from the given snapshot
-            snapHead = arepo.Snapshot(snapFile, onlyHeader=True)
-            times[snapNum] = snapHead.time
-
-
-    # Save snapshot times to NPZ file
-    if( save ):
-        if( log ): log.log("Saving snapshot times to '%s'" % (saveFile) )
-        np.savez(saveFile, times=times)
-
-    return times
-
-
-
-'''
 
 
 '''
@@ -525,34 +419,6 @@ def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False,
 
 
 
-'''
-def plotVLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
-    ylo,yhi = ax.get_ylim()
-    ll, = ax.plot([pos,pos], [ylo,yhi], style, color=col, lw=lw)
-    ax.set_ylim(ylo,yhi)
-
-    if( text != None ):
-        if( tpos == None ): tpos = 0.99*yhi
-        ax.text(pos, tpos, text, horizontalalignment='center', verticalalignment='top',
-                transform = ax.transData, bbox=dict(facecolor='white', alpha=0.7), color=col )
-
-
-    return ax, ll
-
-
-def plotHLine(ax, pos, style='-', col='0.5', lw=1.0, text=None, tpos=None):
-    xlo,xhi = ax.get_xlim()
-    ll, = ax.plot([xlo,xhi], [pos,pos], style, color=col, lw=lw)
-    ax.set_xlim(xlo,xhi)
-
-    if( text != None ):
-        if( tpos == None ): tpos = 0.99*xhi
-        ax.text(tpos, pos, text, horizontalalignment='right', verticalalignment='center',
-                transform = ax.transData, bbox=dict(facecolor='white', alpha=0.7), color=col )
-
-    return ax, ll
-'''
-
 
 
 ###  ===================================  ###
@@ -707,28 +573,6 @@ def findBins(target, bins, thresh=DT_THRESH):
 
 
 
-'''
-
-###  ====================================  ###
-###  =============  OTHER  ==============  ###
-###  ====================================  ###
-
-
-def guessNumsFromFilename(fname):
-
-    run = fname.split("Illustris-")[-1]
-    run = run.split("/")[0]
-    run = np.int(run)
-
-    snap = fname.split("groups_")[-1]
-    snap = snap.split("/")[0]
-    snap = np.int(snap)
-
-    return snap, run
-
-
-'''
-
 
 
 def stringArray(arr, format='%.2f'):
@@ -813,33 +657,6 @@ def bytesString(bytes, precision=1):
 
 
 
-
-'''
-def getFileSizeString(filename, asstr=True):
-    size = os.path.getsize(filename)
-    return convertDataSizeToString(size)
-
-
-def convertDataSizeToString(size):
-    prefSize, pref = getPrefixed(size)
-    unit = pref + 'B'
-    return "%.2f %s" % (prefSize, unit)
-
-
-def getPrefixed(tval):
-    val = np.copy(tval)
-    prefs = [ '', 'K' , 'M' , 'G' ]
-    mult  = 1000.0
-
-    cnt = 0
-    while( val > mult ):
-        val /= mult
-        cnt  += 1
-        if( cnt > 3 ):
-            raise RuntimeError("Error: value too large '%s'" % (str(val)) )
-
-    return val, prefs[cnt]
-'''
 
 
 def countLines(files):
