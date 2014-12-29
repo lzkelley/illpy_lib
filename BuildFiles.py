@@ -53,13 +53,14 @@ def main(run=RUN, verbose=VERBOSE):
         raise ex
 
 
-    # Check each test value
-    for ii, tval in enumerate([t1,t2]):
-        if( tval <= 0 ):
-            raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test %d" % ii)
+    if( t1 <= 0 ):
+        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 1 = %d!" % t1)
+
+    if( t2 <= 0 ):
+        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 2 = %d!" % t2)
 
     if( t3 < cosmo[-2] or t3 > cosmo[-1] ):
-        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 3!")
+        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 3 = %f!" % t3)
 
 
     print "\n\nBHDetails looks good.\n"
