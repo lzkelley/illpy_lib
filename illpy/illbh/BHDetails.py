@@ -41,6 +41,7 @@ RUN = 3                                                                         
 VERBOSE = True                                                                                      # Print verbose output during execution
 
 REDO_TEMP = False                                                                                   # Re-create temporary files
+REDO_SAVE = False                                                                                   # Re-create NPZ save files
 CLEAN_TEMP = False                                                                                  # Delete temporary files after NPZ are created
 
 # Where to find the 'raw' Illustris Merger files
@@ -85,7 +86,7 @@ DETAIL_CREATED = 'created'
 
 
 
-def main(run=RUN, verbose=VERBOSE, redo=REDO_TEMP):
+def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
 
     if( verbose ): print "\nBHDetails.py\n"
 
@@ -102,7 +103,7 @@ def main(run=RUN, verbose=VERBOSE, redo=REDO_TEMP):
     tempExist = aux.filesExist(tempFiles)
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
-    if( not tempExist or redo ):
+    if( not tempExist or redo_temp ):
 
         # Get Illustris BH Details Filenames
         if( verbose ): print " - Finding Illustris BH Details files"
@@ -121,7 +122,7 @@ def main(run=RUN, verbose=VERBOSE, redo=REDO_TEMP):
                     "         with the ``REDO_TEMP`` flag set to ``True``.")
             print note
 
-
+  
     # Confirm all temp files exist
     tempExist = aux.filesExist(tempFiles)
 
@@ -131,11 +132,36 @@ def main(run=RUN, verbose=VERBOSE, redo=REDO_TEMP):
         raise RuntimeError("Temporary Files missing!")
 
 
+    # See if all npz files already exist
+    saveFiles = [ details_save_filename(run, snap) for snap in xrange(cosmo.num) ]
+    saveExist = aux.filesExist(saveFiles)
 
     ### Convert temp ASCII Files, to new Details object files ###
 
-    if( verbose ): print " - Converting temporary files to NPZ"
-    _convertDetailsASCIItoNPZ(cosmo.num, run, verbose=verbose)
+    # If NPZ files don't exist, or we WANT to redo them, create NPZ files
+    if( not saveExist or redo_save ):
+
+        if( verbose ): print " - Converting temporary files to NPZ"
+        _convertDetailsASCIItoNPZ(cosmo.num, run, verbose=verbose)
+
+    else:
+        if( verbose ):
+            print " - All NPZ save files already exist."
+            note = ("   NOTE: if you would like to RE-create the npz save files, using the\n"
+                    "         existing temp files, then rerun BHDetails.py with the\n"
+                    "         ``REDO_SAVE`` flag set to ``True``.\n"
+                    "         To also re-create the temp files, use ``REDO_TEMP``.\n")
+            print note
+
+
+    # Confirm save files exist
+    saveExist = aux.filesExist(saveFiles)
+
+    # If files are missing, raise error
+    if( not saveExist ):
+        print "Save (NPZ) Files missing!  First file = '%s'" % (saveFiles[0])
+        raise RuntimeError("Save (NPZ) Files missing!")
+
 
     return
 
