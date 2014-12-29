@@ -81,10 +81,10 @@ See the documentation inside **Cosmology.py** for detailed usage information.
 Each cosmological measure (e.g. comoving distance) has its own function (e.g. 'Cosmology.comDist')
 which accepts either  
 
-- | an 'integer' argument which refers to a particular illustris snapshot number  
-  | e.g. 'comDist(100)' returns the comoving distance at snapshot 100  
-- | a 'float' argument which refers to a particular scale-factor of the universe to interpolate to  
-  | e.g. 'comDist(0.5)' returns the comoving distance when the scalefactor a(t) = 0.5  
+- an 'integer' argument which refers to a particular illustris snapshot number  
+  e.g. 'comDist(100)' returns the comoving distance at snapshot 100  
+- a 'float' argument which refers to a particular scale-factor of the universe to interpolate to  
+  e.g. 'comDist(0.5)' returns the comoving distance when the scalefactor a(t) = 0.5  
 
 
 - Examples::
@@ -100,6 +100,58 @@ which accepts either
 
 illbh - Acessing blackhole data from the illustris simulations
 --------------------------------------------------------------
+There are two types of illustris blackhole files, details can be found on the illustris wiki, under  
+http://www.illustris-project.org/w/index.php/Blackhole_Files  
+Note that BHs do not exist in illustris until a few dozen snapshots in.
+
+- Blackhole *'details'* have entries printed for each BH, at each timestep in which it is active.  
+  - Each entry gives the BH ID, mass, and local parameters (e.g. local density)  
+- Blackhole *'mergers'* have entries printed for each BH merger.
+  - Each entry gives the time (scale-factor), and both BH ID numbers and Masses.
+  - One of the BHs survives after the merger, this is called the *'out'* BH while the other is the
+    *'in'* BH --- which dissappears.
+  - The mass entry for the *'out' BH* mass is incorrect.  This can be (approximately) corrected
+    using the BH *'details'* files.
+
+Each file type is handled by the submodules **BHDetails** and **BHMergers** respectively.  The
+strategy for both submodules is to process the raw illustris data files into *'intermediate'*
+post-process files, which can then be accessed much more easily (and faster).  The script
+**BuildFiles.py** in the **illpy** top-level directory will build and test these intermediate
+files, see the ***Installation*** section above for more information.  Once the intermediate
+files are produced, data access is quite rapid.
+
+BHDetails  
+  For detailed explanations, see the documentation in the **BHDetails** file,
+  (illpy/illbh/BHDetails.py)  
+  The *'details'* intermediate files are organized into snapshots, for convenience.  If time
+  (scale-factors) `t_i` corresponds to snapshot number `i`, then all details entries between
+  [t_i, t_{i+1}] are saved in the intermediate *'details'* file number `i`.  Thus the last
+  *'details'* file doesn't actually contain any entries.  
+
+  Usage:  
+    Direct usage of the BHDetails module is currently in active development.
+
+
+BHMergers  
+  For detailed explanations, see the documentation in the **BHMergers** file,
+  (illpy/illbh/BHMergers.py)  
+  The *'mergers'* intermediate files each contain all mergers for an entire illustris simulation.
+  There are however, numerous intermediate files.  In particular a *'raw'* file, and a *'fixed'*
+  file.  The former contains exactly the information in the original illustris data files, while
+  the latter 'fixes' the *'out'* BH mass entries based on data recovered from the *'details'*
+  files.  Information on this process can be found with the *'BHMergers._fixMergers()'* function.  
+
+  Usage::
+
+    >> from illpy.illbh import BHMergers            # import the BHMergers submodule  
+    >> mergers = BHMergers.loadMergers()            # load all mergers
+    >> print mergers[BHMergers.MERGERS_NUM]         # print the total number of mergers
+    >> masses = mergers[BHMergers.MERGERS_MASSES]   # get the masses of both BHs in each merger
+    >> print masses.shape                           # The shape is [N,2] for N total mergers
+    >> import numpy as np
+    >> totm = np.sum(masses, axis=1)                # Get the total mass for each merger
+    >> print np.average(totm)                       # Print the average, total-mass for each merger
+
 
 
 Source Structure
@@ -110,25 +162,25 @@ Contents::
     illpy  
     |-- illpy  
     |   |-- AuxFuncs.py  
-|   |-- Constants.py                              : Physical and numerical constants  
-|   |-- illbh  
-|   |   |-- BHConstants.py  
-|   |   |-- BHDetails.py                          : Access BH Details data  
-|   |   |-- BHMergers.py                          : Access BH Mergers data  
-|   |   |-- __init__.py
-|   |   |-- MatchDetails.pyx                      : Perform quick searches in details entries
-|   |
-|   |-- illcosmo
-|   |   |-- Cosmology.py                          : Contains 'Cosmology' class for parameter calcs
-|   |   |-- data
-|   |   |   |-- illustris-snapshot-cosmology-data.npz
-|   |   |
-|   |   |-- __init__.py
-|   |
-|   |-- __init__.py
-|   |-- MANIFEST.in
-|
-|-- README.md
-|-- setup.py                                      : setup script to install package
-|-- setup.sh                                      : bash script to run setup.py w/ standard config
+    |   |-- Constants.py                              : Physical and numerical constants  
+    |   |-- illbh  
+    |   |   |-- BHConstants.py  
+    |   |   |-- BHDetails.py                          : Access BH Details data  
+    |   |   |-- BHMergers.py                          : Access BH Mergers data  
+    |   |   |-- __init__.py
+    |   |   |-- MatchDetails.pyx                      : Perform quick searches in details entries
+    |   |
+    |   |-- illcosmo
+    |   |   |-- Cosmology.py                          : Contains 'Cosmology' class for parameter calcs
+    |   |   |-- data
+    |   |   |   |-- illustris-snapshot-cosmology-data.npz
+    |   |   |
+    |   |   |-- __init__.py
+    |   |
+    |   |-- __init__.py
+    |   |-- MANIFEST.in
+    |
+    |-- README.md
+    |-- setup.py                                      : setup script to install package
+    |-- setup.sh                                      : bash script to run setup.py w/ standard config
 
