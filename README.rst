@@ -1,5 +1,5 @@
-illpy - Python Package for the Illustris data
-=============================================
+illpy - Python Package for Illustris simulation data
+====================================================
 
 **illpy** is a package designed to access and analyze data produced from the Illustris Simulations
 http://www.illustris-project.org/w/index.php/The_Simulations
@@ -58,6 +58,9 @@ Working on **odyssey**, Id recommend using an interactive session to run 'BuildF
 **Once the intermediate files are produced, they are the only files required for usage of 'illbh',
 ie. once intermediate files are produced, they could be copied off of 'odyssey' for future usage.**
 
+
+
+=================================
 
 
 illcosmo - Cosmological parameters for the illustris snapshots
