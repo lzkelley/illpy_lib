@@ -54,12 +54,14 @@ class Cosmology(object):
     hubbleConstant(sf) : hubble constant [km/s/Mpc]
     hubbleFunction(sf) : hubble function []
 
-    snapshot(num)    : scale-factor of the given snapshot number
+    snapshotTimes(num)    : scale-factor of the given snapshot number
+
+
 
     Additionally, `Cosmology` supports the `len()` function, which returns the
     number of snapshots.  The scale-factor for an individual snapshot can be
     retrieved using the standard array accessor `[i]`.  This is equivalent to
-    the `snapshot()` method.
+    the `snapshotTimes()` method.
 
 
     Examples
@@ -111,12 +113,6 @@ class Cosmology(object):
         return self.snapshotTimes(it)
 
 
-    def snapshotTimes(self, num=None):
-        ''' Get scalefactor for all snapshots, or given snapshot number '''
-        if( num == None ): return self.__cosmo[self.__SCALEFACT]
-        else:              return self.__cosmo[self.__SCALEFACT][num]
-
-
     def __len__(self):
         ''' Return number of snapshots '''
         return self.num
@@ -146,6 +142,13 @@ class Cosmology(object):
         # outside range, false
         else:
             return False
+
+
+
+    def snapshotTimes(self, num=None):
+        ''' Get scalefactor for all snapshots, or given snapshot number '''
+        if( num == None ): return self.__cosmo[self.__SCALEFACT]
+        else:              return self.__cosmo[self.__SCALEFACT][num]
 
 
     def redshift(self, sf):
