@@ -43,7 +43,7 @@ def main(run=RUN, verbose=VERBOSE):
 
     # Test BHDetails
     try:
-        dets = BHDetails.loadBHDetails_NPZ(run, cosmo.num-1)                                        # Load last snapshot's details
+        dets = BHDetails.loadBHDetails_NPZ(run, cosmo.num-2)                                        # Load 2nd-last snapshot's details
         t1 = dets[BHDetails.DETAIL_NUM]
         t2 = len(dets[BHDetails.DETAIL_TIMES])
         t3 = np.average(dets[BHDetails.DETAIL_TIMES])
