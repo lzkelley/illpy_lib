@@ -21,17 +21,17 @@ Installation
 The full git repository can be cloned (with permission) from:
 https://bitbucket.org/lzkelley/illpy
 
-The base directory contains the setup script 'setup.py' which can be run as  
+The base directory contains the setup script 'setup.py' which can be run as::
 
     $ python setup.py install
 
-Or, it can be installed as a 'development' version for the user with the command
+Or, it can be installed as a 'development' version for the user with the command::
 
     $ python setup.py develop --user 
 
 This is the recommended method of installation as it builds in-place, allowing modification without
 reinstalling, and does not require administrative access to build in a global directory.  This
-method of installation can be executed using the 'setup.sh' script, i.e.
+method of installation can be executed using the 'setup.sh' script, i.e.::
 
     $ bash setup.py
 
@@ -42,16 +42,16 @@ hours so it will likely be better to just set it up first.  The python script **
 included in the base directory will configure the BH modules, and test them (in a simple way) to
 make sure they are working properly.
 
-**Configure 'illbh' by running 'BuildFiles.py'**:
+**Configure 'illbh' by running 'BuildFiles.py'**::
 
     $ python BuildFiles.py
 
 **This will construct about 10 GB of intermediate files allowing fast access to blackhole data.**  
 **This process can take up to a couple of hours**
 
-Working on **odyssey**, Id recommend using an interactive session to run 'BuildFiles.py':
+Working on **odyssey**, Id recommend using an interactive session to run 'BuildFiles.py'::
 
-    $ srun -n 1 --pty --x11=first -p interact --mem=4096 -t 400 bash    
+    $ srun -n 1 --pty --x11=first -p interact --mem=4096 -t 400 bash      
     $ python BuildFiles.py
 
 **Building the intermediate files requires access to the raw Illustris Blackhole data files.**  
@@ -81,20 +81,20 @@ See the documentation inside **Cosmology.py** for detailed usage information.
 Each cosmological measure (e.g. comoving distance) has its own function (e.g. 'Cosmology.comDist')
 which accepts either  
 
-- an 'integer' argument which refers to a particular illustris snapshot number  
-  e.g. 'comDist(100)' returns the comoving distance at snapshot 100  
-- a 'float' argument which refers to a particular scale-factor of the universe to interpolate to  
-  e.g. 'comDist(0.5)' returns the comoving distance when the scalefactor a(t) = 0.5  
+- | an 'integer' argument which refers to a particular illustris snapshot number  
+  | e.g. 'comDist(100)' returns the comoving distance at snapshot 100  
+- | a 'float' argument which refers to a particular scale-factor of the universe to interpolate to  
+  | e.g. 'comDist(0.5)' returns the comoving distance when the scalefactor a(t) = 0.5  
 
 
-- Examples:
+- Examples::
 
-    >> import illpy.illcosmo as illcosmo      # Import 'illcosmo' module
-    >> cosmo = illcosmo.Cosmology()           # Initialize the 'Cosmology' object
-    >> firstRedshift = cosmo.redshift(0)      # Get the redshift of the first snapshot, number '0'
-    >> halfRedshift = cosmo.redshift(0.5)     # Get the redshift at a scalefactor of '0.5'; z = 1.0
-    >> sf = 0.5*(cosmo[-2] + cosmo[-1])       # Get scalefactor halfway between last two snapshots
-    >> dm = cosmo.distMod(sf)                 # Get the distance modulus at that scale-factor
+    >> import illpy.illcosmo as illcosmo      # Import 'illcosmo' module  
+    >> cosmo = illcosmo.Cosmology()           # Initialize the 'Cosmology' object  
+    >> firstRedshift = cosmo.redshift(0)      # Get the redshift of the first snapshot, number '0'  
+    >> halfRedshift = cosmo.redshift(0.5)     # Get the redshift at a scalefactor of '0.5'; z = 1.0  
+    >> sf = 0.5*(cosmo[-2] + cosmo[-1])       # Get scalefactor halfway between last two snapshots  
+    >> dm = cosmo.distMod(sf)                 # Get the distance modulus at that scale-factor  
 
 
 
@@ -102,12 +102,14 @@ illbh - Acessing blackhole data from the illustris simulations
 --------------------------------------------------------------
 
 
-Contents
---------
+Source Structure
+------------
 
-illpy  
-|-- illpy  
-|   |-- AuxFuncs.py  
+Contents::  
+
+    illpy  
+    |-- illpy  
+    |   |-- AuxFuncs.py  
 |   |-- Constants.py                              : Physical and numerical constants  
 |   |-- illbh  
 |   |   |-- BHConstants.py  
@@ -129,5 +131,4 @@ illpy
 |-- README.md
 |-- setup.py                                      : setup script to install package
 |-- setup.sh                                      : bash script to run setup.py w/ standard config
-
 
