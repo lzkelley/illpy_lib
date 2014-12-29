@@ -63,30 +63,31 @@ ie. once intermediate files are produced, they could be copied off of 'odyssey' 
 illcosmo - Cosmological parameters for the illustris snapshots
 --------------------------------------------------------------
 
-The **illcosmo** module is composed of a class, 'illcosmo.Cosmology' (illpy/illcosmo/Cosmology.py),
-and a data set, illpy/illcosmo/data/illustris-snapshot-cosmology-data.npz.  The data set is
+The **illcosmo** module is a class, **illcosmo.Cosmology** (illpy/illcosmo/Cosmology.py), 
+and a data set, **illpy/illcosmo/data/illustris-snapshot-cosmology-data.npz**.  The data set is
 a table of cosmological measures (e.g. redshift, scalefactor, comoving and lum distance, etc)
 obtained by numerically integrating the FLRW equations with appropriate parameters (densities).
-The 'Cosmology' class can be used to access those parameters at the scale-factor (time)
+The **Cosmology** class can be used to access those parameters at the scale-factor (time)
 corresponding to each snapshot, or to interpolate between those values to find parameter values
 at arbitrary scale-factors.
 
 *Time* in illustris is measures in terms of scale-factor, and thus this is the basic independent
-variable of the 'Cosmology' class.  The parameter 'Cosmology.num' gives the number of snapshots
+variable of the **Cosmology** class.  The parameter *`Cosmology.num`* gives the number of snapshots
 (i.e. 136), and the scale-factor corresponding to each can be accessed using either the standard
-array accessor '[]' or the function 'snapshotTimes()' both of which accept a positive or negative
+array accessor '[]' or the function *`snapshotTimes()`* both of which accept a positive or negative
 (to reverse index) integer between 0 and 'Cosmology.num-1' (i.e. {0,135}).
 
 See the documentation inside **Cosmology.py** for detailed usage information.
 Each cosmological measure (e.g. comoving distance) has its own function (e.g. 'Cosmology.comDist')
 which accepts either  
+
 - an 'integer' argument which refers to a particular illustris snapshot number  
   e.g. 'comDist(100)' returns the comoving distance at snapshot 100  
 - a 'float' argument which refers to a particular scale-factor of the universe to interpolate to  
   e.g. 'comDist(0.5)' returns the comoving distance when the scalefactor a(t) = 0.5  
 
 
- - Examples:
+- Examples:
 
     >> import illpy.illcosmo as illcosmo      # Import 'illcosmo' module
     >> cosmo = illcosmo.Cosmology()           # Initialize the 'Cosmology' object
