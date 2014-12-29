@@ -45,6 +45,8 @@ from glob import glob
 from datetime import datetime
 import numpy as np
 
+
+from BHConstants import DATA_PATH
 import BHDetails
 from .. import illcosmo
 from .. import AuxFuncs as aux
@@ -67,17 +69,15 @@ _MERGERS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhol
 _MERGERS_FILE_NAMES = "blackhole_mergers_*.txt"
 
 # Where to save intermediate files
-_SAVE_PATH = "%s/post-process/" % os.path.dirname(os.path.abspath(__file__))
 _MERGERS_RAW_SAVE_FILENAME = "ill-%d_raw-mergers_v%.1f.npz"
 _MERGERS_FIXED_SAVE_FILENAME = "ill-%d_fixed-mergers_v%.1f.npz"
-
 
 
 ### Internal / Operational Parameters ###
 # Should not be changed during norma usage
 
-savedMergers_rawFilename = lambda x: _SAVE_PATH + (_MERGERS_RAW_SAVE_FILENAME % (x, _VERSION))
-savedMergers_fixedFilename = lambda x: _SAVE_PATH + (_MERGERS_FIXED_SAVE_FILENAME % (x, _VERSION))
+savedMergers_rawFilename = lambda x: DATA_PATH + (_MERGERS_RAW_SAVE_FILENAME % (x, _VERSION))
+savedMergers_fixedFilename = lambda x: DATA_PATH + (_MERGERS_FIXED_SAVE_FILENAME % (x, _VERSION))
 
 _PRINT_INTERVAL_1 = 200                                                                             # When loading raw files, status interval
 _PRINT_INTERVAL_2 = 20                                                                              # When fixing mergers, status interval

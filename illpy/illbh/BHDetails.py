@@ -23,6 +23,9 @@ import os, sys
 from glob import glob
 
 import numpy as np
+
+from BHConstants import DATA_PATH
+
 from .. import AuxFuncs as aux
 from .. import Constants as const
 from .. import illcosmo
@@ -49,12 +52,13 @@ _PRINT_INTERVAL = 2e4                                                           
 
 # Where to save intermediate files
 _MY_PATH = os.path.dirname(os.path.abspath(__file__))
-_POST_PROCESS_PATH = _MY_PATH + "/post-process/ill-%d_bh-details/"
-_DETAILS_SAVE_FILENAME = "ill-%d_details_snap-%d.npz"
-_DETAILS_TEMP_FILENAME = "ill-%d_details_snap-%d_temp.txt"
+#_POST_PROCESS_PATH = _MY_PATH + "/post-process/ill-%d_bh-details/"
+_DETAILS_DIR = "ill-%d_bh-details/"
+_DET_TEMP_NAME = "ill-%d_details_snap-%d_temp.txt"
+_DET_SAVE_NAME = "ill-%d_details_snap-%d.npz"
 
-details_temp_filename = lambda x,y: (_POST_PROCESS_PATH % (x)) + (_DETAILS_TEMP_FILENAME % (x,y))
-details_save_filename = lambda x,y: (_POST_PROCESS_PATH % (x)) + (_DETAILS_SAVE_FILENAME % (x,y))
+details_temp_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_TEMP_NAME % (x,y))
+details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAVE_NAME % (x,y))
 
 
 ### Dictionary Keys for Details Parametesr ###
