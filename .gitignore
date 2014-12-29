@@ -2,3 +2,5 @@ h5py/
 inspector_gadget/
 *.pyc
 .*~
+*.egg-info
+illpy/illbh/data
