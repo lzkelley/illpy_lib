@@ -17,14 +17,14 @@ The package contains two primary modules,
 Contents
 --------
 
-illpy
-|-- illpy
-|   |-- AuxFuncs.py
-|   |-- Constants.py                              : Physical and numerical constants
-|   |-- illbh
-|   |   |-- BHConstants.py
-|   |   |-- BHDetails.py                          : Access BH Details data
-|   |   |-- BHMergers.py                          : Access BH Mergers data
+illpy  
+|-- illpy  
+|   |-- AuxFuncs.py  
+|   |-- Constants.py                              : Physical and numerical constants  
+|   |-- illbh  
+|   |   |-- BHConstants.py  
+|   |   |-- BHDetails.py                          : Access BH Details data  
+|   |   |-- BHMergers.py                          : Access BH Mergers data  
 |   |   |-- __init__.py
 |   |   |-- MatchDetails.pyx                      : Perform quick searches in details entries
 |   |
