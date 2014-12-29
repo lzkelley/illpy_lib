@@ -121,7 +121,7 @@ files, see the ***Installation*** section above for more information.  Once the 
 files are produced, data access is quite rapid.
 
 BHDetails  
-  For detailed explanations, see the documentation in the **BHDetails** file,
+  For detailed explanations, see the documentation in the **BHDetails** file,  
   (illpy/illbh/BHDetails.py)  
   The *'details'* intermediate files are organized into snapshots, for convenience.  If time
   (scale-factors) `t_i` corresponds to snapshot number `i`, then all details entries between
@@ -151,6 +151,10 @@ BHMergers
     >> import numpy as np
     >> totm = np.sum(masses, axis=1)                # Get the total mass for each merger
     >> print np.average(totm)                       # Print the average, total-mass for each merger
+
+
+
+=================================
 
 
 
