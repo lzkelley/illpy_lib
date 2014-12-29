@@ -1,7 +1,7 @@
 illpy - Python Package for the Illustris data
 =============================================
-**illpy** is a package designed to access and analyze data produced from the
-[Illustris Simulations](http://www.illustris-project.org/w/index.php/The_Simulations).
+**illpy** is a package designed to access and analyze data produced from the Illustris Simulations
+http://www.illustris-project.org/w/index.php/The_Simulations
 
 The package contains two primary modules,  
     - **illcosmo** : simulation and snapshot cosmological parameters
@@ -17,6 +17,7 @@ The package contains two primary modules,
 Contents
 --------
 
+```
 illpy  
 |-- illpy  
 |   |-- AuxFuncs.py  
@@ -41,3 +42,4 @@ illpy
 |-- README.md
 |-- setup.py                                      : setup script to install package
 |-- setup.sh                                      : bash script to run setup.py w/ standard config
+```
