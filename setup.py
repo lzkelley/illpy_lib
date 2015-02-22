@@ -1,7 +1,7 @@
 import os
 from setuptools import setup
 
-readme = open('README').read()
+readme = open('README.rst').read()
 
 requirements = [
 
