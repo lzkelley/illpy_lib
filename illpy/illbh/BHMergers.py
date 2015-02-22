@@ -38,6 +38,23 @@ Examples
 Raises
 ------
 
+
+Notes
+-----
+   The underlying data is in the illustris bh merger files, 'blackhole_mergers_<#>.txt', which are
+   processed by `_loadMergersFromIllustris()`.  Each line of the input files is processed by
+   `_parseMergerLine()` which returns the redshift ('time') of the merger, and the IDs and masses
+   of each BH.  Each `merger` is sorted by time (redshift) in `_importMergers()` and placed in a
+   `dict` of all results.  This merger dictionary is saved to a 'raw' savefile whose name is given 
+   by `savedMergers_rawFilename()`.
+   The method `processMergers()` not only loads the merger objects, but also attempts to 'fix' the
+   incorrect `out` BH masses in the `_fixMergers()` method.  The corrected dictionary is then saved
+   to the `fixed` file, whose name is given by `savedMergers_fixedFilename()`.  Finally, the method
+   `processMergers()` also creates mappings of mergers to the snapshots nearest where they occur
+   (``mapM2S`) and visa-versa (``mapS2M``); as well as mergers which take place exactly during a
+   snapshot iteration (``ontop``).  These three maps are included in both merger dictionaries
+   (the `raw` and `fixed` ones).
+
 """
 
 import os, sys
@@ -165,7 +182,7 @@ def processMergers(run=RUN, verbose=VERBOSE, loadRaw=False, onlyRaw=False):
     _saveFixedMergers(mergers, run, verbose)
 
     return mergers
-
+    # processMergers()
 
 
 
@@ -524,11 +541,26 @@ def _parseMergerLine(line):
             '2' corresponds to the 'in' /'accreted'/eliminated BH
         NOTE: that MASS1 is INCORRECT (dynamical mass, instead of BH)
 
+    Returns
+    -------
+    time     : scalar, redshift of merger
+    out_id   : long, id number of `out` BH
+    out_mass : scalar, mass of `out` BH in simulation units (INCORRECT VALUE)
+    in_id    : long, id number of `in` BH
+    in_mass  : scalar, mass of `in` BH in simulation units
+
     """
 
-    strs = line.split()
-    return _DOUBLE(strs[1]), _LONG(strs[2]), _DOUBLE(strs[3]), _LONG(strs[4]), _DOUBLE(strs[5])
+    strs     = line.split()
+    # Convert to proper types
+    time     = _DOUBLE(strs[1])
+    out_id   = _LONG(strs[2])
+    out_mass = _DOUBLE(strs[3])
+    in_id    = _LONG(strs[4])
+    in_mass  = _DOUBLE(strs[5])
 
+    #return _DOUBLE(strs[1]), _LONG(strs[2]), _DOUBLE(strs[3]), _LONG(strs[4]), _DOUBLE(strs[5])
+    return time, out_id, out_mass, in_id, in_mass
 
 
 
