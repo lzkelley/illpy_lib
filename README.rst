@@ -33,7 +33,7 @@ This is the recommended method of installation as it builds in-place, allowing m
 reinstalling, and does not require administrative access to build in a global directory.  This
 method of installation can be executed using the 'setup.sh' script, i.e.::
 
-    $ bash setup.py
+    $ bash setup.sh
 
 The cosmology module *illcosmo* should work immediately.
 The Blackhole modules in **illbh** ***MUST BE INITIALIZED FIRST***.  Technically, they should self-
