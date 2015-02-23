@@ -1,22 +1,40 @@
-# ==================================================================================================
-# BHDetails.py
-# ------------
-#
-#
-#
-#
-#
-#
-# Illustris BH Details Files:
-# 0   1          2    3     4  5
-# ID scalefactor mass mdot rho cs
-#
-#
-# ------------------
-# Luke Zoltan Kelley
-# LKelley@cfa.harvard.edu
-# ==================================================================================================
+"""
+Module to handle Illustris blackhole details files.
 
+Details are accessed via 'intermediate' files which are reorganized versions of the 'raw' illustris
+files 'blackhole_details_<#>.txt'.  The `main()` function assures that details entries are properly
+converted from raw to processed form, organized by time of entry instead of processor.  Those
+details can then be accessed by snapshot and blackhole ID number.
+
+Functions
+---------
+main() : returns None, assures that intermediate files exist -- creating them if necessary.
+detailsForBH() : returns dict, dict; retrieves the details entries for a given BH ID number.
+
+
+Notes
+-----
+  - The BH Details files from illustris, 'blackhole_details_<#>.txt' are organized by the processor
+    on which each BH existed in the simulation.  The method `_reorganizeBHDetails()` sorts each
+    detail entry instead by the time (scalefactor) of the entry --- organizing them into files
+    grouped by which snapshot interval the detail entry corresponds to.  The reorganization is
+    first done into 'temporary' ASCII files before being converted into numpy `npz` files by the
+    method `_convertDetailsASCIItoNPZ()`.  The `npz` files are effectively dictionaries storing
+    the select details parameters (i.e. mass, BH ID, mdot, rho, cs), along with some meta data
+    about the `run` number, and creation time, etc.  Execution of the BHDetails ``main`` routine
+    checks to see if the npz files exist, and if they do not, they are created.
+
+  - There are also routines to obtain the details entries for a specific BH ID.  In particular,
+    the method `detailsForBH()` will return the details entry/entries for a target BH ID and
+    run/snapshot.
+
+  - Illustris Blackhole Details Files 'blackhole_details_<#>.txt'
+    - Each entry is given as
+      0   1            2     3     4    5
+      ID  scalefactor  mass  mdot  rho  cs
+
+
+"""
 
 ### Builtin Modules ###
 import os, sys
@@ -32,6 +50,8 @@ from .. import illcosmo
 
 import datetime
 
+
+
 _DOUBLE = np.float64
 _LONG = np.int64
 
@@ -46,14 +66,12 @@ CLEAN_TEMP = False                                                              
 
 # Where to find the 'raw' Illustris Merger files
 _DETAILS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/' }
-_DETAILS_FILE_NAMES = "blackhole_details_*.txt"
+_DETAILS_FILE_NAMES = "blackhole_details_*.txt"                                                     # Glob regex to match details files
 
 _PRINT_INTERVAL = 2e4                                                                               # Interval at which to print status
 
 
 # Where to save intermediate files
-_MY_PATH = os.path.dirname(os.path.abspath(__file__))
-#_POST_PROCESS_PATH = _MY_PATH + "/post-process/ill-%d_bh-details/"
 _DETAILS_DIR = "ill-%d_bh-details/"
 _DET_TEMP_NAME = "ill-%d_details_snap-%d_temp.txt"
 _DET_SAVE_NAME = "ill-%d_details_snap-%d.npz"
@@ -62,7 +80,7 @@ details_temp_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_TEM
 details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAVE_NAME % (x,y))
 
 
-### Dictionary Keys for Details Parametesr ###
+### Dictionary Keys for Details Parameters ###
 DETAIL_IDS     = 'id'
 DETAIL_TIMES   = 'times'
 DETAIL_MASSES  = 'masses'
@@ -122,7 +140,7 @@ def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
                     "         with the ``REDO_TEMP`` flag set to ``True``.")
             print note
 
-  
+
     # Confirm all temp files exist
     tempExist = aux.filesExist(tempFiles)
 
@@ -141,7 +159,7 @@ def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
     # If NPZ files don't exist, or we WANT to redo them, create NPZ files
     if( not saveExist or redo_save ):
 
-        if( verbose ): print " - Converting temporary files to NPZ"
+       if( verbose ): print " - Converting temporary files to NPZ"
         _convertDetailsASCIItoNPZ(cosmo.num, run, verbose=verbose)
 
     else:
@@ -161,7 +179,6 @@ def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
     if( not saveExist ):
         print "Save (NPZ) Files missing!  First file = '%s'" % (saveFiles[0])
         raise RuntimeError("Save (NPZ) Files missing!")
-
 
     return
 
@@ -507,24 +524,6 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     bhDets = { key : details[key][retInds] for key in returnKeys }
 
     return details, bhDets
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
