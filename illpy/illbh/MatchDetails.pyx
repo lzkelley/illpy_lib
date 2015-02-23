@@ -179,22 +179,35 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim=1] bhTimes,
                          np.ndarray[long, ndim=1] detIDs, np.ndarray[double, ndim=1] detTimes):
     """
-    Match merger BHs to details entries for a particular snapshot.
+    Match merger BHs to details entries based on ID number and entry time.
+
+    Arguments
+    ---------
+    bhIDs    : array[N] long, merger BH ID numbers
+    bhTimes  : array[N] float, merger-BH merger times (scalefactors)
+    detIDs   : array[N] long, details entry ID numbers
+    detTimes : array[N] float, detail entry times (scalefactors)
+
+    Returns
+    -------
+    retinds  : array[N] long, index of bh-details file containing match before merger
+    remnants : array[N] long, index of bh-details file containing match after  merger
+
     """
 
 
     # Get the number of target BHs
     cdef int nums = bhIDs.shape[0]
 
-    # Sort details first by ID, then by time in reverse
+    # Sort details first by ID, then by time in reverse (last in time comes first in list)
     cdef np.ndarray sort_det = np.lexsort( (-detTimes, detIDs) )
 
-    # Sort target BH IDs
+    # Sort target merger BH IDs
     cdef np.ndarray sort_bh = np.argsort(bhIDs)
 
     cdef int ii,jj
 
-    # Initialize arrays to store results; default to '-1'
+    # Initialize arrays to store results; default to '-1' for invalid entries
     cdef np.ndarray retinds = -1*np.ones(nums, dtype=long)
     cdef np.ndarray remnants = -1*np.ones(nums, dtype=long)
 
@@ -213,21 +226,6 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
         # Once match is found; find times before merger
         while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime ): jj += 1
 
-        '''
-        # Once match is found; find times before merger
-        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] > bhtime ): jj += 1
-        
-        # If this is a match, but the time is *the same* as merger time,
-        #     then this details entry is for the total (combined) merger product
-        if( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] == bhtime ):
-            # If there are no earlier entries, store this match to a special list
-            if( detIDs[sort_det[jj+1]] != bh ):
-                remnants[ind] = sort_det[jj]
-
-            # Don't let it be stored to the normal list.  Move to next
-            jj += 1
-        '''
-
         # If this is still a match, store result
         if( detIDs[sort_det[jj]] == bh ):
             # Store entry at sorted index (corresponding to current BH)
@@ -240,6 +238,7 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
 
     return retinds, remnants
 
+# detailsForBlackholes()
 
 
 
