@@ -593,6 +593,9 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         # Convert from list to array
         search = np.array(s2m)
 
+
+        ### Form List(s) of Target BH IDs ###
+
         # Add mergers from next snapshot
         if( snap < const.NUM_SNAPS-1 ): 
             next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
@@ -602,29 +605,6 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         if( snap > 0 ):
             prev = np.array(mergers[MERGERS_MAP_STOM][snap-1])
             if( len(prev) > 0 ): search = np.concatenate( (prev, search) )
-
-
-
-
-        ### Form List(s) of Target BH IDs ###
-
-        # Remove 'ontop' mergers (they merge before details are printed)
-        #     in the previous snapshot, these mergers were added to the search list
-        '''
-        inds = np.where( mergers[MERGERS_MAP_ONTOP][search] )[0]
-        search = np.delete(search, inds)
-
-        # Add 'ontop' mergers from the next snapshot to search list
-        if( snap < numSnaps-1 ):
-            # Get the mergers from the next snapshot
-            next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
-            if( len(next) > 0 ):
-                # Filter to 'ontop' mergers
-                inds = np.where( mergers[MERGERS_MAP_ONTOP][next] == True )[0]
-                next = next[inds]
-                # Add ontop mergers to list
-                search = np.concatenate((search, next))
-        '''
 
 
         ### Prepare Detail and Merger Information for Matching ###
@@ -668,21 +648,6 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
 
         ### Store matches ###
-
-        '''
-        # Both 'before' and 'after' matches
-        for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
-            # Both 'in' and 'out' BHs
-            for IN_OUT in [IN_BH, OUT_BH]:
-                # Select only successful matches
-                inds = np.where( detInds[:,IN_OUT,BEF_AFT] >= 0 )
-                useInds = np.squeeze(detInds[inds,IN_OUT,BEF_AFT])
-
-                # All target parameters
-                for KEY in _DETAIL_PHYSICAL_KEYS:
-                    mergDets[KEY][search[inds],IN_OUT,BEF_AFT] = dets[KEY][useInds]
-        '''
-
 
         # Both 'before' and 'after'
         for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
