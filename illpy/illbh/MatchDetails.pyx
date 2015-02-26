@@ -196,7 +196,10 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
     """
 
     # Get the number of target BHs
-    cdef int nums = bhIDs.shape[0]
+    cdef int numBHs = bhIDs.shape[0]
+    
+    # Number of details lines
+    cdef int numDets = detTimes.shape[0]
 
     # Sort details first by ID, then by time in reverse (last in time comes first in list)
     cdef np.ndarray sort_det = np.lexsort( (-detTimes, detIDs) )
@@ -207,12 +210,12 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
     cdef int ii,jj
 
     # Initialize arrays to store results; default to '-1' for invalid entries
-    cdef np.ndarray indsBef = -1*np.ones(nums, dtype=long)
-    cdef np.ndarray indsAft = -1*np.ones(nums, dtype=long)
+    cdef np.ndarray indsBef = -1*np.ones(numBHs, dtype=long)
+    cdef np.ndarray indsAft = -1*np.ones(numBHs, dtype=long)
 
     ### Iterate over Each Active Merger Binary System ###
     jj = 0
-    for ii in xrange(nums):
+    for ii in xrange(numBHs):
 
         # Get the sorted index
         ind = sort_bh[ii]
@@ -221,17 +224,17 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
         bhtime = bhTimes[ind]
 
         # Find Matching IDs
-        while( detIDs[sort_det[jj]] < bh ): jj += 1
+        while( detIDs[sort_det[jj]] < bh and jj < numDets-1 ): jj += 1
         # Once match is found; find times before merger
-        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime ): jj += 1
+        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime and jj < numDets-1 ): jj += 1
 
         # If this is still a match, it is before the merger --- store index
-        if( detIDs[sort_det[jj]] == bh ):
+        if( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] < bhtime ):
             # Store entry at sorted index (corresponding to current BH)
             indsBef[ind] = sort_det[jj]
 
         # If previous was a match, it was after merger --- store index
-        if( jj > 0 and detIDs[sort_det[jj-1]] == bh ):
+        if( jj > 0 and detIDs[sort_det[jj-1]] == bh and detTimes[sort_det[jj-1]] >= bhtime ):
             indsAft[ind] = sort_det[jj-1]
 
     # } ii
