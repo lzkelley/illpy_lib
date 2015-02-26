@@ -179,7 +179,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim=1] bhTimes,
                          np.ndarray[long, ndim=1] detIDs, np.ndarray[double, ndim=1] detTimes):
     """
-    Match merger BHs to details entries based on ID number and entry time.
+    Match merger BHs by ID to details entries just before and just after merger.
 
     Arguments
     ---------
@@ -190,11 +190,10 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
 
     Returns
     -------
-    retinds  : array[N] long, index of bh-details file containing match before merger
-    remnants : array[N] long, index of bh-details file containing match after  merger
+    indsBef : array[N] long, index of bh-details file containing match before merger
+    indsAft : array[N] long, index of bh-details file containing match after  merger
 
     """
-
 
     # Get the number of target BHs
     cdef int nums = bhIDs.shape[0]
@@ -208,8 +207,8 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
     cdef int ii,jj
 
     # Initialize arrays to store results; default to '-1' for invalid entries
-    cdef np.ndarray retinds = -1*np.ones(nums, dtype=long)
-    cdef np.ndarray remnants = -1*np.ones(nums, dtype=long)
+    cdef np.ndarray indsBef = -1*np.ones(nums, dtype=long)
+    cdef np.ndarray indsAft = -1*np.ones(nums, dtype=long)
 
     ### Iterate over Each Active Merger Binary System ###
     jj = 0
@@ -226,17 +225,18 @@ def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim
         # Once match is found; find times before merger
         while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime ): jj += 1
 
-        # If this is still a match, store result
+        # If this is still a match, it is before the merger --- store index
         if( detIDs[sort_det[jj]] == bh ):
             # Store entry at sorted index (corresponding to current BH)
-            retinds[ind] = sort_det[jj]
-        # Otherwise, if we had a match only *after* the merger, add this to a special list
-        elif( detIDs[sort_det[jj-1]] == bh ):
-            remnants[ind] = sort_det[jj-1]
+            indsBef[ind] = sort_det[jj]
+
+        # If previous was a match, it was after merger --- store index
+        if( jj > 0 and detIDs[sort_det[jj-1]] == bh ):
+            indsAft[ind] = sort_det[jj-1]
 
     # } ii
 
-    return retinds, remnants
+    return indsBef, indsAft
 
 # detailsForBlackholes()
 
