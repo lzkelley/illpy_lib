@@ -425,6 +425,10 @@ def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False,
 ###  =============  MATH  ==============  ###
 ###  ===================================  ###
 
+
+
+
+
 def incrementRollingStats(avevar, count, val):
     """
     Increment a rolling average and stdev calculation with a new value
@@ -617,13 +621,6 @@ def statusString(count, total, durat=None):
     return stat
 
 
-
-
-def getFileSize(fname, precision=1):
-    byteSize = os.path.getsize(fname)
-    return bytesString(byteSize, precision)
-
-
 def bytesString(bytes, precision=1):
     """
     Return a humanized string representation of a number of bytes.
@@ -656,6 +653,40 @@ def bytesString(bytes, precision=1):
     return '%.*f %s' % (precision, bytes / factor, suffix)
 
 
+
+
+###  ====================================  ###
+###  =============  FILES  ==============  ###
+###  ====================================  ###
+
+
+
+def saveDictNPZ(dataDict, savefile, verbose=False):
+    """
+    Save the given dictionary to the given npz file.
+
+    If the path to the given filename doesn't already exist, it is created.
+    If ``verbose`` is True, the saved file size is printed out.
+    """
+
+    # Make sure path to file exists
+    checkPath(savefile)
+
+    # Save and confirm
+    np.savez(savefile, **dataDict)
+    if( not os.path.exists(savefile) ):
+        raise RuntimeError("Could not save to file '%s'!!" % (savefile) )
+
+    if( verbose ): print " - - Saved dictionary to '%s'" % (savefile)
+    if( verbose ): print " - - - Size '%s'" % ( getFileSize(savefile) )
+    return
+
+
+
+
+def getFileSize(fname, precision=1):
+    byteSize = os.path.getsize(fname)
+    return bytesString(byteSize, precision)
 
 
 
