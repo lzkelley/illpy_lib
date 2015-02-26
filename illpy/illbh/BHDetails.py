@@ -42,9 +42,9 @@ from glob import glob
 
 import numpy as np
 
-from BHConstants import DATA_PATH, _DOUBLE, _LONG
-from BHMergers import MERGERS_IDS, MERGERS_MASSES, MERGERS_TIMES, MERGERS_NUM, MERGERS_MAP_STOM, \
-                      MERGERS_MAP_MTOS, MERGERS_MAP_ONTOP, IN_BH, OUT_BH
+from BHConstants import DATA_PATH, _DOUBLE, _LONG, MERGERS_IDS, MERGERS_MASSES, MERGERS_TIMES, \
+                        MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_MAP_MTOS, MERGERS_MAP_ONTOP, IN_BH, \
+                        OUT_BH
 
 from .. import AuxFuncs as aux
 from .. import Constants as const
@@ -97,8 +97,6 @@ _DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS,   DETAIL_TIMES, DETAIL_MASSES,
 
 
 
-
-
 ###  ===================================  ###
 ###  =============  MAIN  ==============  ###
 ###  ===================================  ###
@@ -106,9 +104,6 @@ _DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS,   DETAIL_TIMES, DETAIL_MASSES,
 
 
 def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
-
-    print "HELLO!"
-    raise RuntimeError("GOODBYE!")
 
     if( verbose ): print "\nBHDetails.py\n"
 
@@ -598,11 +593,24 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         # Convert from list to array
         search = np.array(s2m)
 
+        # Add mergers from next snapshot
+        if( snap < const.NUM_SNAPS-1 ): 
+            next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
+            if( len(next) > 0 ): search = np.concatenate( (search, next) )
+        
+        # Add mergers from previous snapshot
+        if( snap > 0 ):
+            prev = np.array(mergers[MERGERS_MAP_STOM][snap-1])
+            if( len(prev) > 0 ): search = np.concatenate( (prev, search) )
+
+
+
 
         ### Form List(s) of Target BH IDs ###
 
         # Remove 'ontop' mergers (they merge before details are printed)
         #     in the previous snapshot, these mergers were added to the search list
+        '''
         inds = np.where( mergers[MERGERS_MAP_ONTOP][search] )[0]
         search = np.delete(search, inds)
 
@@ -616,6 +624,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
                 next = next[inds]
                 # Add ontop mergers to list
                 search = np.concatenate((search, next))
+        '''
 
 
         ### Prepare Detail and Merger Information for Matching ###
@@ -631,7 +640,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
         # Get the BH merger info for this snapshot
         bhids    = mergers[MERGERS_IDS][search]
-        bhmasses = mergers[MERGERS_MASSES][search]
+        #bhmasses = mergers[MERGERS_MASSES][search]
         bhtimes  = mergers[MERGERS_TIMES][search]
         # Duplicate `times` to match shape of `ids` and `masses`
         bhtimes = np.array([bhtimes, bhtimes]).T
@@ -639,7 +648,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         # Reshape 2D to 1D arrays for matching
         searchShape = np.shape(bhids)                                                               # Store initial shape [searchNum,2]
         bhids = bhids.reshape(2*searchNum)
-        bhmasses = bhmasses.reshape(2*searchNum)
+        #bhmasses = bhmasses.reshape(2*searchNum)
         bhtimes = bhtimes.reshape(2*searchNum)
 
         ### Match Details to Mergers and Store ###
@@ -660,6 +669,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
         ### Store matches ###
 
+        '''
         # Both 'before' and 'after' matches
         for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
             # Both 'in' and 'out' BHs
@@ -671,13 +681,46 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
                 # All target parameters
                 for KEY in _DETAIL_PHYSICAL_KEYS:
                     mergDets[KEY][search[inds],IN_OUT,BEF_AFT] = dets[KEY][useInds]
+        '''
+
+
+        # Both 'before' and 'after'
+        for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
+
+            # Both 'in' and 'out' BHs
+            for IN_OUT in [IN_BH, OUT_BH]:
+                # Select only successful matches
+                inds = np.where( detInds[:,IN_OUT,BEF_AFT] >= 0 )[0]
+                #useInds = np.squeeze(detInds[inds,IN_OUT,BEF_AFT])
+                useInds = detInds[inds,IN_OUT,BEF_AFT]
+
+                # Select subset that hasn't been matched before
+                newInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] < 0.0 )[0]
+
+                if( len(newInds) > 0 ):
+                    for KEY in _DETAIL_PHYSICAL_KEYS:
+                        mergDets[KEY][search[inds[newInds]],IN_OUT,BEF_AFT] = dets[KEY][useInds[newInds]]
+
+
+                # Select subset with better matches
+
+                # If we're looking for 'before', look for latest 'before'
+                if( BEF_AFT == DETAIL_BEFORE ):
+                    oldInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] < dets[DETAIL_TIMES][useInds] )[0]
+                # If we're looking for 'adter', look for earliest 'after'
+                else:
+                    oldInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] > dets[DETAIL_TIMES][useInds] )[0]
+
+                if( len(oldInds) > 0 ):
+                    for KEY in _DETAIL_PHYSICAL_KEYS:
+                        mergDets[KEY][search[inds[oldInds]],IN_OUT,BEF_AFT] = dets[KEY][useInds[oldInds]]
 
 
         # Print progress
         count += len(bhids)
         if( verbose ):
             now = datetime.now()        
-            statStr = aux.statusString(count, 2*numMergers, now-start)
+            statStr = aux.statusString(count, 3*2*numMergers, now-start)
             sys.stdout.write('\r - - - %s' % (statStr))
             sys.stdout.flush()
 
