@@ -1,5 +1,6 @@
 
 import os
+import numpy as np
 
 DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
 
