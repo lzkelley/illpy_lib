@@ -62,7 +62,7 @@ import numpy as np
 import BHConstants
 from BHConstants import DATA_PATH, _DOUBLE, _LONG, MERGERS_TIMES, MERGERS_IDS, MERGERS_MASSES, \
                         MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM, MERGERS_MAP_ONTOP, \
-                        IN_BH, OUT_BH
+                        MERGERS_RUN, MERGERS_CREATED, IN_BH, OUT_BH
 
 import BHDetails
 from BHDetails import DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_BEFORE, DETAIL_AFTER
@@ -257,32 +257,12 @@ def _importMergers(run=RUN, verbose=VERBOSE):
 
 def _saveRawMergers(mergers, run, verbose=VERBOSE):
     savefile = savedMergers_rawFilename(run)
-    _saveMergers(mergers, savefile, verbose)
+    aux.saveDictNPZ(mergers, savefile, verbose)
     return
 
 def _saveFixedMergers(mergers, run, verbose=VERBOSE):
     savefile = savedMergers_fixedFilename(run)
-    _saveMergers(mergers, savefile, verbose)
-    return
-
-def _saveMergers(mergers, savefile, verbose=VERBOSE):
-    """
-    Save the given mergers dictionary to the given file.
-
-    If the path to the given filename doesn't already exist, it is created.
-    If ``verbose`` is True, the saved file size is printed out.
-    """
-
-    # Make sure path to file exists
-    aux.checkPath(savefile)
-
-    # Save and confirm
-    np.savez(savefile, **mergers)
-    if( not os.path.exists(savefile) ):
-        raise RuntimeError("Could not save to file '%s'!!" % (savefile) )
-
-    if( verbose ): print " - - Saved Mergers dictionary to '%s'" % (savefile)
-    if( verbose ): print " - - - Size '%s'" % ( aux.getFileSize(savefile) )
+    aux.saveDictNPZ(mergers, savefile, verbose)
     return
 
 
