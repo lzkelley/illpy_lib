@@ -47,13 +47,10 @@ Notes
    of each BH.  Each `merger` is sorted by time (redshift) in `_importMergers()` and placed in a
    `dict` of all results.  This merger dictionary is saved to a 'raw' savefile whose name is given 
    by `savedMergers_rawFilename()`.
-   The method `processMergers()` not only loads the merger objects, but also attempts to 'fix' the
-   incorrect `out` BH masses in the `_fixMergers()` method.  The corrected dictionary is then saved
-   to the `fixed` file, whose name is given by `savedMergers_fixedFilename()`.  Finally, the method
-   `processMergers()` also creates mappings of mergers to the snapshots nearest where they occur
-   (``mapM2S`) and visa-versa (``mapS2M``); as well as mergers which take place exactly during a
-   snapshot iteration (``ontop``).  These three maps are included in both merger dictionaries
-   (the `raw` and `fixed` ones).
+   The method `processMergers()` not only loads the merger objects, but also creates mappings of
+   mergers to the snapshots nearest where they occur (``mapM2S`) and visa-versa (``mapS2M``); as
+   well as mergers which take place exactly during a snapshot iteration (``ontop``).  These three
+   maps are included in the merger dictionary.
 
 """
 
@@ -62,16 +59,16 @@ from glob import glob
 from datetime import datetime
 import numpy as np
 
+import BHConstants
+from BHConstants import DATA_PATH, _DOUBLE, _LONG, MERGERS_TIMES, MERGERS_IDS, MERGERS_MASSES, \
+                        MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM, MERGERS_MAP_ONTOP, \
+                        IN_BH, OUT_BH
 
-from BHConstants import DATA_PATH
 import BHDetails
+from BHDetails import DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_BEFORE, DETAIL_AFTER
+
 from .. import illcosmo
 from .. import AuxFuncs as aux
-
-__all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR',
-            'MERGERS_RUN', 'MERGERS_CREATED', 'MERGERS_NUM',
-            'loadMergers', 'main', 'RUN', 'VERBOSE' ]
-
 
 
 ### Default Runtime Parameters ###
@@ -99,28 +96,6 @@ savedMergers_fixedFilename = lambda x: DATA_PATH + (_MERGERS_FIXED_SAVE_FILENAME
 _PRINT_INTERVAL_1 = 200                                                                             # When loading raw files, status interval
 _PRINT_INTERVAL_2 = 20                                                                              # When fixing mergers, status interval
 
-# Key Names for Mergers Dictionary
-MERGERS_TIMES     = 'times'
-MERGERS_IDS       = 'ids'
-MERGERS_MASSES    = 'masses'
-MERGERS_DIR       = 'dir'
-MERGERS_RUN       = 'run'
-MERGERS_CREATED   = 'created'
-MERGERS_NUM       = 'num'
-MERGERS_MAP_STOM  = 's2m'
-MERGERS_MAP_MTOS  = 'm2s'
-MERGERS_MAP_ONTOP = 'ontop'
-
-# Index of [N,2] arrays corresponding to each BH
-IN_BH  = 0
-OUT_BH = 1
-
-
-# Data Types
-_DOUBLE = np.float64
-_LONG = np.int64
-
-
 
 def main(run=RUN, verbose=VERBOSE):
     """
@@ -141,8 +116,7 @@ def main(run=RUN, verbose=VERBOSE):
     return
 
 
-
-def processMergers(run=RUN, verbose=VERBOSE, loadRaw=False, onlyRaw=False):
+def processMergers(run=RUN, verbose=VERBOSE, loadRaw=True):
 
     ### Load Mergers from Illustris Files ###
     if( verbose ): print " - Importing Mergers"
@@ -170,19 +144,9 @@ def processMergers(run=RUN, verbose=VERBOSE, loadRaw=False, onlyRaw=False):
     if( verbose ): print " - Saving Raw Mergers"
     _saveRawMergers(mergers, run, verbose)
 
-    # If only the 'raw' mergers are targeted, return them here
-    if( onlyRaw ): return mergers
-
-    ### Fix 'out' BH Mass in Mergers ###
-    if( verbose ): print " - Fixing Mergers (using 'details')"
-    _fixMergers(mergers, run, verbose)
-
-    ### Save Fixed Mergers ###
-    if( verbose ): print " - Saving Fixed Mergers"
-    _saveFixedMergers(mergers, run, verbose)
-
     return mergers
     # processMergers()
+
 
 
 
@@ -205,7 +169,6 @@ def loadMergers(run=RUN, verbose=VERBOSE):
         keys are given by the global `MERGERS_*` parameters
 
     """
-
 
     if( verbose ): print " - Loading mergers from save file"
     mergers = _loadMergersFromSave(run, verbose)
@@ -289,153 +252,6 @@ def _importMergers(run=RUN, verbose=VERBOSE):
                 }
 
     return mergers
-
-
-
-def _fixMergers(mergers, run, verbose=VERBOSE):
-    """
-    Fix the accretor/'out' BH Mass using the blackhole details files.
-
-    Merger files have an error in their output: the accretor BH (the 'out' BH
-    which survives the merger process) mass is the 'dynamical' mass instead of
-    the BH mass itself, see:
-    http://www.illustris-project.org/w/index.php/Blackhole_Files
-
-    This method finds the last entry in the Details files for the 'out' BH
-    before the merger event, to 'fix' the recorded mass (i.e. to get the value
-    from a different source).
-
-    Details
-    -------
-    There are numerous complicating factors.  First: the details often aren't
-    written at the same time as the mergers occur --- so there is a (small)
-    temporal offset in the entries.  Second, and harder to deal with, is that
-    some mergers happen soon enough after the next snapshot so that their BH
-    didn't have a detail entry yet.  One solution to this would be to search
-    the previous snapshot for the last valid entry for the BH that couldn't be
-    found in the current snapshot... that's annoying.
-    Instead
-    
-
-
-    """
-
-
-    if( verbose ): print " - - _fixMergers()"
-
-    # Import MatchDetails cython file
-    import pyximport
-    pyximport.install(setup_args={"include_dirs":np.get_include()})
-    import MatchDetails
-
-    numMergers = mergers[MERGERS_NUM]
-    numSnaps = len(mergers[MERGERS_MAP_STOM])
-    fixed = np.zeros(numMergers, dtype=bool)
-    fracDiff = -1.0*np.ones(numMergers, dtype=float)
-    fracDiff2 = -1.0*np.ones(numMergers, dtype=float)
-
-    # Iterate over each snapshot, with list of mergers in each `s2m`
-    count = 0
-    start = datetime.now()
-    for snap,s2m in enumerate(mergers[MERGERS_MAP_STOM]):
-
-        # If there are no mergers in this snapshot, continue to next iteration
-        if( len(s2m) <= 0 ): continue
-
-        search = np.array(s2m)
-
-        # Remove 'ontop' mergers (they merge before details are printed)
-        #     in the previous snapshot, these mergers were added to the search list
-        inds = np.where( mergers[MERGERS_MAP_ONTOP][search] )[0]
-        search = np.delete(search, inds)
-
-        # Add 'ontop' mergers from the next snapshot to search list
-        if( snap < numSnaps-1 ):
-            # Get the mergers from the next snapshot
-            next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
-            if( len(next) > 0 ):
-                # Filter to 'ontop' mergers
-                inds = np.where( mergers[MERGERS_MAP_ONTOP][next] == True )[0]
-                next = next[inds]
-                # Add ontop mergers to list
-                search = np.concatenate((search, next))
-
-
-        # Get the details for this snapshot
-        dets = BHDetails.loadBHDetails_NPZ(run, snap)
-        detIDs = dets[BHDetails.DETAIL_IDS]
-        detTimes = dets[BHDetails.DETAIL_TIMES]
-
-        # If there are no details in this snapshot (should only happen at end), continue
-        if( len(detIDs) <= 0 ): continue
-
-        # Get the BH info for this snapshot
-        bhids = mergers[MERGERS_IDS][search,OUT_BH]
-        bhmasses = mergers[MERGERS_MASSES][search,OUT_BH]
-        bhtimes = mergers[MERGERS_TIMES][search]
-
-        # Find Details indices to match these BHs
-        detInds, remInds = MatchDetails.detailsForBlackholes(bhids, bhtimes, detIDs, detTimes)
-
-        # Find valid, normal matches
-        inds = np.where( detInds >= 0 )[0]
-        if( len(inds) > 0 ):
-            fixMasses = dets[BHDetails.DETAIL_MASSES][detInds[inds]]
-            fracDiff[search[inds]] = fixMasses/bhmasses[inds]
-            mergers[MERGERS_MASSES][search[inds],OUT_BH] = fixMasses
-            fixed[search[inds]] = True
-
-        # Compensate for cases where only the combined remnant was found
-        inds = np.where( remInds >= 0 )[0]
-        if( len(inds) > 0 ):
-            # The 'correct' mass is roughly the remnant mass, minus the 'accreted' BH
-            fixMasses  = dets[BHDetails.DETAIL_MASSES][remInds[inds]] 
-            fixMasses -= mergers[MERGERS_MASSES][search[inds],IN_BH]                                # Subtract off 'accreted' BH mass
-
-            fracDiff2[search[inds]] = fixMasses/bhmasses[inds]
-            mergers[MERGERS_MASSES][search[inds],OUT_BH] = fixMasses
-            fixed[search[inds]] = True
-
-        # Print progress
-        count += len(bhids)
-        if( verbose ):
-            now = datetime.now()        
-            statStr = aux.statusString(count, numMergers, now-start)
-            sys.stdout.write('\r - - - %s' % (statStr))
-            sys.stdout.flush()
-
-    # } snap
-
-
-
-    numFixed = np.count_nonzero(fixed == True)
-    missing = np.where( fixed == False )[0]
-    numMissing = len(missing)
-
-    inds = np.where(fracDiff >= 0.0)[0]
-    aveDiff = np.average(fracDiff[inds])
-    stdDiff = np.std(fracDiff[inds])
-
-    # Adjust down any missing entries
-    if( numMissing > 0 ):
-        fixMasses = aveDiff*mergers[MERGERS_MASSES][missing,OUT_BH]
-        mergers[MERGERS_MASSES][missing,OUT_BH] = fixMasses
-
-    if( verbose ):
-        sys.stdout.write('\n')
-        print " - - - %d Fixed, %d Missing -- (NOTE: Fixed manually!)" % (numFixed, numMissing)
-        print " - - - Average fractional new mass = %.3e +- %.3e" % (aveDiff, stdDiff)
-
-        inds = np.where(fracDiff2 >= 0.0)[0]
-        print " - - - %d were remnant corrected" % (len(inds))
-        if( len(inds) > 0 ):
-            aveDiff = np.average(fracDiff2[inds])
-            stdDiff = np.std(fracDiff2[inds])
-            print " - - - - Average fractional new mass = %.3e +- %.3e" % (aveDiff, stdDiff)
-
-
-    return
-
 
 
 
@@ -629,10 +445,4 @@ def _mapToSnapshots(mergers, verbose=VERBOSE):
 
 
 
-
-
 if __name__ == "__main__": main()
-
-#if __name__ == "__main__" and __package__ is None:
- #   __package__ = "ill_lib.illbh.BHMergers"
-
