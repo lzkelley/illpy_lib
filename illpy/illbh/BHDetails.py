@@ -42,18 +42,15 @@ from glob import glob
 
 import numpy as np
 
-from BHConstants import DATA_PATH
+from BHConstants import DATA_PATH, _DOUBLE, _LONG
+from BHMergers import MERGERS_IDS, MERGERS_MASSES, MERGERS_TIMES, MERGERS_NUM, MERGERS_MAP_STOM, \
+                      MERGERS_MAP_MTOS, MERGERS_MAP_ONTOP, IN_BH, OUT_BH
 
 from .. import AuxFuncs as aux
 from .. import Constants as const
 from .. import illcosmo
 
-import datetime
-
-
-
-_DOUBLE = np.float64
-_LONG = np.int64
+from datetime import datetime
 
 
 ### Default Runtime Parameters ###
@@ -92,7 +89,11 @@ DETAIL_SNAP    = 'snap'
 DETAIL_NUM     = 'num'
 DETAIL_CREATED = 'created'
 
+DETAIL_BEFORE  = 0                                                                                  # Before merger time (MUST = 0!)
+DETAIL_AFTER   = 1                                                                                  # After (or equal) merger time (MUST = 1!)
 
+_DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS,   DETAIL_TIMES, DETAIL_MASSES, 
+                          DETAIL_MDOTS, DETAIL_RHOS,  DETAIL_CS     ]
 
 
 
@@ -105,6 +106,9 @@ DETAIL_CREATED = 'created'
 
 
 def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
+
+    print "HELLO!"
+    raise RuntimeError("GOODBYE!")
 
     if( verbose ): print "\nBHDetails.py\n"
 
@@ -159,7 +163,7 @@ def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
     # If NPZ files don't exist, or we WANT to redo them, create NPZ files
     if( not saveExist or redo_save ):
 
-       if( verbose ): print " - Converting temporary files to NPZ"
+        if( verbose ): print " - Converting temporary files to NPZ"
         _convertDetailsASCIItoNPZ(cosmo.num, run, verbose=verbose)
 
     else:
@@ -528,7 +532,158 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
 
 
 
+def detailsForMergers(mergers, run, verbose=VERBOSE):
+    """
+    Fix the accretor/'out' BH Mass using the blackhole details files.
 
+    Merger files have an error in their output: the accretor BH (the 'out' BH
+    which survives the merger process) mass is the 'dynamical' mass instead of
+    the BH mass itself, see:
+    http://www.illustris-project.org/w/index.php/Blackhole_Files
+
+    This method finds the last entry in the Details files for the 'out' BH
+    before the merger event, to 'fix' the recorded mass (i.e. to get the value
+    from a different source).
+
+    Details
+    -------
+    There are numerous complicating factors.  First: the details often aren't
+    written at the same time as the mergers occur --- so there is a (small)
+    temporal offset in the entries.  Second, and harder to deal with, is that
+    some mergers happen soon enough after the next snapshot so that their BH
+    didn't have a detail entry yet.  One solution to this would be to search
+    the previous snapshot for the last valid entry for the BH that couldn't be
+    found in the current snapshot... that's annoying.
+    Instead
+    
+    """
+
+
+    if( verbose ): print " - - detailsForMergers()"
+
+    # Import MatchDetails cython file
+    import pyximport
+    pyximport.install(setup_args={"include_dirs":np.get_include()})
+    import MatchDetails
+
+    numMergers = mergers[MERGERS_NUM]
+    numSnaps = len(mergers[MERGERS_MAP_STOM])
+
+    ### Initialize Output Arrays ###
+    # array[merger, in/out, bef/aft]
+    detID   = -1*np.ones([numMergers, 2, 2], dtype=_LONG)
+    detTime = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE) 
+    detMass = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
+    detMDot = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
+    detRho  = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
+    detCS   = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
+
+    # Create dictionary of details for mergers
+    mergDets = { DETAIL_IDS    : detID,
+                 DETAIL_TIMES  : detTime,
+                 DETAIL_MASSES : detMass,
+                 DETAIL_MDOTS  : detMDot,
+                 DETAIL_RHOS   : detRho,
+                 DETAIL_CS     : detCS }
+
+
+    # Iterate over each snapshot, with list of mergers in each `s2m`
+    count = 0
+    start = datetime.now()
+    for snap,s2m in enumerate(mergers[MERGERS_MAP_STOM]):
+
+        # If there are no mergers in this snapshot, continue to next iteration
+        if( len(s2m) <= 0 ): continue
+
+        # Convert from list to array
+        search = np.array(s2m)
+
+
+        ### Form List(s) of Target BH IDs ###
+
+        # Remove 'ontop' mergers (they merge before details are printed)
+        #     in the previous snapshot, these mergers were added to the search list
+        inds = np.where( mergers[MERGERS_MAP_ONTOP][search] )[0]
+        search = np.delete(search, inds)
+
+        # Add 'ontop' mergers from the next snapshot to search list
+        if( snap < numSnaps-1 ):
+            # Get the mergers from the next snapshot
+            next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
+            if( len(next) > 0 ):
+                # Filter to 'ontop' mergers
+                inds = np.where( mergers[MERGERS_MAP_ONTOP][next] == True )[0]
+                next = next[inds]
+                # Add ontop mergers to list
+                search = np.concatenate((search, next))
+
+
+        ### Prepare Detail and Merger Information for Matching ###
+        searchNum = len(search)
+
+        # Get all details (IDs and times) for this snapshot
+        dets     = loadBHDetails_NPZ(run, snap)
+        detIDs   = dets[DETAIL_IDS]
+        detTimes = dets[DETAIL_TIMES]
+
+        # If there are no details in this snapshot (should only happen at end), continue
+        if( len(detIDs) <= 0 ): continue
+
+        # Get the BH merger info for this snapshot
+        bhids    = mergers[MERGERS_IDS][search]
+        bhmasses = mergers[MERGERS_MASSES][search]
+        bhtimes  = mergers[MERGERS_TIMES][search]
+        # Duplicate `times` to match shape of `ids` and `masses`
+        bhtimes = np.array([bhtimes, bhtimes]).T
+
+        # Reshape 2D to 1D arrays for matching
+        searchShape = np.shape(bhids)                                                               # Store initial shape [searchNum,2]
+        bhids = bhids.reshape(2*searchNum)
+        bhmasses = bhmasses.reshape(2*searchNum)
+        bhtimes = bhtimes.reshape(2*searchNum)
+
+        ### Match Details to Mergers and Store ###
+
+        # Find Details indices to match these BHs (just before and just after merger)
+        indsBef, indsAft = MatchDetails.detailsForBlackholes(bhids, bhtimes, detIDs, detTimes)
+
+        # Reshape indices to match mergers (in and out BHs)
+        indsBef = np.array(indsBef).reshape(searchShape)
+        indsAft = np.array(indsAft).reshape(searchShape)
+
+        # Reshape det indices to match ``mergDets``
+        # First makesure numbering is consistent!
+        assert DETAIL_BEFORE == 0 and DETAIL_AFTER == 1, "`BEFORE` and `AFTER` broken!!"
+
+        detInds = np.dstack([indsBef,indsAft])
+
+
+        ### Store matches ###
+
+        # Both 'before' and 'after' matches
+        for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
+            # Both 'in' and 'out' BHs
+            for IN_OUT in [IN_BH, OUT_BH]:
+                # Select only successful matches
+                inds = np.where( detInds[:,IN_OUT,BEF_AFT] >= 0 )
+                useInds = np.squeeze(detInds[inds,IN_OUT,BEF_AFT])
+
+                # All target parameters
+                for KEY in _DETAIL_PHYSICAL_KEYS:
+                    mergDets[KEY][search[inds],IN_OUT,BEF_AFT] = dets[KEY][useInds]
+
+
+        # Print progress
+        count += len(bhids)
+        if( verbose ):
+            now = datetime.now()        
+            statStr = aux.statusString(count, 2*numMergers, now-start)
+            sys.stdout.write('\r - - - %s' % (statStr))
+            sys.stdout.flush()
+
+    # } snap
+
+    return mergDets
 
 
 
