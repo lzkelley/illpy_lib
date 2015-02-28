@@ -42,9 +42,7 @@ from glob import glob
 
 import numpy as np
 
-from BHConstants import DATA_PATH, _DOUBLE, _LONG, MERGERS_IDS, MERGERS_MASSES, MERGERS_TIMES, \
-                        MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_MAP_MTOS, MERGERS_MAP_ONTOP, IN_BH, \
-                        OUT_BH
+from BHConstants import *
 
 from .. import AuxFuncs as aux
 from .. import Constants as const
@@ -77,20 +75,6 @@ details_temp_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_TEM
 details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAVE_NAME % (x,y))
 
 
-### Dictionary Keys for Details Parameters ###
-DETAIL_IDS     = 'id'
-DETAIL_TIMES   = 'times'
-DETAIL_MASSES  = 'masses'
-DETAIL_MDOTS   = 'mdots'
-DETAIL_RHOS    = 'rhos'
-DETAIL_CS      = 'cs'
-DETAIL_RUN     = 'run'
-DETAIL_SNAP    = 'snap'
-DETAIL_NUM     = 'num'
-DETAIL_CREATED = 'created'
-
-DETAIL_BEFORE  = 0                                                                                  # Before merger time (MUST = 0!)
-DETAIL_AFTER   = 1                                                                                  # After (or equal) merger time (MUST = 1!)
 
 _DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS,   DETAIL_TIMES, DETAIL_MASSES, 
                           DETAIL_MDOTS, DETAIL_RHOS,  DETAIL_CS     ]
@@ -464,7 +448,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     if( verbose ): print " - - detailsForBH()"
 
     # Details keys which should be returned
-    returnKeys = [ DETAIL_TIMES, DETAIL_MASSES, DETAIL_MDOTS, DETAIL_RHOS, DETAIL_CS ]
+    # returnKeys = [ DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_MDOTS, DETAIL_RHOS, DETAIL_CS ]
     # If no match is found, return all values as this:
     missingValue = -1.0
 
@@ -491,7 +475,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     # If there are no matches, return None array
     if( len(inds) == 0 ):
         if( verbose ): print "No matches in snap %d for ID %d" % (snap, bhid)
-        return { key : missingValue for key in returnKeys }
+        return { key : missingValue for key in _DETAIL_PHYSICAL_KEYS }
 
     # Get times for matching details
     detTimes = details[DETAIL_TIMES][inds]
@@ -520,7 +504,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     # Convert indices to global array
     retInds = inds[retInds]
     # Create output dictionary with same keys as `details`
-    bhDets = { key : details[key][retInds] for key in returnKeys }
+    bhDets = { key : details[key][retInds] for key in _DETAIL_PHYSICAL_KEYS }
 
     return details, bhDets
 
