@@ -24,7 +24,6 @@ import os
 import sys
 import datetime
 import matplotlib                  as mpl
-#import cPickle as pickle
 from matplotlib import pyplot      as plt
 
 from glob import glob
@@ -282,80 +281,6 @@ def plotRect(ax, loc):
     return
 
 
-def histPlot(ax, values, bins, weights=None, ls='-', lw=1.0, color='k', ave=False, scale=None, label=None):
-    """
-    Manually plot a histogram.
-
-    Uses numpy.histogram to obtain binned values, then plots them manually
-    as connected lines with the given parameters.  If `weights` are provided,
-    they are the values summed for each bin instead of 1.0 for each entry in
-    `values`.
-
-    Parameters
-    ----------
-    ax : object, matplotlib.axes
-        Axes on which to make plot
-
-    values : array_like, scalar
-        Array of values to be binned and plotted.  Each entry which belongs in
-        a bin, increments that bin by 1.0 or the corresponding entry in
-        `weights` if it is provived.
-
-    bins : array_like, scalar
-        Edges of bins to use for histogram, with both left and right edges.
-        If `bins` has length N, there will be N-1 bins.
-
-    weights : array_like, scalar, optional
-        Array of the same length as `values` which contains the weights to be
-        added to each bin.
-
-    ls : str, optional
-        linestyle to plot with
-
-    lw : scalar, optional
-        lineweight to plot with
-
-    color : str, optional
-        color of line to plot with
-
-    scale : scalar or array of scalars
-        Rescale the resulting histogram by this/these values
-        (e.g. 1/binVol will convert to density)
-
-    label : str, optional
-        label to associate with plotted histogram line
-
-    Returns
-    -------
-    ll : object, matplotlib.lines.Line2D
-        Line object which was plotted to axes `ax`
-        (can then be used to make a legend, etc)
-
-    hist : array, scalar
-        The histogram which is plotted
-
-    """
-
-    hist,edge = np.histogram( values, bins=bins, weights=weights )
-
-    # Find the average of each weighed bin instead.
-    if( ave and weights is not None ): 
-        hist = [ hh/nn if nn > 0 else 0.0 
-                 for hh,nn in zip(hist,np.histogram( values, bins=bins)[0]) ]
-
-    # Rescale the bin values
-    if( scale != None ):
-        hist *= scale
-
-    yval = np.concatenate([ [hh,hh] for hh in hist ])
-    xval = np.concatenate([ [edge[jj],edge[jj+1]] for jj in range(len(edge)-1) ])
-
-    if( ax == None ): 
-        ll = None
-    else:         
-        ll, = ax.plot( xval, yval, ls, lw=lw, color=color, label=label)
-
-    return ll, hist
 
 
 
