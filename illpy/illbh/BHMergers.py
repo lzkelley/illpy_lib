@@ -59,16 +59,13 @@ from glob import glob
 from datetime import datetime
 import numpy as np
 
-import BHConstants
-from BHConstants import DATA_PATH, _DOUBLE, _LONG, MERGERS_TIMES, MERGERS_IDS, MERGERS_MASSES, \
-                        MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM, MERGERS_MAP_ONTOP, \
-                        MERGERS_RUN, MERGERS_CREATED, IN_BH, OUT_BH
-
 import BHDetails
-from BHDetails import DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_BEFORE, DETAIL_AFTER
+import BHConstants
+from BHConstants import *
 
 from .. import illcosmo
 from .. import AuxFuncs as aux
+
 
 
 ### Default Runtime Parameters ###
@@ -113,7 +110,7 @@ def main(run=RUN, verbose=VERBOSE):
 
     mergers = processMergers(run, verbose)
 
-    return
+v    return
 
 
 def processMergers(run=RUN, verbose=VERBOSE, loadRaw=True):
