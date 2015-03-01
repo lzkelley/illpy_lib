@@ -35,10 +35,11 @@ import BHConstants
 from BHConstants import *
 
 from .. import Constants
-
+from .. import AuxFuncs as aux
 
 RUN = 3
 VERBOSE = True
+
 
 
 
@@ -58,7 +59,7 @@ def main(run=RUN, verbose=VERBOSE):
     ###  Get Details for Mergers and Save  ###
     if( verbose ): print " - - Matching Mergers to Details"
     start = datetime.now()
-    detailsForMergers(mergers, mapM2S, mapS2M, run)
+    detailsForMergers(mergers, run, verbose=verbose)
     stop = datetime.now()
     if( verbose ): print " - - - Mergers matched after %s" % (str(stop-start))
 
@@ -75,7 +76,7 @@ def main(run=RUN, verbose=VERBOSE):
 ###  ================================================  ###
 
 
-def detailsForMergers(mergers, m2s, s2m, run, snapNums=None, verbose=VERBOSE):
+def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
     
     if( verbose ): print " - - detailsForMergers()"
 
@@ -99,17 +100,33 @@ def detailsForMergers(mergers, m2s, s2m, run, snapNums=None, verbose=VERBOSE):
 
     ### Allocate arrays for results ###
     #     Row for each merger; Column for each BH In merger [0-in, 1-out]
-    ids  = np.zeros([numMergers,2], dtype=_LONG)
+    '''
+    ids  = np.zeros([numMergers,2], dtype=_LONG)    
     mass = np.zeros([numMergers,2], dtype=_DOUBLE)
     mdot = np.zeros([numMergers,2], dtype=_DOUBLE)
     rho  = np.zeros([numMergers,2], dtype=_DOUBLE)
     cs   = np.zeros([numMergers,2], dtype=_DOUBLE)
+    '''
+
+    ids   = -1*np.ones([numMergers,2,2], dtype=_LONG)    
+    times = -1*np.ones([numMergers,2,2], dtype=_DOUBLE)
+    mass  = -1*np.ones([numMergers,2,2], dtype=_DOUBLE)
+    mdot  = -1*np.ones([numMergers,2,2], dtype=_DOUBLE)
+    rho   = -1*np.ones([numMergers,2,2], dtype=_DOUBLE)
+    cs    = -1*np.ones([numMergers,2,2], dtype=_DOUBLE)
+
+    mergDets = {}
+
+    for KEY in DETAIL_PHYSICAL_KEYS:
+        if( KEY == DETAIL_IDS ): mergDets[KEY] = -1 * np.ones([numMergers,2,2], dtype=_LONG)
+        else:                    mergDets[KEY] = -1.0*np.ones([numMergers,2,2], dtype=_DOUBLE)
+
 
     # Maintain a list of Mergers which could not be matched to Details
     missingMergers = []
 
     ### Iterate over Target Snapshots ###
-    if( verbose ): print " - - Iterating over %d snapshots" % (numSnapsHere)
+    if( verbose ): print " - - - Iterating over %d snapshots" % (numSnapsHere)
     startAll = datetime.now()
     numMatched = 0
     lastList = []                                                                                   # These are failed matches, passed on
@@ -117,7 +134,11 @@ def detailsForMergers(mergers, m2s, s2m, run, snapNums=None, verbose=VERBOSE):
 
     for ii,snum in enumerate(snapNumbers):
         startOne = datetime.now()
-        if( verbose ): print " - - - Snapshot %d/%d" % (ii, numSnapsHere)
+        if( verbose ): print " - - - Snapshot %d/%d   # %d" % (ii, numSnapsHere, snum)
+
+        # if( ii > 2 ): break ### !!!!!!
+
+        s2m = mergers[MERGERS_MAP_STOM]
 
         # If there are no mergers to match, continue to next iteration
         if( len(s2m[snum]) == 0 and len(lastList) == 0 ):
@@ -132,28 +153,40 @@ def detailsForMergers(mergers, m2s, s2m, run, snapNums=None, verbose=VERBOSE):
         if( verbose ): print " - - - - Details loaded after %s" % (str(stop-start))
 
         # If there are no details here, continue to next iteration
-        if( len(dets) == 0 ): continue
+        if( dets[DETAIL_NUM] == 0 ): 
+            if( verbose ): print " - - - - No details for snapshot %d" % (snum)
+            continue
 
         
         ## Load Details Information ##
         start = datetime.now()
-        matched = detailsForMergersAtSnapshot(mergers, s2m[snum], lastList, dets, 
+        matched = detailsForMergersAtSnapshot(mergers, mergers[MERGERS_MAP_STOM][snum], lastList, dets, 
                                               nextList, missingMergers, run, snum,
-                                              ids, mass, mdot, rho, cs, verbose=verbose)
+                                              mergDets, verbose=verbose)
                            
         numMatched += matched                                                                       # Track successful matches
         numMissing = len(missingMergers)                                                            
         lastList = nextList                                                                         # Pass 'next' list on
         nextList = []                                                                               # Clear for next iteration
         stop = datetime.now()
-        if( verbose ): print " - - - - Snapshot Mergers Matched retreived after %s" % (str(stop-start))
-        
+        if( verbose ): print " - - - - Snapshot Mergers Matched after %s" % (str(stop-start))
+
         stopOne = datetime.now()
         if( verbose ): 
             print " - - - - - %d matched, %d missing After %s / %s" % (numMatched, numMissing, str(stopOne-startOne), str(stopOne-startAll))
 
 
+
     # } ii
+
+
+    ### Get Parameters from Detail Indices ###
+
+    inds = np.where( mergDets[DETAIL_IDS][:,0,0] >= 0 )[0]
+    print "SUCCESS IN BEFORE %d" % (len(inds))
+
+    saveFile = 'ill-%d_matched-merger-details_test.npz' % (run)
+    aux.saveDictNPZ(mergDets, saveFile, verbose=verbose)
 
     '''
     # Create save file name
@@ -185,7 +218,7 @@ def detailsForMergers(mergers, m2s, s2m, run, snapNums=None, verbose=VERBOSE):
 
 def detailsForMergersAtSnapshot(mergers, mrgList, prevList, dets,
                                 nextList, missList, run, snap,
-                                ids, mass, mdot, rho, cs, verbose=VERBOS):
+                                mergDets, verbose=VERBOSE):
 
     '''
     Get the Details for a list of mergers for this snapshot.
@@ -200,7 +233,6 @@ def detailsForMergersAtSnapshot(mergers, mrgList, prevList, dets,
     batch.  'prevList' is that list, that wasn't found in the last iteration.
     Also try to find 'prevList' here, if they are not found, add them to 'missList'
     
-    
     mergers   : IN, <Mergers>    object containing all merger information
     mrgList   : IN, list, <int>  indices of target mergers
     prevList  : IN, list, <int>  list of additional mergers not found last time
@@ -214,123 +246,211 @@ def detailsForMergersAtSnapshot(mergers, mrgList, prevList, dets,
 
     '''
 
-    if( verbose ): print " - - detailsForMergersAtSnapshot()"
+    if( verbose ): print " - - - detailsForMergersAtSnapshot()"
 
-    NORM_MRG = 0
-    PREV_MRG = 1
-    
+    NORM_MRG = 0                                                                                    # Mergers from this snapshot
+    PREV_MRG = 1                                                                                    # Mergers from previous snapshot
+
+
     # Concatenate the new list (mrgList) with the previous (prevList);
     #     make array (mrgTypes) to track which element is which
-    fullList = np.concatenate( (mrgList, prevList) )
+    if( len(prevList) > 0 ): fullList = np.concatenate( (mrgList, prevList) )
+    else: fullList = np.array(mrgList)
+
     numTarget = len(fullList)
     mrgTypes = np.ones( len(mrgList) + len(prevList), dtype=_LONG )*NORM_MRG                        # Set first group as NORM type
     mrgTypes[len(mrgList):] = PREV_MRG                                                              # Next group as PREV type
+
+
+    detInds = -1*np.ones([numTarget,2,2], dtype=_LONG)
     
-    if( verbose ): print " - - - targeting %d/%d mergers" % (numTarget, mergers[MERGERS_NUM])
+    if( verbose ): print " - - - - targeting %d/%d mergers" % (numTarget, mergers[MERGERS_NUM])
 
     ### Iterate Over Target Merger Indices ###
     numGood = 0                                                                                     # Number matched right away
     numNext = 0                                                                                     # Num passed on to next iter
     numSaved = 0                                                                                    # Num from past, now matched
     numMissing = 0                                                                                  # Num from past, unmatched
+    numIncomp = 0
+
+    missInBef = 0
+    missOutBef = 0
+    missOutAft = 0
+
     for ii, (mtype, mnum) in enumerate(zip(mrgTypes,fullList)):
 
         # Extract target parameters
-        '''
-        mtime = mergers.time[mnum]
-        inid  = mergers.in_id[mnum]
-        outid = mergers.out_id[mnum]
-        '''
         mtime = mergers[MERGERS_TIMES][mnum]
         inid  = mergers[MERGERS_IDS][mnum, IN_BH]
         outid = mergers[MERGERS_IDS][mnum, OUT_BH]
 
+        for IO,tid in enumerate([inid, outid]):
+            inds = detailsIndForBHAtTime(tid, mtime, dets)
 
-        for jj,tid in enumerate([inid, outid]):
-            #dargs  = detailsForBH(tid,  mtime, dets)
-            dargs  = detailsForBH(tid, run, snap, details=dets, side=None, verbose=verbose)
+            for BA in [DETAIL_BEFORE, DETAIL_AFTER]:
+                
+                # If there are matches
+                if( inds[BA] is not None ):
+                    
+                    # If this hasn't been matched before, store match
+                    if( mergDets[DETAIL_IDS][mnum,IO,BA] < 0 ): 
+                        detInds[ii,IO,BA] = inds[BA]
 
-            # If there are no matches
-            if( dargs == None ): 
-                # If this is from the normal list, add to 'next' list
-                if( mtype == NORM_MRG ): 
-                    nextList.append(mnum)
-                    numNext += 1
-                # If this is from the previous list, add to 'missing' list
-                elif( mtype == PREV_MRG ): 
-                    missList.append(mnum)
+                    # If already matched, see if this is better
+                    else:
+                        oldTime = dets[DETAIL_TIMES][ detInds[ii,IO,BA] ]
+                        newTime = dets[DETAIL_TIMES][ inds[BA] ]
+
+                        # For *before* matches, later   is better
+                        if(   BA == DETAIL_BEFORE ):
+                            if( newTime > oldTime ): 
+                                detInds[ii,IO,BA] = inds[BA]
+                        # For *after* matches,  earlier is better
+                        elif( BA == DETAIL_AFTER ):
+                            if( newTime < oldTime ): 
+                                detInds[ii,IO,BA] = inds[BA]
+
+            # } BA
+
+        # } IO
+
+
+        # If any of expected matches are missing
+        if( detInds[ii,IN_BH, DETAIL_BEFORE] < 0 or
+            detInds[ii,OUT_BH,DETAIL_BEFORE] < 0 or detInds[ii,OUT_BH,DETAIL_AFTER] < 0 ):
+
+            # If this is from the normal list, add to 'next' list
+            if( mtype == NORM_MRG ): 
+                nextList.append(mnum)
+                numNext += 1
+            # If this is from the previous list, add to 'missing' list
+            elif( mtype == PREV_MRG ): 
+
+                if( detInds[ii,IN_BH, DETAIL_BEFORE] < 0 ): 
+                    print " - - - - - - Snap  %d, Merger %d, Missing IN  BEFORE" % (snap, mnum)
+                    missInBef += 1
+
+                if( detInds[ii,OUT_BH,DETAIL_BEFORE] < 0 ): 
+                    print " - - - - - - Snap  %d, Merger %d, Missing OUT BEFORE" % (snap, mnum)
+                    missOutBef += 1
+
+                if( detInds[ii,OUT_BH,DETAIL_AFTER ] < 0 ):
+                    print " - - - - - - Snap  %d, Merger %d, Missing OUT AFTER " % (snap, mnum)
+                    missOutAft += 1
                     numMissing += 1
-                else: 
-                    raise RuntimeError("Unrecognized type %d in merger list!" % (mtype) )
+                    missList.append(mnum)
 
-                continue
+                numIncomp += 1
+            else: 
+                raise RuntimeError("Unrecognized type %d in merger list!" % (mtype) )
 
-            # Track if successful match after previous failure
-            if( mtype == PREV_MRG ): numSaved += 1
+            continue
 
-            numGood += 1
-            ids[mnum,jj] = tid
-            mass[mnum,jj] = dargs[Details.DETAIL_MASS]
-            mdot[mnum,jj] = dargs[Details.DETAIL_MDOT]
-            rho[mnum,jj] = dargs[Details.DETAIL_RHO]
-            cs[mnum,jj] = dargs[Details.DETAIL_CS]
+        # Track if successful match after previous failure
+        if( mtype == PREV_MRG ): numSaved += 1
+
+        numGood += 1
+
+    # } ii
+
+    for IO in [IN_BH, OUT_BH]:
+        for BA in [DETAIL_BEFORE, DETAIL_AFTER]:
+
+            inds = np.where( detInds[:,IO,BA] >= 0 )[0]
+
+            if( len(inds) > 0 ):
+                for KEY in DETAIL_PHYSICAL_KEYS:
+                    mergDets[KEY][fullList[inds],IO,BA] = dets[KEY][detInds[inds,IO,BA]]
 
 
-    if( log ): 
-        log.log("%d good, %d passed, %d saved, %d missing." % 
-                (numGood, numNext, numSaved, numMissing), 1 )
-
+    if( verbose ): 
+        print " - - - - - %d good, %d passed, %d saved, %d missing" % (numGood, numNext, numSaved, numMissing)
+        print " - - - - - - %d Incomplete : %d in before,  %d out before,  %d out after (missing)" % (numIncomp, missInBef, missOutBef, missOutAft)
 
 
     return numGood
     
 
-'''
-def detailsForBH(bhid, mtime, dets, log=None):
 
-    if( log ): log.log("detailsForBH()", 1)
+def detailsIndForBHAtTime(bhid, mtime, dets, verbose=False):
+    '''
+    Get the details indices matching the target BH around a given time.
+
+    Finds all indices of matching IDs in the details entries, then finds the
+    nearest entry to the time ``mtime`` both before and after.  Returns `None`
+    for no match on that side (before or after).
+
+    Arguments
+    ---------
+    bhid : long, ID number of target BH
+    mtime : scalar, time (scale factor) of desired detail entries
+    dets : dict, BHDetails details entries
+    verbose : bool (optional : False), print verbose output
+
+    Returns
+    -------
+    indBef : long, index number of match before given time
+    indAft : long, index number of match after  given time
+
+    '''
+
+    if( verbose ): print " - - - detailsIndForBH()"
 
     start = datetime.now()
 
     ### Find the Details index which matched ID and Nearest in Time ###
 
     # Find details indices with BH ID match
-    detInds = np.where( bhid == dets.id )[0]
+    detInds = np.where( bhid == dets[DETAIL_IDS] )[0]
 
     # If there are no matches, return None
     if( len(detInds) == 0 ): 
-        if( log ): log.log("No ID matches")
-        return None
+        if( verbose ): print " - - - - No ID matches"
+        return None, None
 
     # Get times for matching details
-    detTimes = dets.time[ detInds ]
+    detTimes = dets[DETAIL_TIMES][detInds]
     # Get indices to sort details times
     sortInd = np.argsort(detTimes)
-    # Find last detail before merger time
-    lastInd = np.where( detTimes[sortInd] <= mtime )[0]
 
-    # If there are no matches, return None
-    if( len(lastInd) == 0 ): 
-        if( log ): log.log("No time matches")
-        return None
+    # details *before* merger time
+    indBef = np.where( detTimes[sortInd] <  mtime )[0]
+    # details *after*  merger time
+    indAft = np.where( detTimes[sortInd] >= mtime )[0]
+
 
     ### Convert Index to usable ###
 
-    # Get the last sorted time entry
-    lastInd = lastInd[-1]
-    # Get the actual time entry
-    lastInd = sortInd[lastInd]
-    # Get the overall index
-    detInd = detInds[lastInd]
+    # If there are *before* matches
+    if( len(indBef) > 0 ):
+        # Get the last sorted time entry
+        indBef = indBef[-1]
+        # Get the actual time entry
+        indBef = detInds[ sortInd[indBef] ]
+    else:
+        indBef = None
+
+
+    # If there are *after* matches
+    if( len(indAft) > 0 ):
+        # Get the last sorted time entry
+        indAft = indAft[-1]
+        # Get the actual time entry
+        indAft = detInds[ sortInd[indAft] ]
+    else:
+        indAft = None
+
 
     stop = datetime.now()
 
-    if( log ): 
-        log.log("Matched time offset = %.2e; After %s" % 
-                (mtime-dets.time[detInd], str(stop-start)))
+    if( verbose ):
+        timeBef = mtime - dets[DETAILS_TIMES][indBef]
+        timeAft = dets[DETAILS_TIMES][indAft] - mtime
+        print " - - - - Indices After %s : Before %.2e   After %.2e" % (str(stop-start), timeBef, timeAft)
 
-    return dets[detInd]
-'''
+
+    return indBef, indAft
+
     
 
 
