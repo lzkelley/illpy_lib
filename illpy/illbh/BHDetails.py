@@ -258,16 +258,16 @@ def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
         ids, times, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
         # Store details in dictionary
-        details = { DETAIL_NUM : len(ids),
-                    DETAIL_RUN : run,
-                    DETAIL_SNAP : snap,
-                    DETAIL_CREATED : datetime.datetime.now().ctime(),
-                    DETAIL_IDS    : ids,
-                    DETAIL_TIMES  : times,
-                    DETAIL_MASSES : masses,
-                    DETAIL_MDOTS  : mdots,
-                    DETAIL_RHOS   : rhos,
-                    DETAIL_CS     : cs }
+        details = { DETAILS_NUM : len(ids),
+                    DETAILS_RUN : run,
+                    DETAILS_SNAP : snap,
+                    DETAILS_CREATED : datetime.datetime.now().ctime(),
+                    DETAILS_IDS    : ids,
+                    DETAILS_TIMES  : times,
+                    DETAILS_MASSES : masses,
+                    DETAILS_MDOTS  : mdots,
+                    DETAILS_RHOS   : rhos,
+                    DETAILS_CS     : cs }
 
         np.savez(sav, **details)
         if( not os.path.exists(sav) ):
@@ -444,7 +444,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     if( verbose ): print " - - detailsForBH()"
 
     # Details keys which should be returned
-    # returnKeys = [ DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_MDOTS, DETAIL_RHOS, DETAIL_CS ]
+    # returnKeys = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES, DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
     # If no match is found, return all values as this:
     missingValue = -1.0
 
@@ -454,27 +454,27 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     if( details == None ):
         if( verbose ): print " - - - No details provided, loading for snapshot %d" % (snap)
         details = loadBHDetails_NPZ(run, snap)
-        if( verbose ): print " - - - - Loaded %d details" % (details[DETAIL_NUM])
+        if( verbose ): print " - - - - Loaded %d details" % (details[DETAILS_NUM])
 
     # Make sure these details match target snapshot and run
-    assert details[DETAIL_RUN] == run, \
-        "Details run %d does not match target %d!" % (details[DETAIL_RUN], run)
+    assert details[DETAILS_RUN] == run, \
+        "Details run %d does not match target %d!" % (details[DETAILS_RUN], run)
 
-    assert details[DETAIL_SNAP] == snap, \
-        "Details snap %d does not match target %d!" % (details[DETAIL_SNAP], snap)
+    assert details[DETAILS_SNAP] == snap, \
+        "Details snap %d does not match target %d!" % (details[DETAILS_SNAP], snap)
 
     ### Find the Details index which matched ID and Nearest in Time ###
 
     # Find details indices with BH ID match
-    inds = np.where( bhid == details[DETAIL_IDS] )[0]
+    inds = np.where( bhid == details[DETAILS_IDS] )[0]
 
     # If there are no matches, return None array
     if( len(inds) == 0 ):
         if( verbose ): print "No matches in snap %d for ID %d" % (snap, bhid)
-        return { key : missingValue for key in DETAIL_PHYSICAL_KEYS }
+        return { key : missingValue for key in DETAILS_PHYSICAL_KEYS }
 
     # Get times for matching details
-    detTimes = details[DETAIL_TIMES][inds]
+    detTimes = details[DETAILS_TIMES][inds]
     # Get indices to sort times
     sortInds = np.argsort(detTimes)
 
@@ -500,7 +500,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     # Convert indices to global array
     retInds = inds[retInds]
     # Create output dictionary with same keys as `details`
-    bhDets = { key : details[key][retInds] for key in _DETAIL_PHYSICAL_KEYS }
+    bhDets = { key : details[key][retInds] for key in DETAILS_PHYSICAL_KEYS }
 
     return details, bhDets
 
@@ -554,12 +554,12 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
     detCS   = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
 
     # Create dictionary of details for mergers
-    mergDets = { DETAIL_IDS    : detID,
-                 DETAIL_TIMES  : detTime,
-                 DETAIL_MASSES : detMass,
-                 DETAIL_MDOTS  : detMDot,
-                 DETAIL_RHOS   : detRho,
-                 DETAIL_CS     : detCS }
+    mergDets = { DETAILS_IDS    : detID,
+                 DETAILS_TIMES  : detTime,
+                 DETAILS_MASSES : detMass,
+                 DETAILS_MDOTS  : detMDot,
+                 DETAILS_RHOS   : detRho,
+                 DETAILS_CS     : detCS }
 
 
     # Iterate over each snapshot, with list of mergers in each `s2m`
@@ -592,8 +592,8 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
         # Get all details (IDs and times) for this snapshot
         dets     = loadBHDetails_NPZ(run, snap)
-        detIDs   = dets[DETAIL_IDS]
-        detTimes = dets[DETAIL_TIMES]
+        detIDs   = dets[DETAILS_IDS]
+        detTimes = dets[DETAILS_TIMES]
 
         # If there are no details in this snapshot (should only happen at end), continue
         if( len(detIDs) <= 0 ): continue
@@ -622,7 +622,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
         # Reshape det indices to match ``mergDets``
         # First makesure numbering is consistent!
-        assert DETAIL_BEFORE == 0 and DETAIL_AFTER == 1, "`BEFORE` and `AFTER` broken!!"
+        assert DETAILS_BEFORE == 0 and DETAILS_AFTER == 1, "`BEFORE` and `AFTER` broken!!"
 
         detInds = np.dstack([indsBef,indsAft])
 
@@ -630,7 +630,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         ### Store matches ###
 
         # Both 'before' and 'after'
-        for BEF_AFT in [DETAIL_BEFORE, DETAIL_AFTER]:
+        for BEF_AFT in [DETAILS_BEFORE, DETAILS_AFTER]:
 
             # Both 'in' and 'out' BHs
             for IN_OUT in [IN_BH, OUT_BH]:
@@ -640,24 +640,24 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
                 useInds = detInds[inds,IN_OUT,BEF_AFT]
 
                 # Select subset that hasn't been matched before
-                newInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] < 0.0 )[0]
+                newInds = np.where( mergDets[DETAILS_TIMES][search[inds],IN_OUT,BEF_AFT] < 0.0 )[0]
 
                 if( len(newInds) > 0 ):
-                    for KEY in _DETAIL_PHYSICAL_KEYS:
+                    for KEY in DETAILS_PHYSICAL_KEYS:
                         mergDets[KEY][search[inds[newInds]],IN_OUT,BEF_AFT] = dets[KEY][useInds[newInds]]
 
 
                 # Select subset with better matches
 
                 # If we're looking for 'before', look for latest 'before'
-                if( BEF_AFT == DETAIL_BEFORE ):
-                    oldInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] < dets[DETAIL_TIMES][useInds] )[0]
+                if( BEF_AFT == DETAILS_BEFORE ):
+                    oldInds = np.where( mergDets[DETAILS_TIMES][search[inds],IN_OUT,BEF_AFT] < dets[DETAILS_TIMES][useInds] )[0]
                 # If we're looking for 'adter', look for earliest 'after'
                 else:
-                    oldInds = np.where( mergDets[DETAIL_TIMES][search[inds],IN_OUT,BEF_AFT] > dets[DETAIL_TIMES][useInds] )[0]
+                    oldInds = np.where( mergDets[DETAILS_TIMES][search[inds],IN_OUT,BEF_AFT] > dets[DETAILS_TIMES][useInds] )[0]
 
                 if( len(oldInds) > 0 ):
-                    for KEY in _DETAIL_PHYSICAL_KEYS:
+                    for KEY in DETAILS_PHYSICAL_KEYS:
                         mergDets[KEY][search[inds[oldInds]],IN_OUT,BEF_AFT] = dets[KEY][useInds[oldInds]]
 
 

@@ -5,9 +5,9 @@ import numpy as np
 __all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR', 'MERGERS_RUN', 'MERGERS_NUM', \
             'MERGERS_CREATED', 'MERGERS_MAP_STOM', 'MERGERS_MAP_MTOS', 'MERGERS_MAP_ONTOP', \
             'IN_BH', 'OUT_BH', 'DATA_PATH', '_DOUBLE', '_LONG', \
-            'DETAIL_IDS', 'DETAIL_TIMES', 'DETAIL_MASSES', 'DETAIL_MDOTS', 'DETAIL_RHOS', 'DETAIL_CS', \
-            'DETAIL_RUN', 'DETAIL_SNAP', 'DETAIL_NUM', 'DETAIL_CREATED', 'DETAIL_BEFORE', 'DETAIL_AFTER', \
-            'DETAIL_PHYSICAL_KEYS' ]
+            'DETAILS_IDS', 'DETAILS_TIMES', 'DETAILS_MASSES', 'DETAILS_MDOTS', 'DETAILS_RHOS', 'DETAILS_CS', \
+            'DETAILS_RUN', 'DETAILS_SNAP', 'DETAILS_NUM', 'DETAILS_CREATED', 'DETAILS_BEFORE', 'DETAILS_AFTER', \
+            'DETAILS_PHYSICAL_KEYS' ]
 
 DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
 
@@ -16,8 +16,8 @@ _LONG = np.int64
 
 
 # Key Names for Mergers Dictionary
-MERGERS_TIMES     = 'times'
 MERGERS_IDS       = 'ids'
+MERGERS_TIMES     = 'times'
 MERGERS_MASSES    = 'masses'
 MERGERS_DIR       = 'dir'
 MERGERS_RUN       = 'run'
@@ -33,18 +33,18 @@ OUT_BH = 1
 
 
 ### Dictionary Keys for Details Parameters ###
-DETAIL_IDS     = 'id'
-DETAIL_TIMES   = 'times'
-DETAIL_MASSES  = 'masses'
-DETAIL_MDOTS   = 'mdots'
-DETAIL_RHOS    = 'rhos'
-DETAIL_CS      = 'cs'
-DETAIL_RUN     = 'run'
-DETAIL_SNAP    = 'snap'
-DETAIL_NUM     = 'num'
-DETAIL_CREATED = 'created'
+DETAILS_IDS     = 'id'
+DETAILS_TIMES   = 'times'
+DETAILS_MASSES  = 'masses'
+DETAILS_MDOTS   = 'mdots'
+DETAILS_RHOS    = 'rhos'
+DETAILS_CS      = 'cs'
+DETAILS_RUN     = 'run'
+DETAILS_SNAP    = 'snap'
+DETAILS_NUM     = 'num'
+DETAILS_CREATED = 'created'
 
-DETAIL_BEFORE  = 0                                                                                  # Before merger time (MUST = 0!)
-DETAIL_AFTER   = 1                                                                                  # After (or equal) merger time (MUST = 1!)
+DETAILS_BEFORE  = 0                                                                                  # Before merger time (MUST = 0!)
+DETAILS_AFTER   = 1                                                                                  # After (or equal) merger time (MUST = 1!)
 
-DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS, DETAIL_TIMES, DETAIL_MASSES, DETAIL_MDOTS, DETAIL_RHOS, DETAIL_CS ]
+DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES, DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
