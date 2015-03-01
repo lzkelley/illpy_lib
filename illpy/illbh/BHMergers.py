@@ -110,7 +110,7 @@ def main(run=RUN, verbose=VERBOSE):
 
     mergers = processMergers(run, verbose)
 
-v    return
+    return
 
 
 def processMergers(run=RUN, verbose=VERBOSE, loadRaw=True):
