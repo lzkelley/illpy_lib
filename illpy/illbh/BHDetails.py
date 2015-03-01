@@ -76,10 +76,6 @@ details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAV
 
 
 
-_DETAIL_PHYSICAL_KEYS = [ DETAIL_IDS,   DETAIL_TIMES, DETAIL_MASSES, 
-                          DETAIL_MDOTS, DETAIL_RHOS,  DETAIL_CS     ]
-
-
 
 ###  ===================================  ###
 ###  =============  MAIN  ==============  ###
@@ -475,7 +471,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     # If there are no matches, return None array
     if( len(inds) == 0 ):
         if( verbose ): print "No matches in snap %d for ID %d" % (snap, bhid)
-        return { key : missingValue for key in _DETAIL_PHYSICAL_KEYS }
+        return { key : missingValue for key in DETAIL_PHYSICAL_KEYS }
 
     # Get times for matching details
     detTimes = details[DETAIL_TIMES][inds]
