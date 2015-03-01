@@ -261,29 +261,8 @@ def createFigure(left=AX_LEFT, right=AX_RIGHT, bottom=AX_BOTTOM, top=AX_TOP):
 
 
 
-def saveFigure(fname, fig, log=None):
-    fig.savefig(fname)
-    if( log ): log.log("Saved figure '%s'" % (fname) )
-    return
 
-
-def setColorCycle(num, ax=None, cmap=plt.cm.spectral, left=0.1, right=0.9):
-    if(ax == None): ax = plt.gca()
-    cols = [cmap(it) for it in np.linspace(left, right, num)]
-    ax.set_color_cycle(cols[::-1])
-    return cols
-
-
-def plotRect(ax, loc):
-    rect = mpl.patches.Rectangle((loc[0], loc[1]), loc[2], loc[3],
-                                 alpha=0.4, facecolor='None', ls='dashed', lw=1.0, transform=ax.transData)
-    ax.add_patch(rect)
-    return
-
-
-
-
-
+'''
 def plotHistLine(ax, bins, values, ls='-', lw=1.0, color='k'):
     """
     Manually plot a histogrammed data.
@@ -318,10 +297,10 @@ def plotHistLine(ax, bins, values, ls='-', lw=1.0, color='k'):
     ll, = ax.plot( xval, yval, ls, lw=lw, color=color)
 
     return ll
+'''
 
 
-
-
+'''
 def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False, grid=True,
                symlogx=0.0, symlogy=0.0):
     """ Configure an axis object with the given settings. """
@@ -341,7 +320,7 @@ def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False,
     elif( logy ):         ax.set_yscale('log')
 
     return
-
+'''
 
 
 
