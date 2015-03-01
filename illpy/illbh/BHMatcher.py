@@ -1,25 +1,17 @@
-# ==================================================================================================
-# BHMatcher.py
-# ---------------------------
-#
-# This code takes in merger (from 'blackhole_mergers_<N>.txt') information in a 'Mergers' object,
-# and matches it with details (from 'blackhole_details_<N>.txt') information in a 'Details' object.
-#
-#
-#
-# Contains
-# --------
-# + detailsForMergersAtSnapshot() :
-#
-#
-#
-# ------------------
-# Luke Zoltan Kelley
-# LKelley@cfa.harvard.edu
-# ==================================================================================================
+"""
+Routines to match BH Mergers with BH Details entries based on times and IDs.
+
+The files 'blackhole_mergers_<N>.txt' contain the time and IDs ('in' and 'out' BHs) of BH mergers.
+The 'in' BH's are the ones which are absorbed into the 'out' BHs---i.e. the ones which continue to
+exist after the merger.  The merger files also contain masses, but these are incorrect for the
+'out' BHs - and must be reconstructed from the 'details files: 'blackhole_details_<N>.txt', which
+also contain information about the environment (e.g. density, etc).
 
 
-### Builtin Modules ###
+
+"""
+
+
 import random
 import sys
 
@@ -53,10 +45,10 @@ def main(run=RUN, verbose=VERBOSE):
 
     if( verbose ): print " - BHMatcher.py"
 
-    ### Set Basic Parameters ###
+    # Set Basic Parameters
     mergers = BHMergers.loadMergers(run)
 
-    ###  Get Details for Mergers and Save  ###
+    # Get Details for Mergers
     if( verbose ): print " - - Matching Mergers to Details"
     start = datetime.now()
     mergerDetails = detailsForMergers(mergers, run, verbose=verbose)
@@ -74,12 +66,34 @@ def main(run=RUN, verbose=VERBOSE):
 
 
 
+
+
+
 ###  ================================================  ###
 ###  ===============  OTHER FUNCTIONS  ==============  ###
 ###  ================================================  ###
 
 
 def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
+    """
+    Given a set of mergers, retrieve corresponding 'details' entries for BHs.
+
+
+
+    Arguments
+    ---------
+    mergers : dict, data arrays for mergers
+    run : int, illustris run number {1,3}
+    snapNums : array_like(int) (optional : None), particular snapshots in which
+               to match.  If `None` then all snapshots are used.
+    verbose : bool (optional : ``VERBOSE``), flag to print verbose output.
+
+    
+    Returns
+    -------
+    mergDets : dict, data arrays corresponding to each 'merger' BHs
+
+    """
 
     if( verbose ): print " - - detailsForMergers()"
 
@@ -124,8 +138,8 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
     if( verbose ): print " - - - Iterating over %d snapshots" % (numSnapsHere)
     startAll = datetime.now()
     numMatched = 0
-    lastList = []                                                                                   # These are failed matches, passed on
-    nextList = []                                                                                   # These will become 'lastList'
+    prevList = []                                                                                   # These are failed matches, passed on
+    nextList = []                                                                                   # These will become 'prevList'
 
     for ii,snum in enumerate(snapNumbers):
         startOne = datetime.now()
@@ -134,7 +148,7 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
         s2m = mergers[MERGERS_MAP_STOM]
 
         # If there are no mergers to match, continue to next iteration
-        if( len(s2m[snum]) == 0 and len(lastList) == 0 ):
+        if( len(s2m[snum]) == 0 and len(prevList) == 0 ):
             if( verbose ): print " - - - - No mergers for snapshot %d, or carried over" % (snum)
             continue
 
@@ -148,17 +162,26 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
         # If there are no details here, continue to next iteration
         if( dets[DETAIL_NUM] == 0 ):
             if( verbose ): print " - - - - No details for snapshot %d" % (snum)
+
+            if( len(prevList) > 0 ):
+                print " - - - - - Pusing back 'prev' list"
+                for mmm in prevList: prevList.append(mmm)
+
+            if( len(s2m[snum]) > 0 ): 
+                print " - - - - - Pushing back s2m list"
+                for mmm in s2m[snum]: prevList.append(mmm)
+
             continue
 
 
         ## Load Details Information ##
         start = datetime.now()
-        matched = detailsForMergersAtSnapshot(mergers, mergers[MERGERS_MAP_STOM][snum], lastList, dets,
+        matched = detailsForMergersAtSnapshot(mergers, mergers[MERGERS_MAP_STOM][snum], prevList, dets,
                                               nextList, missingMergers, run, snum, mergDets, verbose=verbose)
 
         numMatched += matched                                                                       # Track successful matches
         numMissing = len(missingMergers)
-        lastList = nextList                                                                         # Pass 'next' list on
+        prevList = nextList                                                                         # Pass 'next' list on
         nextList = []                                                                               # Clear for next iteration
         stop = datetime.now()
         if( verbose ): print " - - - - Snapshot Mergers Matched after %s" % (str(stop-start))
@@ -167,9 +190,8 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
         if( verbose ):
             print " - - - - - %d matched, %d missing After %s / %s" % (numMatched, numMissing, str(stopOne-startOne), str(stopOne-startAll))
 
-
-
     # } ii
+
 
     # Add Meta data to merger details
     mergDets[DETAIL_RUN] = run
@@ -216,7 +238,6 @@ def detailsForMergersAtSnapshot(mergers, mrgList, prevList, dets,
 
     NORM_MRG = 0                                                                                    # Mergers from this snapshot
     PREV_MRG = 1                                                                                    # Mergers from previous snapshot
-
 
     # Concatenate the new list (mrgList) with the previous (prevList);
     #     make array (mrgTypes) to track which element is which
