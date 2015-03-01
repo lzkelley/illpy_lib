@@ -33,12 +33,6 @@ from Constants import *
 
 DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
 
-AX_LEFT   = 0.08
-AX_RIGHT  = 0.08
-AX_BOTTOM = 0.12
-AX_TOP    = 0.13
-
-
 
 
 ###  ======================================  ###
@@ -221,107 +215,6 @@ def zToA(z, a0=1.0):
     """ Convert a redshift to a scale-factor """
     a = a0/(1.0+z)
     return a
-
-
-
-###  =======================================  ###
-###  =============  PLOTTING  ==============  ###
-###  =======================================  ###
-
-
-
-def createFigures(nfigs=1, figsize=None, axsize=None, axpos=None):
-
-    # Set unset parameters to defaults
-    if( figsize == None ): figsize = FIG_SIZE
-    if( axsize == None ): axsize = AX_SIZE
-    if( axpos == None ): axpos = AX_POS
-
-    # Make parameters iterable
-    if( not np.iterable(axsize) ): axsize = [ axsize ]
-    if( not np.iterable(axpos) ): axpos = [ axpos ]
-
-    # Create figures, add axes
-    figs = [ plt.figure(figsize=figsize) for ii in range(nfigs) ]
-    for ff in figs:
-        for axp,axs in zip(axpos, axsize):
-            ff.add_axes(axp + axs)
-
-    return figs
-
-
-def createFigure(left=AX_LEFT, right=AX_RIGHT, bottom=AX_BOTTOM, top=AX_TOP):
-
-    fig = plt.figure(figsize=FIG_SIZE)
-    pos = [left, bottom]
-    size = [1.0-left-right, 1.0-bottom-top]
-    fig.add_axes(pos + size)
-
-    return fig
-
-
-
-
-'''
-def plotHistLine(ax, bins, values, ls='-', lw=1.0, color='k'):
-    """
-    Manually plot a histogrammed data.
-
-
-    Parameters
-    ----------
-    ax : object matplotlib.axes
-        Axes on which to make plot
-    bins : array_like, scalar
-        Edges of bins to use for histogram, with both left and right edges.
-        If `bins` has length N, there will be N-1 bins.
-    values : array_like, scalar
-        Array of binned values
-    (ls : str, optional)
-        linestyle to plot with
-    (lw : scalar, optional)
-        lineweight to plot with
-    (color : str, optional)
-        color of line to plot with
-
-    Returns
-    -------
-    ll : object, matplotlib.lines.Line2D
-        Line object which was plotted to axes `ax`
-        (can then be used to make a legend, etc)
-
-    """
-
-    yval = np.concatenate([ [vv,vv] for vv in values ])
-    xval = np.concatenate([ [bins[jj],bins[jj+1]] for jj in range(len(bins)-1) ])
-    ll, = ax.plot( xval, yval, ls, lw=lw, color=color)
-
-    return ll
-'''
-
-
-'''
-def configPlot(ax, xlabel=None, ylabel=None, title=None, logx=False, logy=False, grid=True,
-               symlogx=0.0, symlogy=0.0):
-    """ Configure an axis object with the given settings. """
-
-    # Set Labels
-    if( xlabel ): ax.set_xlabel(xlabel)
-    if( ylabel ): ax.set_ylabel(ylabel)
-    if( title  ): ax.set_title(title)
-
-    # Grid
-    ax.grid(grid)
-
-    # Axis Scales
-    if( symlogx != 0.0 ): ax.set_xscale('symlog', linthreshx=symlogx)
-    elif( logx ):         ax.set_xscale('log')
-    if( symlogy != 0.0 ): ax.set_yscale('symlog', linthreshy=symlogy)
-    elif( logy ):         ax.set_yscale('log')
-
-    return
-'''
-
 
 
 
