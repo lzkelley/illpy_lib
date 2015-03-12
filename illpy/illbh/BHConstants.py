@@ -44,7 +44,16 @@ DETAILS_SNAP    = 'snap'
 DETAILS_NUM     = 'num'
 DETAILS_CREATED = 'created'
 
-DETAILS_BEFORE  = 0                                                                                  # Before merger time (MUST = 0!)
-DETAILS_AFTER   = 1                                                                                  # After (or equal) merger time (MUST = 1!)
+# Types of matches between mergers and details
+DETAILS_BEFORE  = 0                                                                                 # Before merger time (MUST = 0!)
+DETAILS_AFTER   = 1                                                                                 # After (or equal) merger time (MUST = 1!)
+DETAILS_FIRST   = 2                                                                                 # First matching details entry (MUST = 2!)
 
-DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES, DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
+DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES, 
+                          DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
+
+
+
+
+assert DETAILS_BEFORE == 0 and DETAILS_AFTER == 1 and DETAILS_FIRST == 2, \
+    "``DETAILS_<BEFORE/AFTER/FIRST>`` MUST be in the proper order!"
