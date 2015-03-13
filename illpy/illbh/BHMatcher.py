@@ -32,6 +32,8 @@ from .. import AuxFuncs as aux
 RUN = 3
 VERBOSE = True
 
+NUM_BHS = 2                                                                                         # There are 2 BHs, {IN_BH, OUT_BH}
+NUM_TIMES = 3                                                                                       # There are 3 times, {DETAIL_BEFORE, DETAIL_AFTER, DETAIL_FIRST}
 
 
 
@@ -62,8 +64,6 @@ def main(run=RUN, verbose=VERBOSE):
     if( verbose ): print " - Done"
 
     return
-
-
 
 
 
@@ -118,9 +118,6 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
 
     ### Allocate arrays for results ###
     #     Row for each merger; Column for each BH In merger [0-in, 1-out], and for before and after merger time
-    NUM_BHS = 2                                                                                     # There are 2 BHs, {IN_BH, OUT_BH}
-    NUM_TIMES = 3                                                                                   # There are 3 times, {DETAIL_BEFORE, DETAIL_AFTER, DETAIL_FIRST}
-
     '''
     ids   = -1*np.ones([numMergers, NUM_BHS, NUM_TIMES], dtype=_LONG)
     times = -1*np.ones([numMergers, NUM_BHS, NUM_TIMES], dtype=_DOUBLE)
@@ -185,8 +182,7 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
         ## Load Details Information ##
         start = datetime.now()
         mrgList = mergers[MERGERS_MAP_STOM][snum]                                                   # Mergers in this Snapshot
-        matched = detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, missList,
-                                              run, snum, mergDets, verbose=verbose)
+        matched = detailsForMergersAtSnapshot(mergers, dets, search, run, snum, mergDets, verbose=verbose)
 
         numMatched += matched                                                                       # Track successful matches
         numMissing = len(missList)
@@ -212,7 +208,7 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
 
 
 
-def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, missList,
+def detailsForMergersAtSnapshot(mergers, dets, search,
                                 run, snap, mergDets, verbose=VERBOSE):
 
     '''
@@ -242,35 +238,17 @@ def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, miss
 
     if( verbose ): print " - - - detailsForMergersAtSnapshot()"
 
-    NORM_MRG = 0                                                                                    # Mergers from this snapshot
-    PREV_MRG = 1                                                                                    # Mergers from previous snapshot
+    numTarget = len(search)
 
-    # Concatenate the new list (mrgList) with the previous (prevList);
-    #     make array (mrgTypes) to track which element is which
-    if( len(prevList) > 0 ): fullList = np.concatenate( (mrgList, prevList) )
-    else: fullList = np.array(mrgList)
-
-    numTarget = len(fullList)
-    mrgTypes = np.ones( len(mrgList) + len(prevList), dtype=_LONG )*NORM_MRG                        # Set first group as NORM type
-    mrgTypes[len(mrgList):] = PREV_MRG                                                              # Next group as PREV type
-
-
-    detInds = -1*np.ones([numTarget,2,2], dtype=_LONG)
+    
+    detInds = -1*np.ones([numTarget,NUM_BHS,NUM_TIMES], dtype=_LONG)
 
     if( verbose ): print " - - - - targeting %d/%d mergers" % (numTarget, mergers[MERGERS_NUM])
 
+
     ### Iterate Over Target Merger Indices ###
-    numGood = 0                                                                                     # Number matched right away
-    numNext = 0                                                                                     # Num passed on to next iter
-    numSaved = 0                                                                                    # Num from past, now matched
-    numMissing = 0                                                                                  # Num from past, unmatched
-    numIncomp = 0
 
-    missInBef = 0
-    missOutBef = 0
-    missOutAft = 0
-
-    for ii, (mtype, mnum) in enumerate(zip(mrgTypes,fullList)):
+    for ii, mnum in enumerate(search):
 
         # Extract target parameters
         mtime = mergers[MERGERS_TIMES][mnum]
@@ -280,7 +258,7 @@ def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, miss
         for IO,tid in enumerate([inid, outid]):
             inds = detailsIndForBHAtTime(tid, mtime, dets)
 
-            for BA in [DETAILS_BEFORE, DETAILS_AFTER]:
+            for BA in [DETAILS_BEFORE, DETAILS_AFTER, DETAILS_FIRST]:
 
                 # If there are matches
                 if( inds[BA] is not None ):
@@ -294,12 +272,12 @@ def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, miss
                         oldTime = dets[DETAILS_TIMES][ detInds[ii,IO,BA] ]
                         newTime = dets[DETAILS_TIMES][ inds[BA] ]
 
-                        # For *before* matches, later   is better
+                        # For *before* matches, later is better
                         if(   BA == DETAILS_BEFORE ):
                             if( newTime > oldTime ):
                                 detInds[ii,IO,BA] = inds[BA]
-                        # For *after* matches,  earlier is better
-                        elif( BA == DETAILS_AFTER ):
+                        # For *after* and *first* matches, earlier is better
+                        elif( BA == DETAILS_AFTER or BA == DETAILS_FIRST):
                             if( newTime < oldTime ):
                                 detInds[ii,IO,BA] = inds[BA]
 
@@ -308,46 +286,14 @@ def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, miss
         # } IO
 
 
-        # If any of expected matches are missing
-        if( detInds[ii,IN_BH, DETAILS_BEFORE] < 0 or
-            detInds[ii,OUT_BH,DETAILS_BEFORE] < 0 or detInds[ii,OUT_BH,DETAILS_AFTER] < 0 ):
-
-            # If this is from the normal list, add to 'next' list
-            if( mtype == NORM_MRG ):
-                nextList.append(mnum)
-                numNext += 1
-            # If this is from the previous list, add to 'missing' list
-            elif( mtype == PREV_MRG ):
-
-                if( detInds[ii,IN_BH, DETAILS_BEFORE] < 0 ):
-                    print " - - - - - - Snap  %d, Merger %d, Missing IN  BEFORE" % (snap, mnum)
-                    missInBef += 1
-
-                if( detInds[ii,OUT_BH,DETAILS_BEFORE] < 0 ):
-                    print " - - - - - - Snap  %d, Merger %d, Missing OUT BEFORE" % (snap, mnum)
-                    missOutBef += 1
-
-                if( detInds[ii,OUT_BH,DETAILS_AFTER ] < 0 ):
-                    print " - - - - - - Snap  %d, Merger %d, Missing OUT AFTER " % (snap, mnum)
-                    missOutAft += 1
-                    numMissing += 1
-                    missList.append(mnum)
-
-                numIncomp += 1
-            else:
-                raise RuntimeError("Unrecognized type %d in merger list!" % (mtype) )
-
-            continue
-
-        # Track if successful match after previous failure
-        if( mtype == PREV_MRG ): numSaved += 1
-
-        numGood += 1
 
     # } ii
 
+
+    ### Store Details Data in Dictionary Arrays ###
+
     for IO in [IN_BH, OUT_BH]:
-        for BA in [DETAILS_BEFORE, DETAILS_AFTER]:
+        for BA in [DETAILS_BEFORE, DETAILS_AFTER, DETAILS_FIRST]:
 
             inds = np.where( detInds[:,IO,BA] >= 0 )[0]
 
@@ -355,13 +301,16 @@ def detailsForMergersAtSnapshot(mergers, dets, mrgList, prevList, nextList, miss
                 for KEY in DETAILS_PHYSICAL_KEYS:
                     mergDets[KEY][fullList[inds],IO,BA] = dets[KEY][detInds[inds,IO,BA]]
 
+                # } KEY
 
-    if( verbose ):
-        print " - - - - - %d good, %d passed, %d saved, %d missing" % (numGood, numNext, numSaved, numMissing)
-        print " - - - - - - %d Incomplete : %d in before,  %d out before,  %d out after (missing)" % (numIncomp, missInBef, missOutBef, missOutAft)
+            # } if
+
+        # } BA
+
+    # } IO
 
 
-    return numGood
+    return
 
 
 
