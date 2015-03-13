@@ -1,40 +1,24 @@
-# =================================================================================================
-# MatchDetails.pyx
-# ----------------
-#
-#
-#
-# ------------------
-# Luke Zoltan Kelley
-# LKelley@cfa.harvard.edu
-# =================================================================================================
+"""
 
+
+
+"""
 
 import numpy as np
 cimport numpy as np
 
+from BHConstants import IN_BH, OUT_BH, DETAILS_BEFORE, DETAILS_AFTER, DETAILS_FIRST
 
-def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long, ndim=1] inid,
-                               np.ndarray[long, ndim=1] outid, np.ndarray[long, ndim=1] detid ):
+
+def getDetailIndicesForMergers(np.ndarray[long,  ndim=1] target, np.ndarray[long, ndim=2] mid, 
+                               np.ndarray[float, ndim=1] mtime,  np.ndarray[long, ndim=3] lind,
+                               np.ndarray[float, ndim=3] ltime,
+                               np.ndarray[long,  ndim=1] detid,  np.ndarray[long, ndim=1] dtime  ):
     """
     Match merger BHs to details entries for a particular snapshot.
 
-    'Details' are entries written by Illustris for each active BH at each
-    timestep, which includes info like mass and mdot, etc.
-    'Mergers' are pairs ('in' and 'out') of BHs which merge into a single 'out'
-    BH.  This function finds the index (line number) of the first 'details'
-    entry to match the merger-remnant (the surviving BH: 'out').
-
-    The array ``detid`` gives the BH ID for each details entry in this snapshot
-    (i.e. between the start and end times corresponding to this snapshot).
-    The arrays ``inid`` and ``outid`` give the BH ID numbers for each BH in
-    each merger event (all mergers, not just during this snapshot).
-    The ``active`` array gives the Mergers which are 'active' in this snapshot,
-    i.e. mergers which have occured before the time of this snapshot.
-
-
     This function takes as input the indices of active BH mergers as
-    ``active``.  The in and out BH indices for *all* mergers are given in
+    ``target``.  The in and out BH indices for *all* mergers are given in
     ``inid`` and ``outid``.  The ``outid``s are cross checked with each of
     IDs for the details entries given in ``detid``.  When matches are missing,
     it is assumed that the 'out' BH later merged into another system, in which
@@ -53,9 +37,9 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
 
     Parameters
     ----------
-    active : array, long
-        Array of indices corresponding to 'active' (already formed) binary
-        systems to be matched.  Length is the number of active mergers ``N``.
+    target : array, long
+        Array of indices corresponding to 'target' (already formed) binary
+        systems to be matched.  Length is the number of target mergers ``N``.
     inid : array, long
         Array of indices for Merger 'in' BHs.  Length is the total number
         of Mergers, same as ``outid``.
@@ -70,7 +54,7 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
     -------
     3 arrays are returned, each of length equal to the total number of Mergers.
     Entries for *inactive* systems have values set to `-1`.  The values for
-    active BHs are described below.
+    target BHs are described below.
 
     targetID : array, long
         Indices of each merger 'out' BH which is the target.  Length is the
@@ -84,164 +68,100 @@ def getDetailIndicesForMergers(np.ndarray[long, ndim=1] active, np.ndarray[long,
         Indices of the Details entries which correspond to each Merger.
 
     """
-
-
-    # Get the lengths of all input arrays
-    cdef int numMergers = inid.shape[0]                                                             # Length of both 'inid' and 'outid'
-    cdef int numDetails = detid.shape[0]
-    cdef int numActive  = active.shape[0]
-
-    # Find indices to sort ID arrays for faster searching
-    cdef np.ndarray sort_inid = np.argsort(inid)
-    cdef np.ndarray sort_outid = np.argsort(outid)
-    cdef np.ndarray sort_detid = np.argsort(detid)
-
-    cdef long ind, target, found
-    cdef int MAX_COUNT = 100
-
-    # Initialize arrays to store results; default to '-1'
-    cdef np.ndarray retinds = -1*np.ones(numActive, dtype=long)
-    cdef np.ndarray targetID = -1*np.ones(numActive, dtype=long)
-    cdef np.ndarray foundID = -1*np.ones(numActive, dtype=long)
-
-    ### Iterate over Each Active Merger Binary System ###
-    for mm in range(numActive):
-
-        target = outid[active[mm]]
-        found = target
-        # Store the target ID in the output array
-        targetID[mm] = target
-
-        # Try to find binary (out bh) in details
-        ind = np.searchsorted( detid, target, 'left', sorter=sort_detid )
-
-        # If search failed, set ind to invalid
-        if( detid[sort_detid[ind]] != found ): ind = -1
-
-        # If search failed; see if this 'out' bh merged again, update 'out' id to that
-        count = 0
-        while( ind < 0 ):
-
-            # Check if we are stuck, if so, break
-            if( count >= MAX_COUNT ):
-                ind = -1
-                break
-
-            ### See if this 'out' BH merged again ###
-            #   i.e. if it was the 'in' BH of a later merger
-
-            ind = np.searchsorted( inid, found, 'left', sorter=sort_inid )
-
-            # If target is not an 'in bh' then it is missing, break
-            if( inid[sort_inid[ind]] != found ):
-                ind = -1
-                break
-
-
-            ### Redo details search with new 'out id'
-
-            # Set new 'out id' to match partner of 'in id'
-            found = outid[sort_inid[ind]]
-
-            # Redo search
-            ind = np.searchsorted( detid, found, 'left', sorter=sort_detid )
-
-            # Check if search succeeded
-            if( detid[sort_detid[ind]] != found ): ind = -1
-
-            # Increment counter to make sure not stuck
-            count += 1
-
-        # } while
-
-        # If we have a match, store results
-        if( ind >= 0 ):
-            # Store matching Details index
-            retinds[mm] = sort_detid[ind]
-            # Store the ID which was eventually matched
-            foundID[mm] = found
-
-    # } mm
-
-    return targetID, foundID, retinds
-
-
-
-
-
-
-
-
-
-
-
-
-def detailsForBlackholes(np.ndarray[long, ndim=1] bhIDs, np.ndarray[double, ndim=1] bhTimes,
-                         np.ndarray[long, ndim=1] detIDs, np.ndarray[double, ndim=1] detTimes):
-    """
-    Match merger BHs by ID to details entries just before and just after merger.
-
-    Arguments
-    ---------
-    bhIDs    : array[N] long, merger BH ID numbers
-    bhTimes  : array[N] float, merger-BH merger times (scalefactors)
-    detIDs   : array[N] long, details entry ID numbers
-    detTimes : array[N] float, detail entry times (scalefactors)
-
-    Returns
-    -------
-    indsBef : array[N] long, index of bh-details file containing match before merger
-    indsAft : array[N] long, index of bh-details file containing match after  merger
-
-    """
-
-    # Get the number of target BHs
-    cdef int numBHs = bhIDs.shape[0]
     
-    # Number of details lines
-    cdef int numDets = detTimes.shape[0]
+    
+    # Get the lengths of all input arrays
+    cdef int numMergers = mid.shape[0]
+    cdef int numDetails = detid.shape[0]
+    cdef int numTarget  = target.shape[0]
 
-    # Sort details first by ID, then by time in reverse (last in time comes first in list)
-    cdef np.ndarray sort_det = np.lexsort( (-detTimes, detIDs) )
+    # Sort first by ID then by time
+    cdef np.ndarray s_det = np.lexsort( (dtime, detid) )
 
-    # Sort target merger BH IDs
-    cdef np.ndarray sort_bh = np.argsort(bhIDs)
+    # Declare variables
+    cdef np.ndarray s_mrg
+    cdef long s_ind, t_id, s_first_match, first_match, s_before_match, s_after_match
+    cdef long d_ind_first, d_ind_before, d_ind_after
+    cdef float t_time, d_first_time, d_before_time, d_after_time
 
-    cdef int ii,jj
+    ### Iterate over Each Target Merger Binary System ###
+    
+    ### Iterate over Each Type of BH ###
+    for BH in range([IN_BH, OUT_BH]):
 
-    # Initialize arrays to store results; default to '-1' for invalid entries
-    cdef np.ndarray indsBef = -1*np.ones(numBHs, dtype=long)
-    cdef np.ndarray indsAft = -1*np.ones(numBHs, dtype=long)
+        # Sort *target* mergers first by ID, then by Merger Time
+        s_target = np.lexsort( (mtime[target], mid[target,BH]) )
+        
 
-    ### Iterate over Each Active Merger Binary System ###
-    jj = 0
-    for ii in xrange(numBHs):
+        ### Iterate over Each Entry ###
+        for ii in range(numTarget):
+            s_ind  = target[s_target[ii]]                                                           # Sorted, target-merger index
+            t_id   = mid[s_ind, BH]                                                                 # Target-merger BH ID
+            t_time = mtime[s_ind]                                                                   # Target-merger BH Time
 
-        # Get the sorted index
-        ind = sort_bh[ii]
-        # Get the sorted BH ID and time
-        bh = bhIDs[ind]
-        bhtime = bhTimes[ind]
+            ### Find First Match ###
+            #   Find index in sorted 'det' arrays with first match to target ID `t_id`
+            s_first_match = np.searchsorted( detid, t_id, 'left', sorter=s_det )
 
-        # Find Matching IDs
-        while( detIDs[sort_det[jj]] < bh and jj < numDets-1 ): jj += 1
-        # Once match is found; find times before merger
-        while( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] >= bhtime and jj < numDets-1 ): jj += 1
+            # If this is not a match, no matching entries, continue to next BH
+            if( detid[s_det[s_first_match]] != t_id ): continue
+            
+            ## Store first match
+            d_ind_first = s_det[s_first_match]
+            d_first_time  = dtime[d_ind_first]
+            # if there are no previous matches or new match is *earlier*
+            if( lind[s_ind, BH, DETAILS_FIRST] < 0 or d_first_time < ltime[s_ind, BH, DETAILS_FIRST] ):
+                lind [s_ind, BH, DETAILS_FIRST] = d_ind_first                                       # Set link to details index
+                ltime[s_ind, BH, DETAILS_FIRST] = d_first_time                                      # Set link to details time
 
-        # If this is still a match, it is before the merger --- store index
-        if( detIDs[sort_det[jj]] == bh and detTimes[sort_det[jj]] < bhtime ):
-            # Store entry at sorted index (corresponding to current BH)
-            indsBef[ind] = sort_det[jj]
 
-        # If previous was a match, it was after merger --- store index
-        if( jj > 0 and detIDs[sort_det[jj-1]] == bh and detTimes[sort_det[jj-1]] >= bhtime ):
-            indsAft[ind] = sort_det[jj-1]
+            ### Find 'before' Match ###
+            #   Find the *latest* detail ID match *before* the merger time
+            s_before_match = s_first_match                                                          # Has to come after the 'first' match
+            # Increment if the next entry is also an ID match and next time is still *before*
+            while( detid[s_det[s_before_match+1]] == t_id and dtime[s_det[s_before_match+1]] < t_time ):
+                s_before_match += 1
 
-    # } ii
 
-    return indsBef, indsAft
+            ## Store Before Match 
+            d_ind_before  = s_det[s_before_match]
+            d_before_time = dtime[d_ind_before]
+            # If we no longer match the ID, something is wrong
+            if( detid[d_ind_before] != t_id ):
+                raise RuntimeError("ID '%d' (merger %d) no longer matches 'before'!!" % (t_id, s_ind))
 
-# detailsForBlackholes()
+            # if there are no previous matches or new match is *later*
+            if( lind[s_ind, BH, DETAILS_BEFORE] < 0 or d_before_time > ltime[s_ind, BH, DETAILS_BEFORE] ):
+                lind [s_ind, BH, DETAILS_BEFORE] = d_ind_before                                     # Set link to details index
+                ltime[s_ind, BH, DETAILS_BEFORE] = d_before_time                                    # Set link to details time
+            
+
+            ## Find 'after' Match
+            #  Find the *earliest* detail ID match *after* the merger time
+            #  Only exists if this is the 'out' BH
+            if( BH == OUT_BH ):
+
+                s_after_match = s_before_match                                                      # Has to come after the 'before' match
+                # Increment if the next entry is also an ID match, but this time is still *before*
+                while( detid[s_det[s_after_match+1]] == t_id and dtime[s_det[s_after_match]] < t_time ):
+                    s_after_match += 1
+
+                ## Store After Match 
+                d_ind_after  = s_det[s_after_match]
+                d_after_time = dtime[d_ind_after]
+                # If we no longer match the ID, something is wrong
+                if( detid[d_ind_before] != t_id ):
+                    raise RuntimeError("ID '%d' (merger %d) no longer matches 'before'!!" % (t_id, s_ind))
+
+                # if there are no previous matches or new match is *earlier*
+                if( lind[s_ind, BH, DETAILS_AFTER] < 0 or d_after_time < ltime[s_ind, BH, DETAILS_AFTER] ):
+                    lind [s_ind, BH, DETAILS_AFTER] = d_ind_after                                     # Set link to details index
+                    ltime[s_ind, BH, DETAILS_AFTER] = d_after_time                                    # Set link to details time
+            
+
+
+    return 
+
 
 
 
