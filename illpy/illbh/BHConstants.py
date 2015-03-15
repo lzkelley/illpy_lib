@@ -5,9 +5,10 @@ import numpy as np
 __all__ = [ 'MERGERS_TIMES', 'MERGERS_IDS', 'MERGERS_MASSES', 'MERGERS_DIR', 'MERGERS_RUN', 'MERGERS_NUM', \
             'MERGERS_CREATED', 'MERGERS_MAP_STOM', 'MERGERS_MAP_MTOS', 'MERGERS_MAP_ONTOP', \
             'IN_BH', 'OUT_BH', 'DATA_PATH', '_DOUBLE', '_LONG', \
+            'NUM_BH_TYPES', 'NUM_BH_TIMES', \
             'DETAILS_IDS', 'DETAILS_TIMES', 'DETAILS_MASSES', 'DETAILS_MDOTS', 'DETAILS_RHOS', 'DETAILS_CS', \
             'DETAILS_RUN', 'DETAILS_SNAP', 'DETAILS_NUM', 'DETAILS_CREATED', 'DETAILS_BEFORE', 'DETAILS_AFTER', \
-            'DETAILS_PHYSICAL_KEYS' ]
+            'DETAILS_FIRST', 'DETAILS_PHYSICAL_KEYS' ]
 
 DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
 
@@ -26,6 +27,10 @@ MERGERS_NUM       = 'num'
 MERGERS_MAP_STOM  = 's2m'
 MERGERS_MAP_MTOS  = 'm2s'
 MERGERS_MAP_ONTOP = 'ontop'
+
+NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {IN_BH, OUT_BH}
+NUM_BH_TIMES = 3                                                                                    # There are 3 times, {DETAIL_BEFORE, DETAIL_AFTER, DETAIL_FIRST}
+
 
 # Index of [N,2] arrays corresponding to each BH
 IN_BH  = 0
@@ -49,7 +54,7 @@ DETAILS_BEFORE  = 0                                                             
 DETAILS_AFTER   = 1                                                                                 # After (or equal) merger time (MUST = 1!)
 DETAILS_FIRST   = 2                                                                                 # First matching details entry (MUST = 2!)
 
-DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES, 
+DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES,
                           DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
 
 
