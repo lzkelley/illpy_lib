@@ -24,15 +24,21 @@ main : initialize the intermediate npz file
 loadMergers : load merger data as a dictionary
 
 
+Mergers Dictionary
+------------------
+{ MERGERS_NUM   : <int>, total number of mergers `N` ,
+  MERGERS_TIMES : array(`N`, <int>), the time of each merger [scale-factor] , 
+  
+
 Examples
 --------
 
-> # Load mergers from Illustris-2
-> mergers = BHMergers.loadMergers(run=2, verbose=True)
-> # Print the number of mergers
-> print mergers[BHMergers.MERGERS_NUM]
-> # Print the first 10 merger times
-> print mergers[BHMergers.MERGERS_TIMES][:10]
+>>> # Load mergers from Illustris-2
+>>> mergers = BHMergers.loadMergers(run=2, verbose=True)
+>>> # Print the number of mergers
+>>> print mergers[BHMergers.MERGERS_NUM]
+>>> # Print the first 10 merger times
+>>> print mergers[BHMergers.MERGERS_TIMES][:10]
 
 
 Raises
