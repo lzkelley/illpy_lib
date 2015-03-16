@@ -223,6 +223,21 @@ def zToA(z, a0=1.0):
 ###  ===================================  ###
 
 
+def nonzeroMin(arr):
+    """
+    Set all less-than or equal to zero values to the otherwise minimum value.
+    """
+    
+    fix = np.array(arr)
+    
+    good = np.where( fix >  0.0 )[0]
+    bad  = np.where( fix <= 0.0 )[0]
+    
+    fix[bad] = np.min( fix[good] )
+    return fix
+
+
+
 def minmax(arr):
     """
     Get the minimum and maximum of the given array
