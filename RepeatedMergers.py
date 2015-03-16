@@ -10,40 +10,38 @@
 # ==================================================================================================
 
 
-### Builtin Modules ###
 import numpy as np
-import scipy as sp
-import traceback as tb
-from glob import glob
 from datetime import datetime
 from matplotlib import pyplot as plt
-import bisect
-import random
-import sys
 import os
-import h5py
-
-import warnings
-warnings.simplefilter('error')                                                                      # Throw Error on Warnings
 
 
-### Custom Modules and Files ###
-from Settings import *
-sys.path.append(*LIB_PATHS)
+import illpy
+from illpy import AuxFuncs as aux
+from illpy.Constants import *
+from illpy.illbh.BHConstants import *
 
-from Constants import *
+#from Settings import *
+#from Constants import *
 
 import Basics
 
-#import pyximport #; pyximport.install()
-#pyximport.install(setup_args={"include_dirs":np.get_include()})
+import pyximport
+pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 import FindRepeats
 
 import plotting as gwplot
 
-RUN_NUM = 3                                                                                         # Which illustris simulation to target
-FILE_NAME = "repeated_save.npz"
+RUN = 3                                                                                         # Which illustris simulation to target
+FILE_NAME = lambda xx: "ill-%d_repeated-mergers.npz" % (xx)
 
+LOAD = False
+
+REPEAT_LAST = 'last'
+REPEAT_NEXT = 'next'
+REPEAT_INTERVAL = 'interval'
+REPEAT_CREATED = 'created'
+REPEAT_RUN = 'run'
 
 
 ###  ==============================================================  ###
@@ -52,7 +50,7 @@ FILE_NAME = "repeated_save.npz"
 
 
 
-def main():
+def main(run=RUN, load=LOAD):
 
     ### Initialize Log File ###
     print "\nRepeatedMergers.py\n"
@@ -60,8 +58,6 @@ def main():
     start_time  = datetime.now()
 
     ### Set basic Parameters ###
-    run = RUN_NUM
-
     print " - Loading Basics"
     start = datetime.now()
     base = Basics.Basics(run)
@@ -71,9 +67,9 @@ def main():
 
     ### Find Repeated Mergers ###
 
-    fname = FILE_NAME
+    fname = FILE_NAME(run)
     # Try to load precalculated repeat data
-    if( os.path.exists(fname) ): 
+    if( os.path.exists(fname) and not load ): 
         print " - Loading Repeated Merger Data"
         start = datetime.now()
         dat = np.load(fname)
@@ -87,7 +83,8 @@ def main():
     else:
         print " - Finding Repeated Mergers"
         start = datetime.now()
-        interval, next, last = repeatedMergerTimes(base)
+        repeats = repeatedMergerTimes(run, base)
+        aux.saveDictNPZ(repeats, fname, verbose=True)
         stop = datetime.now()
         print " - - Done after %s" % (str(stop-start))
 
@@ -95,8 +92,8 @@ def main():
     ### Process Repeat Data ###
     lowerInter, numPast, numFuture = processRepeats(interval, next, last, base)
 
-
     return interval, lowerInter, numPast, numFuture
+
     
     ### Plot Repeat Data ###
     gwplot.plotFig4_RepeatedMergers(interval, lowerInter, numFuture)
@@ -121,11 +118,54 @@ def main():
 
 
 
-def processRepeats(inter, next, last, base):
+def repeatedMergerTimes(run, base):
+
+    print " - repeatedMergerTimes()"
+
+    numMergers = base.mergers[MERGERS_NUM]
+    next  = -1*  np.ones([numMergers],              dtype=long)
+    last  = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=long)
+    inter = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=np.float64)
+
+    # Convert merger scale factors to ages
+    print " - - Converting merger times"
+    start = datetime.now()
+    scales = base.mergers[MERGERS_TIMES]
+    times = np.array([ base.cosmo.age(sc) for sc in scales ], dtype=np.float64)
+    stop = datetime.now()
+    print " - - - Done after %s" % (str(stop-start))
+
+
+    # Get repeated merger information
+    print " - - Getting repeat statistics"
+    start = datetime.now()
+    mids = base.mergers[MERGERS_IDS]
+    FindRepeats.findRepeats(mids, times, last, next, inter)
+    stop = datetime.now()
+    print " - - - Retrieved after %s" % (str(stop-start))
+
+    # Create dictionary to store data
+    repeatDict = { REPEAT_LAST     : last,
+                   REPEAT_NEXT     : next,
+                   REPEAT_INTERVAL : inter,
+                   REPEAT_CREATED  : datetime.now().ctime(),
+                   REPEAT_RUN      : run }
+
+    return repeatDict
+
+
+
+
+
+def processRepeats(repeats, base):
 
     print " - processRepeats()"
     
     print " - - %d Mergers" % (base.numMergers)
+
+    interval = repeats[REPEAT_INTERVAL]
+    last     = repeats[REPEAT_LAST]
+    next     = repeats[REPEAT_NEXT]
 
     aveFuture = 0.0
     aveFutureNum = 0
@@ -144,8 +184,8 @@ def processRepeats(inter, next, last, base):
     for ii in xrange(base.numMergers):
 
         # Get lower limit intervals (i.e. no later merger)
-        if( inter[ii] < 0.0 ):
-            mtime = base.cosmo.age(base.mergers['time'][ii])
+        if( interval[ii] < 0.0 ):
+            mtime = base.cosmo.age(base.mergers[MERGERS_TIMES][ii])
             # Store time from merger until now
             lowerInter[ii] = (nowTime - mtime)
            
@@ -191,40 +231,6 @@ def processRepeats(inter, next, last, base):
     print " - - Average Number of Repeated mergers  past, future  =  %.3f, %.3f" % (avePast, aveFuture)
 
     return lowerInter, numPast, numFuture
-
-
-
-
-def repeatedMergerTimes(base):
-
-    print " - repeatedMergerTimes()"
-
-    # Convert merger scale factors to ages
-    print " - - Converting merger times"
-    start = datetime.now()
-    scales = base.mergers['time']
-    times = np.array([ base.cosmo.age(sc) for sc in scales ], dtype=np.float32)
-    stop = datetime.now()
-    print " - - - Done after %s" % (str(stop-start))
-
-
-    # Get repeated merger information
-    print " - - Getting repeat statistics"
-    start = datetime.now()
-    inter, next, last = FindRepeats.findRepeats(base.mergers['id'], times)
-    stop = datetime.now()
-    print " - - - Retrieved after %s" % (str(stop-start))
-    fname = FILE_NAME
-    np.savez(fname, inter=inter, next=next, last=last)
-    print " - - Saved to '%s'" % (fname)
-
-
-    inds = np.where( inter >= 0.0 )[0]
-    print "Num Intervals = %d" % (len(inds))
-    aveInter = np.average( inter[inds] )
-    print "Ave Interval  =  %.4e [s]  =  %.4f [Myr]" % (aveInter, aveInter/(1.0e6*YEAR))
-
-    return interv, next, last
 
 
 
