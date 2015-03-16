@@ -223,7 +223,18 @@ def zToA(z, a0=1.0):
 ###  ===================================  ###
 
 
+def minmax(arr):
+    """
+    Get the minimum and maximum of the given array
+    """
+    return np.min(arr), np.max(arr)
 
+    
+def avestd(arr):
+    """
+    Get the average and standard deviation of the given array.
+    """
+    return np.average(arr), np.std(arr)
 
 
 def incrementRollingStats(avevar, count, val):
