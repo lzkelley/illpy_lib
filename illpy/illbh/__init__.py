@@ -12,3 +12,4 @@ import BHMergers
 import BHDetails
 import BHConstants
 import BHMatcher
+import BHTree
