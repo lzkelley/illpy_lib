@@ -21,9 +21,6 @@ from illpy import AuxFuncs as aux
 from illpy.Constants import *
 from illpy.illbh.BHConstants import *
 
-#from Settings import *
-#from Constants import *
-
 import Basics
 
 import pyximport
@@ -40,12 +37,12 @@ LOAD = False
 
 REPEAT_LAST = 'last'
 REPEAT_NEXT = 'next'
-REPEAT_INTERVAL = 'interval'
+REPEAT_LAST_TIME = 'lastTime'
+REPEAT_NEXT_TIME = 'nextTime'
 REPEAT_CREATED = 'created'
 REPEAT_RUN = 'run'
 
-
-HEADER = " - RepeatedMergers :"
+MYR = (1.0e6)*YEAR
 
 ###  ==============================================================  ###
 ###  ===========================  MAIN  ===========================  ###
@@ -168,9 +165,10 @@ def calculateRepeatedMergers(run, base, verbose=VERBOSE):
     if( verbose ): print " - - RepeatedMergers.calculateRepeatedMergers()"
 
     numMergers = base.mergers[MERGERS_NUM]
-    next  = -1*  np.ones([numMergers],              dtype=long)
-    last  = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=long)
-    inter = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=np.float64)
+    last     = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=long)
+    next     = -1*  np.ones([numMergers],              dtype=long)
+    lastTime = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=np.float64)
+    nextTime = -1.0*np.ones([numMergers],              dtype=np.float64)
 
     # Convert merger scale factors to ages
     if( verbose ): print " - - - Converting merger times"
@@ -185,7 +183,7 @@ def calculateRepeatedMergers(run, base, verbose=VERBOSE):
     if( verbose ): print " - - - Getting repeat statistics"
     start = datetime.now()
     mids = base.mergers[MERGERS_IDS]
-    FindRepeats.findRepeats(mids, times, last, next, inter)
+    FindRepeats.findRepeats(mids, times, last, next, lastTime, nextTime)
     stop = datetime.now()
     if( verbose ): print " - - - - Retrieved after %s" % (str(stop-start))
 
@@ -197,11 +195,12 @@ def calculateRepeatedMergers(run, base, verbose=VERBOSE):
 
 
     # Create dictionary to store data
-    repeats = { REPEAT_LAST     : last,
-                REPEAT_NEXT     : next,
-                REPEAT_INTERVAL : inter,
-                REPEAT_CREATED  : datetime.now().ctime(),
-                REPEAT_RUN      : run }
+    repeats = { REPEAT_LAST      : last,
+                REPEAT_NEXT      : next,
+                REPEAT_LAST_TIME : lastTime,
+                REPEAT_NEXT_TIME : nextTime,
+                REPEAT_CREATED   : datetime.now().ctime(),
+                REPEAT_RUN       : run }
 
     return repeats
 
@@ -229,72 +228,49 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
 
     if( verbose ): print " - - RepeatedMergers.analyzeRepeats()"
     
-    numMergers = base.numMergers
+    numMergers   = base.numMergers
 
-    interval = repeats[REPEAT_INTERVAL]
-    last     = repeats[REPEAT_LAST]
-    next     = repeats[REPEAT_NEXT]
+    last         = repeats[REPEAT_LAST]
+    next         = repeats[REPEAT_NEXT]
+    timeLast     = repeats[REPEAT_LAST_TIME]
+    timeNext     = repeats[REPEAT_NEXT_TIME]
 
-    aveFuture = 0.0
+    aveFuture    = 0.0
+    avePast      = 0.0
     aveFutureNum = 0
-    avePast = 0.0
-    avePastNum = 0
+    avePastNum   = 0
 
-    lowerInter = -1.0*np.ones(base.numMergers, dtype=float)
-    numPast = -1*np.ones(base.numMergers, dtype=int)
-    numFuture = -1*np.ones(base.numMergers, dtype=int)
+    #timeBetween  = -1.0*np.ones(numMergers, dtype=float)
+    numPast      = np.zeros(numMergers, dtype=int  )
+    numFuture    = np.zeros(numMergers, dtype=int  )
 
     # Get age of the universe now
-    nowTime = base.cosmo.age(1.0)
-
+    #nowTime = base.cosmo.age(1.0)
 
 
     if( verbose ): print " - - - %d Mergers" % (numMergers)
 
     # Find number of unique merger BHs (i.e. no previous mergers)
     inds = np.where( (last[:,IN_BH] < 0) & (last[:,OUT_BH] < 0) & (next[:] < 0) )
-    numTwoIsolated = len(inds)
+    numTwoIsolated = len(inds[0])
     inds = np.where( ((last[:,IN_BH] < 0) ^ (last[:,OUT_BH] < 0)) & (next[:] < 0) )                 # 'xor' comparison
-    numOneIsolated = len(inds)
+    numOneIsolated = len(inds[0])
     
     if( verbose ): 
-        print " - - - Mergers with neither BH previously merged = %d" % (numTwoIsolated)
-        print " - - - Mergers with one     BH previously merged = %d" % (numOneIsolated)
-
-
-    inds = np.where( interval == 0.0 )
-    print "%d Intervals = 0.0" % (len(inds[0]))
-    if( len(inds[0]) > 0 ):
-        print "\te.g."
-        print "\t", inds[0][0], inds[0][1], " : ", interval[inds]
-
-
-    inds = np.where( interval < 0.0 )
-    print "%d Intervals < 0.0" % (len(inds[0]))
-    if( len(inds[0]) > 0 ):
-        print "\te.g."
-        print "\t", inds[0][0], inds[0][1], " : ", interval[inds]
+        print " - - - Mergers with neither  BH previously merged = %d" % (numTwoIsolated)
+        print " - - - Mergers with only one BH previously merged = %d" % (numOneIsolated)
 
 
     ### Go back through All Mergers to Count Repeats ###
     
-    for ii in xrange(base.numMergers):
-
-        # Get lower limit intervals (i.e. no later merger)
-        if( interval[ii] < 0.0 ):
-            mtime = base.cosmo.age(base.mergers[MERGERS_TIMES][ii])
-            # Store time from merger until now
-            lowerInter[ii] = (nowTime - mtime)
-           
+    for ii in xrange(numMergers):
 
         ## Count Forward from First Mergers ##
         # If this is a first merger
-        if( last[ii] < 0 ):
-            jj = next[ii]
-            # Walk through future mergers
-            while( jj >= 0 ):
-                numFuture[ii] += 1
-                jj = next[jj]
+        if( all(last[ii,:] < 0) ):
+
+            # Count the number of mergers that the 'out' BH  from this merger, will later be in
+            numFuture[ii] = countFutureMergers(next, ii)
 
             # Accumulate for averaging
             aveFuture += numFuture[ii]
@@ -304,16 +280,13 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
         ## Count Backward from Last Mergers ##
         # If this is a final merger
         if( next[ii] < 0 ):
-            jj = last[ii]
-            # Walk through past mergers
-            while( jj >= 0 ):
-                numPast[ii] += 1
-                jj = last[jj]
+
+            # Count the number of mergers along the longest branch of past merger tree
+            numPast[ii] = countPastMergers(last, ii)
 
             # Accumulate for averaging
             avePast += numPast[ii]
             avePastNum += 1
-
 
     # } ii
 
@@ -323,11 +296,48 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
 
     inds = np.where(next >= 0)[0]
     numRepeats = len(inds)
-    fracRepeats = 1.0*numRepeats/base.numMergers
-    print " - - Number of repeated mergers = %d/%d = %.4f" % (numRepeats, base.numMergers, fracRepeats)
-    print " - - Average Number of Repeated mergers  past, future  =  %.3f, %.3f" % (avePast, aveFuture)
+    fracRepeats = 1.0*numRepeats/numMergers
+    print " - - - Number of repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats)
+    print " - - - Average Number of Repeated mergers  past, future  =  %.3f, %.3f" % (avePast, aveFuture)
 
-    return lowerInter, numPast, numFuture
+
+    indsInt = np.where( timeNext >= 0.0 )[0]
+    print " - - - Number of merger intervals    = %d" % (len(indsInt))
+    timeStats = aux.avestd( timeNext[indsInt] )
+    print " - - - - Time between = %.4e +- %.4e [Myr]" % (timeStats[0]/MYR, timeStats[1]/MYR)
+
+    inds = np.where( timeNext == 0.0 )[0]
+    print " - - - Number of zero time intervals = %d" % (len(inds))
+
+    return timeNext[indsInt], numPast, numFuture
+
+
+
+def countFutureMergers( next, ind ):
+    count = 0
+    ii = ind
+    while( next[ii] >= 0 ):
+        count += 1
+        ii = next[ii]
+
+    return count
+
+
+def countPastMergers( last, ind ):
+    
+    last_in  = last[ind, IN_BH]
+    last_out = last[ind, OUT_BH]
+    
+    num_in   = 0
+    num_out  = 0
+
+    if( last_in >= 0 ):
+        num_in = countPastMergers( last, last_in )
+
+    if( last_out >= 0 ):
+        num_out = countPastMergers( last, last_out )
+
+    return np.max([num_in, num_out])+1
 
 
 
