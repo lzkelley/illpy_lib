@@ -58,7 +58,20 @@ DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_TIMES, DETAILS_MASSES,
                           DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
 
 
-
-
 assert DETAILS_BEFORE == 0 and DETAILS_AFTER == 1 and DETAILS_FIRST == 2, \
     "``DETAILS_<BEFORE/AFTER/FIRST>`` MUST be in the proper order!"
+
+
+
+### BH Merger Tree ###
+
+TREE_LAST         = 'last'
+TREE_NEXT         = 'next'
+TREE_LAST_TIME    = 'lastTime'
+TREE_NEXT_TIME    = 'nextTime'
+TREE_CREATED      = 'created'
+TREE_RUN          = 'run'
+TREE_NUM_FUTURE   = 'numFuture'
+TREE_NUM_PAST     = 'numPast'
+TREE_TIME_BETWEEN = 'timeBetween'
+

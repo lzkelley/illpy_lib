@@ -18,16 +18,6 @@ VERBOSE  = True
 _VERSION = 0.1
 LOAD     = False
 
-TREE_LAST         = 'last'
-TREE_NEXT         = 'next'
-TREE_LAST_TIME    = 'lastTime'
-TREE_NEXT_TIME    = 'nextTime'
-TREE_CREATED      = 'created'
-TREE_RUN          = 'run'
-TREE_NUM_FUTURE   = 'numFuture'
-TREE_NUM_PAST     = 'numPast'
-TREE_TIME_BETWEEN = 'timeBetween'
-
 MYR = (1.0e6)*YEAR
 
 _TREE_SAVE_FILENAME = "ill-%d_bh-tree_v%.1f.npz"
