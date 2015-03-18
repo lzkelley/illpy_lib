@@ -610,7 +610,19 @@ def checkDir(tdir):
     return ndir
 
 
-#
+def npzToDict(npz):
+    """
+    Given a numpy npz file, convert it to a dictionary with the same keys and values.
+    
+    Arguments
+    ---------
+    npz : <NpzFile>, input dictionary-like object
+    
+    Returns
+    -------
+    newDict : <dict>, output dictionary with key-values from npz file.
 
-
+    """
+    newDict = { key : npz[key] for key in npz.keys() }
+    return newDict
 
