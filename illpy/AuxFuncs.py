@@ -222,6 +222,14 @@ def zToA(z, a0=1.0):
 ###  =============  MATH  ==============  ###
 ###  ===================================  ###
 
+def frexp10(xx): 
+    """
+    Decompose the given number into a mantissa and exponent for scientific notation.
+    """
+    exponent = int(np.log10(xx)) 
+    mantissa = xx / np.power(10.0, exponent)
+    return mantissa, exponent
+
 
 def nonzeroMin(arr):
     """
