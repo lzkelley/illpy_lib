@@ -1,3 +1,5 @@
 readtreeHDF5.py
 readhaloHDF5.py
 readsubfHDF5.py
+hdf5lib.py
+hdf5lib_param.py
