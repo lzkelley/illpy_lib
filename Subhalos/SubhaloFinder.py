@@ -12,7 +12,7 @@ import illpy
 from illpy.Constants import *
 from Constants import *
 
-
+import Figures
 
 RUN = 3
 VERBOSE = True
@@ -60,7 +60,13 @@ def main(run=RUN, verbose=VERBOSE):
     if( verbose ): print " - - Found %d/%d valid subhalos" % (len(inds), numSubhalos)
 
 
+    Figures.figa01.plotFigA01_Subfind_SFR( run, cat[SH_SFR][inds], cat[SH_MASS_TYPE][inds], cat[SH_BH_MASS][inds] )
+
+
     return cat, inds
+
+
+
 
 
 
