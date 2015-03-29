@@ -9,6 +9,7 @@ import readtreeHDF5
 import readsubfHDF5
 
 import illpy
+from illpy import Cosmology
 from illpy.Constants import *
 from Constants import *
 
@@ -80,14 +81,42 @@ def main(run=RUN, verbose=VERBOSE, plot=PLOT):
     if( verbose ): print " - Loading branches for %d selected subhalos" % (len(inds))
     epas, snaps, sfrInds = getSubhaloBranches(sfrInds, tree, target, verbose=verbose)
 
-    
+
+    ### Get Weights for Quality of EplusA Galaxies ###
+    weights = weightEplusA_sfr(epas, snaps, verbose=verbose)
+
+
+    if( plot ): Figures.figa02.plotFigA02_Branches_SFR(run, snaps, epas, weights)
+
 
     return run, target, cat, inds, sfrInds, tree, epas, snaps
 
 
 
 
+def weightEplusA_sfr(epas, snaps, cosmo=None, verbose=VERBOSE):
 
+    if( verbose ): print " - - SubhaloFinder.weightEplusA_sfr()"
+
+    if( cosmo is None ): cosmo = Cosmology()
+
+    sfr = epas[SH_SFR]
+
+    durSnaps = np.concatenate([[snaps[0]-1],snaps])
+
+    scales  = cosmo.snapshotTimes(durSnaps)
+    lbtimes = cosmo.age(scales)
+
+    durs = np.diff(lbtimes)
+
+    starsFormed = sfr*durs/YEAR
+
+    #weights = sfr[:,0]/np.max(sfr[:,1:], axis=1)
+    weights = starsFormed[:,0]/np.sum(starsFormed[:,1:], axis=1)
+    
+    return weights
+
+# } weightEplusA_sfr()
 
 
 
@@ -101,9 +130,9 @@ def getSubhaloBranches(inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STA
     assert numSubhalos > MIN_NUM_SUBHALOS, "There are only %d Subhalos!!!" % (numSubhalos)
 
     # Get snapshot numbers included in the branches
-    branchSnaps = np.arange(target, NUM_SNAPS)[::-1]
+    branchSnaps = np.arange(target, NUM_SNAPS)
     branchLens = NUM_SNAPS - target
-    if( verbose ): print " - - - Branch Snaps = %d [%d,%d]" % (branchLens, branchSnaps[-1], branchSnaps[0])
+    if( verbose ): print " - - - Branch Snaps = %d [%d,%d]" % (branchLens, branchSnaps[0], branchSnaps[-1])
 
 
     # Make sure branches are long enough to analyze
@@ -163,9 +192,14 @@ def getSubhaloBranches(inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STA
             badInds.append(ii)
             continue
 
+
+        # Sort by snapshot number
+        sort = np.argsort(nums)
+
         # Store Parameters
         for key in useKeys:
-            epas[key][ii] = getattr(desc, key)
+            epas[key][ii] = getattr(desc, key)[sort]                                                # In CHRONOLOGICAL order
+
 
     # } ii
 
