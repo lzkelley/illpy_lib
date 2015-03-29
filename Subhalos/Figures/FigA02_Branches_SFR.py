@@ -56,31 +56,46 @@ COL_SFR = '0.3'
 DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a02_ill-%d_branches_sfr.png'
 
 
-def plotFigA02_Branches_SFR(run, snaps, branches, subs=NUM_SUBS, fname=None, verbose=True):
+def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=True):
 
     if( verbose ): print " - - FigA02_Branches_SFR.plotFigA02_Branches_SFR()"
 
     if( fname is None ): fname = DEF_FNAME % (run)
 
+    sfr = branches[SH_SFR]
+    numSubhalos = len(sfr)
+
+    '''
+    cosmo = Cosmology()
+    scales = cosmo.snapshotTimes(snaps)
+    redz   = cosmo.redshift(scales)
+    lbtime = cosmo.lookbackTime(scales)
+    lbtime[np.where(lbtime < 0.0)] = 0.0
+    '''
+
+
     ### Create Figure and Axes ###
     fig, ax = plt.subplots(figsize=FIG_SIZE, nrows=1, ncols=1, squeeze=False)
     plt.subplots_adjust(left=LEFT, right=RIGHT, bottom=BOTTOM, hspace=HSPACE, top=TOP, wspace=WSPACE)
-    
-    ### Choose Random Subset of Subhalos ###
-    numSubhalos = len(branches[SH_SFR])
 
-    # If trying to select more than available, plot all
-    if( subs >= numSubhalos ): 
-        subs = numSubhalos
-        inds = np.arange(subs)
-    # If actually a subset, select randomly
-    else:
-        inds = np.random.choice( np.arange(numSubhalos), size=subs, replace=False )
 
-    if( verbose ): print " - - - Plotting %d/%d" % (subs, numSubhalos)
+    inds = np.argsort(weights)
+
+    cfunc, cnorm, cmap = pfunc.cmapColors([np.min(weights), np.max(weights)])
+
 
     ## Plot Scatter SFR versus BH Mass
-    lines, names = figa02_sfr_lines(ax[0,0], snaps, branches[SH_SFR][inds], cols=branches[SH_BH_MASS][inds])
+    lines, names = figa02_sfr_lines(ax[0,0], snaps, sfr[inds], cols=cfunc(weights[inds]))
+
+
+    cbax = fig.add_axes([0.92, 0.2, 0.02, 0.6])
+    cb = mpl.colorbar.ColorbarBase(cbax, cmap=cmap, norm=cnorm, orientation='vertical')
+
+    ticks = [np.min(weights), np.average(weights), np.max(weights)]
+    tick_labels = [ "%.2f" % tt for tt in ticks ]
+
+    cb.set_ticks(ticks)
+    cb.set_ticklabels(tick_labels)
 
     '''
     # Add Legend
@@ -92,9 +107,11 @@ def plotFigA02_Branches_SFR(run, snaps, branches, subs=NUM_SUBS, fname=None, ver
     fig.savefig(fname)
     if( verbose ): print " - - - Saved Figure to '%s'" % (fname)
 
-    return fig
+    return cb
 
 # plotFigA01_Subfind_SFR()
+
+
 
 
 def figa02_sfr_lines(ax, snaps, sfr, cols=None):
@@ -102,28 +119,8 @@ def figa02_sfr_lines(ax, snaps, sfr, cols=None):
 
     nums = len(sfr)
 
-    cosmo = Cosmology()
-    scales = cosmo.snapshotTimes(snaps)
-    redz   = cosmo.redshift(scales)
-    lbtime = cosmo.lookbackTime(scales)
-    lbtime[np.where(lbtime < 0.0)] = 0.0
-
     lines = []
     names = []
-
-
-    start = np.argmin(snaps)
-    other = np.where(snaps != np.min(snaps))[0]
-
-    weight = sfr[:,start]/np.max(sfr[:,other], axis=1)
-
-    print sfr[4]
-
-    print sfr[:20,start]
-    np.max(sfr[:20,other], axis=1)
-    print weight[:20]
-    print np.average(weight)
-    print np.std(weight)
 
     ### Configure Axes ###
     xlabel = r'Snapshot [#]'
@@ -132,25 +129,17 @@ def figa02_sfr_lines(ax, snaps, sfr, cols=None):
     pfunc.setAxis(ax, axis='x', fs=FS, c='black', label=xlabel, scale='linear', grid=GRID)
     pfunc.setAxis(ax, axis='y', fs=FS, c='black', label=ylabel, scale=SCALE, grid=GRID)
 
-    inds = np.where( cols > 0.0 )
-    norm = mpl.colors.LogNorm(vmin=np.min(cols[inds]), vmax=np.max(cols[inds]))
-
     ### Plot SFR ###
 
     for ii in xrange(nums):
 
-        usecols = cols
-
         if( cols is None ):
-            inds = np.where( sfr[ii] > 0.0 )[0]
-            if( len(inds) < 2 ): continue
-            l1, = ax.plot(snaps[inds], sfr[ii][inds], ls='-', lw=LW, c=COL_SFR, alpha=ALPHA)
+            l1, = ax.plot(snaps, sfr[ii], ls='-', lw=LW, c=COL_SFR, alpha=ALPHA)
         else:
-            inds = np.where( (sfr[ii] > 0.0) & (cols[ii] > 0.0) )[0]
-            if( len(inds) < 2 ): continue
-            l1 = pfunc.colorline(snaps[inds], sfr[ii][inds], cols[ii][inds], norm=norm, lw=LW, alpha=ALPHA)
+            l1, = ax.plot(snaps, sfr[ii], ls='-', lw=LW, c=cols[ii], alpha=ALPHA)
 
 
+    '''
     aves = np.average(sfr, axis=0)
     stds = np.std(sfr, axis=0)
 
@@ -159,6 +148,9 @@ def figa02_sfr_lines(ax, snaps, sfr, cols=None):
     for jj in [-1,+1]:
         l1, = ax.plot(snaps, aves+jj*stds, ls=':', lw=LW, c='black')
         l1.set_dashes(DOTS)
+
+    '''
+
 
     return lines, names
 
