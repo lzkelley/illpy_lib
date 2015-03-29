@@ -18,6 +18,7 @@ import Figures
 RUN     = 3
 SFR_CUT = 0.9
 VERBOSE = True
+PLOT    = True
 
 TARGET_LOOKBACK_TIME = 1.0e9                                                                        # [years]
 
@@ -29,7 +30,7 @@ MIN_NUM_SUBHALOS   = 10
 
 
 
-def main(run=RUN, verbose=VERBOSE):
+def main(run=RUN, verbose=VERBOSE, plot=PLOT):
 
     if( verbose ): print "SubhaloFinder.py"
 
@@ -63,7 +64,7 @@ def main(run=RUN, verbose=VERBOSE):
     if( verbose ): print " - - Found %d/%d valid subhalos" % (len(inds), numSubhalos)
 
     # Plot initial subhalos
-    Figures.figa01.plotFigA01_Subfind_SFR( run, cat[SH_SFR][inds], cat[SH_MASS_TYPE][inds], cat[SH_BH_MASS][inds] )
+    if( plot ): Figures.figa01.plotFigA01_Subfind_SFR( run, cat[SH_SFR][inds], cat[SH_MASS_TYPE][inds], cat[SH_BH_MASS][inds] )
 
 
     ### Select Subhalos Based on Star Formation Rate ###
@@ -81,14 +82,18 @@ def main(run=RUN, verbose=VERBOSE):
 
     
 
-    return target, cat, inds, sfrInds, tree, epas, snaps
+    return run, target, cat, inds, sfrInds, tree, epas, snaps
 
 
 
 
 
 
-def getSubhaloBranches(inds, tree, target, verbose=VERBOSE):
+
+
+
+def getSubhaloBranches(inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, 
+                       nbh=MIN_BH_PARTICLES, verbose=VERBOSE):
 
     if( verbose ): print " - - SubhaloFinder.getSubhaloBranches()"
     numSubhalos = len(inds)
@@ -103,16 +108,19 @@ def getSubhaloBranches(inds, tree, target, verbose=VERBOSE):
 
     # Make sure branches are long enough to analyze
     assert branchLens > 2, "``branchLens`` < 2!!"
-    
+
+    # Also get snapshot numbers 
+    useKeys = np.concatenate([SUBFIND_PARAMETERS, SUBLINK_PARAMETERS]).tolist()
 
     ### Build Dictionary To Store Branches Data ###
 
     # Get sample branch to determine shapes of parameters
-    desc = tree.get_future_branch(target, inds[0], keysel=SUBFIND_PARAMETERS)
+    desc = tree.get_future_branch(target, inds[0], keysel=useKeys)
+
 
     # Initialize dictionary with zeros arrays for each parameter
     epas = {}
-    for key in SUBFIND_PARAMETERS:
+    for key in useKeys:
         val = getattr(desc, key)
         shp = np.shape(val)
 
@@ -121,39 +129,55 @@ def getSubhaloBranches(inds, tree, target, verbose=VERBOSE):
 
     # } key
 
-    # Also get snapshot numbers 
-    useKeys = np.concatenate([SUBFIND_PARAMETERS, [SL_SNAP_NUM]])
     
     ### Find Branches for Subhalos and Store Parameters ###
     numMissing = 0
+    numNaked = 0
+    numZeroSFR = 0
     badInds = []
-    first = True
     if( verbose ): print " - - - Finding branches for %d subhalos" % (len(inds))
     for ii,subh in enumerate(inds):
         # Get Branches
         desc = tree.get_future_branch(target, subh, keysel=useKeys)
+
+        # Make sure subhalo found in all future snapshots
         nums = getattr(desc, SL_SNAP_NUM)
         if( len(nums) != branchLens ):
             numMissing += 1
             badInds.append(ii)
             continue
-        elif( first ):
-            epas[SL_SNAP_NUM] = nums
-            first = False
+
+        # Make sure subhalo has enough particles in all future snapshots
+        lenTypes = getattr(desc, SH_LEN_TYPE)
+        if( any(lenTypes[:, PARTICLE_TYPE_GAS ] < ngas ) or 
+            any(lenTypes[:, PARTICLE_TYPE_STAR] < nstar) or
+            any(lenTypes[:, PARTICLE_TYPE_BH  ] < nbh  )   ):
+            numNaked += 1
+            badInds.append(ii)
+            continue
+
+        # Make sure SFR is never uniformly Zero
+        sfr = getattr(desc, SH_SFR)
+        if( any(sfr <= 0.0) ):
+            numZeroSFR += 1
+            badInds.append(ii)
+            continue
 
         # Store Parameters
-        for key in SUBFIND_PARAMETERS:
+        for key in useKeys:
             epas[key][ii] = getattr(desc, key)
 
     # } ii
 
     ### Cleanup bad Subhalos (no branches) ###
     inds = np.delete(inds, badInds)
-    for key in SUBFIND_PARAMETERS:
+    for key in useKeys:
         epas[key] = np.delete(epas[key], badInds, axis=0)
 
                 
-    if( verbose ): print " - - - - Retrieved %d branches with (%d errors)" % (len(epas[SH_SFR]),numMissing)
+    if( verbose ): 
+        print " - - - - Retrieved %d branches with (%d missing, %d lacking, %d zero SFR)" % \
+            (len(epas[SH_SFR]), numMissing, numNaked, numZeroSFR)
 
 
     return epas, branchSnaps, inds
@@ -210,42 +234,23 @@ def filterSubhalos_minParticles(cat, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PART
     
     if( verbose ): print " - - SubhaloFinder.filterSubhalos_minParticles()"
 
-    filt = dict(cat)
-
-    lenTypes = filt[SH_LEN_TYPE]
-    nums = len(filt[SH_SFR])
+    lenTypes = cat[SH_LEN_TYPE]
+    nums = len(cat[SH_SFR])
     
     reqs = [ ngas, nstar, nbh ]
     types = [ PARTICLE_TYPE_GAS, PARTICLE_TYPE_STAR, PARTICLE_TYPE_BH ]
     names = [ 'Gas', 'Star', 'BH' ]
     inds = set(range(nums))
 
-
     ### Find Good Subhalos ###
     for num, typ, nam in zip(reqs, types, names):
 
         temp = np.where( lenTypes[:,typ] >= num )[0]
-        #inds = inds.union(temp)
         inds = inds.intersection(temp)
         if( verbose ): 
             print " - - - Requiring at least %d '%s' (%d) Particles" % (num, nam, typ)
             print " - - - - %d/%d Valid (%d left)" % (len(temp), nums, len(inds))
 
-            
-    '''
-    ### Remove Subhalos ###
-    for key in filt.keys():
-        print "\nOld shape for '%s' = %s" % (str(key), str(np.shape(filt[key])))
-
-        if( len(np.shape(filt[key])) > 1 ): axis = 0
-        else:                               axis = None
-
-        filt[key] = np.delete(filt[key], list(inds), axis=axis )
-        print "New shape for '%s' = %s" % (str(key), str(np.shape(filt[key])))
-
-        return filt
-
-    '''
 
     return np.array(list(inds))
     
