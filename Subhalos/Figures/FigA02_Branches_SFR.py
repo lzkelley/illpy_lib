@@ -23,6 +23,7 @@ FS = 14
 FS_TITLE = 16
 FS_LEGEND = 10
 LW = 1.0
+LW2 = 2.0
 
 PS = 20                                                                                              # Point-size
 ALPHA = 0.4
@@ -35,12 +36,13 @@ DASHES = [8,4]
 DOTS = [3,2]
 
 
+NUM_BINS = 20
 
-NUM_SUBS = 100
+PERCENTILES = [10,50,90]
 
 '''
 NUM = 40
-PERCENTILES = [10,50,90]
+
 
 AXIS_BH      = 0
 AXIS_STELLAR = 1
@@ -73,9 +75,8 @@ def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=T
     lbtime[np.where(lbtime < 0.0)] = 0.0
     '''
 
-
     ### Create Figure and Axes ###
-    fig, ax = plt.subplots(figsize=FIG_SIZE, nrows=1, ncols=1, squeeze=False)
+    fig, ax = plt.subplots(figsize=FIG_SIZE, nrows=1, ncols=2, squeeze=False)
     plt.subplots_adjust(left=LEFT, right=RIGHT, bottom=BOTTOM, hspace=HSPACE, top=TOP, wspace=WSPACE)
 
 
@@ -85,7 +86,11 @@ def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=T
 
 
     ## Plot Scatter SFR versus BH Mass
-    lines, names = figa02_sfr_lines(ax[0,0], snaps, sfr[inds], cols=cfunc(weights[inds]))
+    lines, names = figa02_sfr_lines(ax[0,0], snaps, sfr[inds], cfunc(weights[inds]))
+
+
+    ## Plot Scatter SFR versus BH Mass
+    figa02_weights_hist(ax[0,1], weights[inds])
 
 
     cbax = fig.add_axes([0.92, 0.2, 0.02, 0.6])
@@ -114,8 +119,7 @@ def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=T
 
 
 
-def figa02_sfr_lines(ax, snaps, sfr, cols=None):
-
+def figa02_sfr_lines(ax, snaps, sfr, weights):
 
     nums = len(sfr)
 
@@ -129,17 +133,11 @@ def figa02_sfr_lines(ax, snaps, sfr, cols=None):
     pfunc.setAxis(ax, axis='x', fs=FS, c='black', label=xlabel, scale='linear', grid=GRID)
     pfunc.setAxis(ax, axis='y', fs=FS, c='black', label=ylabel, scale=SCALE, grid=GRID)
 
-    ### Plot SFR ###
-
+    ### Plot SFR Histories ###
     for ii in xrange(nums):
-
-        if( cols is None ):
-            l1, = ax.plot(snaps, sfr[ii], ls='-', lw=LW, c=COL_SFR, alpha=ALPHA)
-        else:
-            l1, = ax.plot(snaps, sfr[ii], ls='-', lw=LW, c=cols[ii], alpha=ALPHA)
+        l1, = ax.plot(snaps, sfr[ii], ls='-', lw=LW, c=weights[ii], alpha=ALPHA)
 
 
-    '''
     aves = np.average(sfr, axis=0)
     stds = np.std(sfr, axis=0)
 
@@ -149,9 +147,39 @@ def figa02_sfr_lines(ax, snaps, sfr, cols=None):
         l1, = ax.plot(snaps, aves+jj*stds, ls=':', lw=LW, c='black')
         l1.set_dashes(DOTS)
 
-    '''
-
 
     return lines, names
 
 
+
+def figa02_weights_hist(ax, weights, num=NUM_BINS):
+
+    lines = []
+    names = []
+
+    ### Configure Axes ###
+    xlabel = r'Weight'
+    ylabel = r'Count'
+    pfunc.setAxis(ax, axis='x', fs=FS, c='black', label=xlabel, scale=SCALE)
+    pfunc.setAxis(ax, axis='y', fs=FS, c='black', label=ylabel, scale=SCALE)
+
+    stats = np.percentile(weights, PERCENTILES)
+
+    # Create Bins
+    extr = np.array([np.min(weights), np.max(weights)])
+    bins = np.logspace( *np.log10(extr), num=num )
+
+    # Plot
+    ax.hist(weights, bins=bins, orientation='vertical', log=True, color='blue', lw=LW2)
+
+    ax.set_xlim(extr)
+
+    print stats
+    lens = len(stats)
+
+    for ii,st in enumerate(stats):
+        l1 = ax.axvline(st, ls='--', lw=LW2, color='black')
+        if( (ii == 1 and lens == 3) or (ii == 2 and lens == 5) ): l1.set_dashes(DASHES)
+        else:                                                     l1.set_dashes(DOTS)
+
+    return
