@@ -8,4 +8,5 @@ __status__ = "Development"
 
 
 
-import FigA01_Subfind_SFR as figa01
+import FigA01_Subfind_SFR     as figa01
+import FigA02_Branches_SFR    as figa02
