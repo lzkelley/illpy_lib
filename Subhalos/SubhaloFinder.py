@@ -27,6 +27,8 @@ MIN_BH_PARTICLES   = 1
 
 MIN_NUM_SUBHALOS   = 10
 
+
+
 def main(run=RUN, verbose=VERBOSE):
 
     if( verbose ): print "SubhaloFinder.py"
@@ -57,7 +59,7 @@ def main(run=RUN, verbose=VERBOSE):
 
     # Find valid subhalos
     if( verbose ): print " - Finding valid subhalos"
-    inds = filterSubhalos(cat, verbose=verbose)
+    inds = filterSubhalos_minParticles(cat, verbose=verbose)
     if( verbose ): print " - - Found %d/%d valid subhalos" % (len(inds), numSubhalos)
 
     # Plot initial subhalos
@@ -65,9 +67,7 @@ def main(run=RUN, verbose=VERBOSE):
 
 
     ### Select Subhalos Based on Star Formation Rate ###
-    sfrInds = sfrSubhalos(cat, inds, cut=cut, verbose=verbose)
-
-
+    sfrInds, sfrs = sfrSubhalos(cat, inds, cut=cut, verbose=verbose)
 
 
     ### Load Merger Tree ###
@@ -75,9 +75,16 @@ def main(run=RUN, verbose=VERBOSE):
     tree = readtreeHDF5.TreeDB(treePath)
 
 
+    ### Get Branches of Target Halos ###
+    if( verbose ): print " - Loading branches for %d selected subhalos" % (len(inds))
+    epas, snaps, sfrInds = getSubhaloBranches(sfrInds, tree, target, verbose=verbose)
 
     
-    return cat, inds, sfrInds, tree
+
+    return target, cat, inds, sfrInds, tree, epas, snaps
+
+
+
 
 
 
@@ -114,46 +121,50 @@ def getSubhaloBranches(inds, tree, target, verbose=VERBOSE):
 
     # } key
 
+    # Also get snapshot numbers 
+    useKeys = np.concatenate([SUBFIND_PARAMETERS, [SL_SNAP_NUM]])
     
     ### Find Branches for Subhalos and Store Parameters ###
     numMissing = 0
-    if( verbose ): print " - - - Finding brancehs for %d subhalos" % (len(inds))
+    badInds = []
+    first = True
+    if( verbose ): print " - - - Finding branches for %d subhalos" % (len(inds))
     for ii,subh in enumerate(inds):
         # Get Branches
-        desc = tree.get_future_branch(target, subh, keysel=np.append(SUBFIND_PARAMETERS, SL_SNAP_NUM))
+        desc = tree.get_future_branch(target, subh, keysel=useKeys)
         nums = getattr(desc, SL_SNAP_NUM)
-        missing_flag = False
         if( len(nums) != branchLens ):
-            if( verbose ): print "!!!! ii = %d, subhalo = %d, branch length = %d" % (ii, subh, len(nums))
-            missing_flag = True
             numMissing += 1
+            badInds.append(ii)
+            continue
+        elif( first ):
+            epas[SL_SNAP_NUM] = nums
+            first = False
 
         # Store Parameters
         for key in SUBFIND_PARAMETERS:
-            val = getattr(desc, key)
-
-            # If a snapshot is missing, insert each snapshots value manually
-            if( missing_flag ): 
-                for jj,sn in enumerate(nums):
-                    kk = np.where( branchSnaps == sn )[0]
-                    if( len(kk) == 1 ): epas[key][jj,kk] = val[jj]
-
-            # If all snapshots exist, insert full array
-            else:
-                epas[key][ii] = getattr(desc, key)
+            epas[key][ii] = getattr(desc, key)
 
     # } ii
+
+    ### Cleanup bad Subhalos (no branches) ###
+    inds = np.delete(inds, badInds)
+    for key in SUBFIND_PARAMETERS:
+        epas[key] = np.delete(epas[key], badInds, axis=0)
+
                 
-    if( verbose ): print " - - - - Retrieved branches with %d unexpected lengths" % (numMissing)
+    if( verbose ): print " - - - - Retrieved %d branches with (%d errors)" % (len(epas[SH_SFR]),numMissing)
 
 
+    return epas, branchSnaps, inds
 
-    return epas
+# } getSubhaloBranches()
+
 
 
 
 def sfrSubhalos(cat, inds, cut=SFR_CUT, specific=False, verbose=VERBOSE):
-
+    
     if( verbose ): print " - - SubhaloFinder.sfrSubhalos()"
 
     sfr = cat[SH_SFR][inds]
@@ -170,31 +181,34 @@ def sfrSubhalos(cat, inds, cut=SFR_CUT, specific=False, verbose=VERBOSE):
 
 
     setAve = np.average(sfr)
-
-    # Find target percentile cut
+        
+    # Find target percentile cut (``cut`` given as fraction, convert to percentil)
     cutVal = np.percentile(sfr, cut*100.0)
     if( verbose ): print " - - - Cutting%s SFR above %.3f, %.3e %s" % (vstr1, cut, cutVal, vstr2)
 
     # Find indices Within ``inds`` above cut
     subInds = np.where( sfr >= cutVal )[0]
-    subAve = np.average(sfr[subInds])
+    subsfr = sfr[subInds]
+    subAve = np.average(subsfr)
     # Conver to overall indices
     sfrInds = inds[subInds]
 
     if( verbose ): 
         print " - - - From %d to %d Subhalos (All %d)" % (len(inds), len(sfrInds), len(cat[SH_SFR]))
-        print " - - - Ave before and after cut = %.2e, %.2e %s" % (setAve, subAve, vstr2)
+        print " - - -         Min,     Ave,     Max      %s" % (vstr2)
+        print " - - - Before  %.2e %.2e %.2e" % (np.min(sfr), setAve, np.max(sfr))
+        print " - - - After   %.2e %.2e %.2e" % (np.min(subsfr), subAve, np.max(subsfr))
 
 
-    return sfrInds
+    return sfrInds, subsfr
     
 
 
 
-def filterSubhalos(cat, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, nbh=MIN_BH_PARTICLES, 
-                   verbose=VERBOSE):
+def filterSubhalos_minParticles(cat, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, 
+                                nbh=MIN_BH_PARTICLES, verbose=VERBOSE):
     
-    if( verbose ): print " - - SubhaloFinder.filterSubhalos()"
+    if( verbose ): print " - - SubhaloFinder.filterSubhalos_minParticles()"
 
     filt = dict(cat)
 
