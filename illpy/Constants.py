@@ -22,6 +22,8 @@ MDOT_CONV             = 10.22                                                   
 DENS_CONV             = 6.77025e-22                                                                 # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
 DIST_CONV             = KPC/HPAR                                                                    # Convert from [ckpc/h] to [comoving cm]
 CS_CONV               = 1.0                                                                         # ??????? FIX
+
+
 BOX_LENGTH            = 75000                                                                       # [ckpc/h]
 FTPI                  = 4.0*np.pi/3.0                                                               # (4.0/3.0)*Pi
 NWTG                  = 6.673840e-08                                                                # Newton's Gravitational  Constant
@@ -30,17 +32,31 @@ SPLC                  = 2.997925e+10                                            
 H0                    = 2.268546e-18                                                                # Hubble constant at z=0.0   in [1/s]
 
 
+# Derived Physical Constants
+MYR                   = 1.0e6*YEAR
+GYR                   = 1.0e9*YEAR
+
+
 ### Numerical Constants ###
 
-INT = np.int32
+INT  = np.int32
 LONG = np.int64
-FLT = np.float32
-DBL = np.float64
+FLT  = np.float32
+DBL  = np.float64
 
 
 ### Illustris Constants ###
 
 NUM_SNAPS             = 136
+
+ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
+                          2 : "L75n910FP",
+                          3 : "L75n455FP" }
+
+
+_ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
+GET_ILLUSTRIS_OUTPUT_DIR = lambda run: _ILLUSTRIS_OUTPUT_DIR_BASE % (RUN_NAMES[run])
+
 
 # Indices for Different Types of Particles
 PARTICLE_TYPE_GAS     = 0
