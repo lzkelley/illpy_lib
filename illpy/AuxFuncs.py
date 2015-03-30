@@ -22,6 +22,7 @@ import numpy as np
 import warnings
 import os
 import sys
+import types
 import datetime
 import matplotlib                  as mpl
 from matplotlib import pyplot      as plt
@@ -196,8 +197,6 @@ def constructOffsetTables(gcat):
     return halo_offsets, subhalo_offsets, offset_table
 
 '''
-
-
 
 
 
@@ -458,8 +457,12 @@ def bytesString(bytes, precision=1):
     
     Arguments
     ---------
-    bytes : scalar, number of bytes
-    precision : int, target precision in number of decimal places
+    bytes : <scalar>, number of bytes
+    precision : <int>, target precision in number of decimal places
+
+    Returns
+    -------
+    strSize : <string>, human readable size
 
     Examples
     --------
@@ -481,7 +484,9 @@ def bytesString(bytes, precision=1):
         if bytes >= factor: break
 
     # NOTE: for this to work right, must "from __future__ import division" else integer
-    return '%.*f %s' % (precision, bytes / factor, suffix)
+    strSize = '%.*f %s' % (precision, bytes / factor, suffix)
+
+    return strSize
 
 
 
@@ -489,6 +494,72 @@ def bytesString(bytes, precision=1):
 ###  ====================================  ###
 ###  =============  FILES  ==============  ###
 ###  ====================================  ###
+
+def combineFiles(inFilenames, outFilename, verbose=False):
+    """
+    Concatenate the contents of a set of input files into a single output file.
+
+    Arguments
+    ---------
+    inFilenames : iterable<str>, list of input file names
+    outFilename : <str>, output file name
+    verbose : <bool> (optional=_VERBOSE), print verbose output
+    
+    Returns
+
+    """
+
+    precision = 2
+
+    
+    if( verbose ): print " - - AuxFuncs.combineFiles()"
+    # Make sure outfile path exists
+    checkPath(outFilename)
+
+    inSize = 0.0
+    count  = 0
+    nums = len(inFilenames)-1
+    if( nums <= 100 ): interval = 1
+    else:              interval = np.int( np.floor(nums/100.0) )
+
+    # Open output file for writing
+    with open(outFilename, 'w') as outfil:
+        
+        # Iterate over input files
+        for inname in inFilenames:
+            inSize += os.path.getsize(inname)
+            
+            if( verbose ):
+                if( count % interval == 0 or count == nums):
+                    sys.stdout.write('\r - - - %.2f%% Complete' % (100.0*count/nums))
+
+                if( count == nums ): sys.stdout.write('\n')
+                sys.stdout.flush()
+
+
+            # Open input file for reading
+            with open(inname, 'r') as infil:
+            
+                # Iterate over input file lines
+                for line in infil:
+                    outfil.write(line)
+
+            # } infil
+
+            count += 1
+
+        # } inname
+
+    # } outfil
+
+    outSize = os.path.getsize(outFilename)
+
+    inStr   = bytesString(inSize, precision)
+    outStr  = bytesString(outSize, precision)
+
+    if( verbose ): print " - - - Total input size = %s, output size = %s" % (inStr, outStr)
+
+    return 
 
 
 
@@ -515,16 +586,38 @@ def saveDictNPZ(dataDict, savefile, verbose=False):
 
 
 
-def getFileSize(fname, precision=1):
-    byteSize = os.path.getsize(fname)
-    return bytesString(byteSize, precision)
+def getFileSize(fnames, precision=1):
+    """
+    Return a human-readable size of a file or set of files.
+
+    Arguments
+    ---------
+    fnames : <string> or list/array of <string>, paths to target file(s)
+    precisions : <int>, desired decimal precision of output
+
+    Returns
+    -------
+    byteStr : <string>, human-readable size of file(s)
+
+    """
+
+    ftype = type(fnames)
+    if( ftype is not list and ftype is not np.ndarray ): fnames = [ fnames ]
+    
+    byteSize = 0.0
+    for fil in fnames: byteSize += os.path.getsize(fil)
+
+    byteStr = bytesString(byteSize, precision)
+    return byteStr
+
 
 
 
 def countLines(files):
     """ Count the number of lines in the given file """
 
-    if( not np.iterable(files) ): files = [files]
+    # If string, or otherwise not-iterable, convert to list
+    if( not iterableNotString(files) ): files = [ files ]
 
     nums = 0
     # Iterate over each file
@@ -533,6 +626,19 @@ def countLines(files):
         nums += sum(1 for line in open(fil))
 
     return nums
+
+
+def iterableNotString(args):
+    """
+    Check if the arguments is iterable and not a string.
+    """
+    
+    # if NOT iterable, return false
+    if( not np.iterable(args) ): return False
+    # if string, return False
+    if( isinstance(args, types.StringTypes) ): return False
+
+    return True
 
 
 
@@ -576,46 +682,12 @@ def filesExist(files):
     return allExist
 
 
-
-def checkFileDir(tpath):
-    """
-    For any given path make sure the 'head' portion (directories) exist.
-
-    e.g. checkFileDir('one/two/three/file.txt') will make sure that
-         'one/two/three/' exists.  'file.txt' is ignored
-    """
-    head,tail = os.path.split(tpath)
-    if( len(head) > 0 ):
-        checkDir(head)
-
-    return
-
-
 def checkPath(tpath):
     path,name = os.path.split(tpath)
     if( len(path) > 0 ):
         if( not os.path.isdir(path) ): os.makedirs(path)
         
-    return
-
-
-def checkDir(tdir):
-    """
-    Create the given directory if it doesn't already exist.
-
-    Return the same directory assuring it terminates with a '/'
-
-    """
-    ndir = str(tdir)
-    if( len(ndir) > 0 ):
-        # If directory doesn't exist, create it
-        if( not os.path.isdir(ndir) ): os.makedirs(ndir)
-        # If it still doesn't exist, error
-        if( not os.path.isdir(ndir) ): raise RuntimeError("Directory '%s' does not exist!" % (ndir) )
-        # Make sure pattern ends with '/'
-        if( not ndir.endswith('/') ): ndir += '/'
-
-    return ndir
+    return 
 
 
 def npzToDict(npz):
