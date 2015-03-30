@@ -24,9 +24,9 @@ RUN = 3
 VERBOSE = True
 
 
-DF = DETAILS_FIRST
-DB = DETAILS_BEFORE
-DA = DETAILS_AFTER
+FST = BH_FIRST
+BEF = BH_BEFORE
+AFT = BH_AFTER
 
 
 
@@ -167,9 +167,9 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
 
         start = datetime.now()
         # iterate over in/out BHs
-        for BH in [IN_BH,OUT_BH]:
+        for BH in [BH_IN,BH_OUT]:
             # Iterate over match times
-            for FBA in [DF, DB, DA]:
+            for FBA in [FST, BEF, AFT]:
 
                 # Find valid matches
                 inds = np.where( matchNew[:, BH, FBA] >= 0 )[0]
@@ -216,8 +216,8 @@ def checkMatches(matches, mergers):
     RAND_NUMS = 4
 
     numMergers = mergers[MERGERS_NUM]
-    bh_str = { IN_BH : "In ", OUT_BH : "Out" }
-    time_str = { DF : "First ", DB : "Before", DA : "After " }
+    bh_str = { BH_IN : "In ", BH_OUT : "Out" }
+    time_str = { FST : "First ", BEF : "Before", AFT : "After " }
 
     good = np.zeros([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=bool)
     
@@ -226,12 +226,12 @@ def checkMatches(matches, mergers):
     print "             First  Before After"
 
     # Iterate over both BHs
-    for BH in [IN_BH, OUT_BH]:
+    for BH in [BH_IN, BH_OUT]:
 
         num_str = ""
 
         # Iterate over match times
-        for FBA in [DF, DB, DA]:
+        for FBA in [FST, BEF, AFT]:
 
             inds = np.where( matches[DETAILS_TIMES][:,BH,FBA] >= 0.0 )[0]
             good[inds, BH, FBA] = True
@@ -245,21 +245,21 @@ def checkMatches(matches, mergers):
     print "\n - - - Number of Match Combinations :"
 
     # All Times
-    inds = np.where( np.sum(good[:,OUT_BH,:], axis=1) == NUM_BH_TIMES )[0]
+    inds = np.where( np.sum(good[:,BH_OUT,:], axis=1) == NUM_BH_TIMES )[0]
     print " - - - - All            : %5d" % (len(inds))
     
     # Before and After
-    inds = np.where( good[:,OUT_BH,DB] & good[:,OUT_BH,DA] )[0]
+    inds = np.where( good[:,BH_OUT,BEF] & good[:,BH_OUT,AFT] )[0]
     print " - - - - Before & After : %5d" % (len(inds))
 
     # First and Before
-    inds = np.where( good[:,OUT_BH,DF] & good[:,OUT_BH,DB] )[0]
+    inds = np.where( good[:,BH_OUT,FST] & good[:,BH_OUT,BEF] )[0]
     print " - - - - First & Before : %5d" % (len(inds))
     
 
     print ""
-    inds = np.where( (good[:,OUT_BH,DF]  == True ) & 
-                     (good[:,OUT_BH,DB] == False)    )[0]
+    inds = np.where( (good[:,BH_OUT,FST]  == True ) & 
+                     (good[:,BH_OUT,BEF] == False)    )[0]
 
     print " - - - Number of First without Before : %5d" % (len(inds))
     if( len(inds) > 0 ):
@@ -270,9 +270,9 @@ def checkMatches(matches, mergers):
 
         for ii in sel:
             sel_id = inds[ii]
-            tmat = matches[DETAILS_TIMES][sel_id,OUT_BH,:]
+            tmat = matches[DETAILS_TIMES][sel_id,BH_OUT,:]
             tt = mergers[MERGERS_TIMES][sel_id]
-            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (sel_id, tmat[DF], tmat[DB], tt, tmat[DA])
+            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (sel_id, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
 
@@ -280,11 +280,11 @@ def checkMatches(matches, mergers):
     print "\n - - - Number of BAD ID Matches:"
     print "             First  Before After"
     # Iterate over both BHs
-    for BH in [IN_BH, OUT_BH]:
+    for BH in [BH_IN, BH_OUT]:
         num_str = ""
         eg = None
         # Iterate over match times
-        for FBA in [DF, DB, DA]:
+        for FBA in [FST, BEF, AFT]:
 
             dids = matches[DETAILS_IDS][:,BH,FBA]
             mids = mergers[MERGERS_IDS][:,BH]
@@ -296,24 +296,24 @@ def checkMatches(matches, mergers):
 
         print "       %s : %s" % ( bh_str[BH], num_str )
         if( eg is not None ):
-            tmat = matches[DETAILS_TIMES][sel_id,OUT_BH,:]
+            tmat = matches[DETAILS_TIMES][sel_id,BH_OUT,:]
             tt = mergers[MERGERS_TIMES][sel_id]
-            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[DF], tmat[DB], tt, tmat[DA])
+            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
     ### Check Time Matches ###
     print "\n - - - Number of BAD time Matches:"
     # Iterate over both BHs
-    for BH in [IN_BH, OUT_BH]:
+    for BH in [BH_IN, BH_OUT]:
         num_str = ""
         eg = None
         # Iterate over match times
-        for FBA in [DF, DB, DA]:
+        for FBA in [FST, BEF, AFT]:
 
             dt = matches[DETAILS_TIMES][:,BH,FBA]
             mt = mergers[MERGERS_TIMES]
 
-            if( FBA in [DF,DB] ): inds = np.where( (good[:,BH,FBA]) & (dt >= mt) )[0]
+            if( FBA in [FST,BEF] ): inds = np.where( (good[:,BH,FBA]) & (dt >= mt) )[0]
             else:                 inds = np.where( (good[:,BH,FBA]) & (dt <  mt) )[0]
 
             num_str += "%5d  " % (len(inds))
@@ -321,9 +321,9 @@ def checkMatches(matches, mergers):
             
         print "       %s : %s" % ( bh_str[BH], num_str )
         if( eg is not None ):
-            tmat = matches[DETAILS_TIMES][eg,OUT_BH,:]
+            tmat = matches[DETAILS_TIMES][eg,BH_OUT,:]
             tt = mergers[MERGERS_TIMES][eg]
-            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[DF], tmat[DB], tt, tmat[DA])
+            print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
 

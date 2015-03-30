@@ -7,7 +7,7 @@ import numpy as np
 cimport numpy as np
 
 import illpy
-from illpy.illbh.BHConstants import IN_BH, OUT_BH
+from illpy.illbh.BHConstants import BH_IN, BH_OUT
 
 def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
               np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,  
@@ -19,10 +19,10 @@ def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
     The output array ``next`` provides the index for the 'next' merger which the 'out' BH
     participates in.  When such a 'repeat' is found, the second ('next') merger also has the
     previous merger stored in the ``last`` array, where `last[ii,jj]` says that BH `jj`
-    ({IN_BH,OUT_BH}) from merger `ii` was previously the 'out' BH from merger `last[ii,jj]`.
+    ({BH_IN,BH_OUT}) from merger `ii` was previously the 'out' BH from merger `last[ii,jj]`.
 
     The array `lastTime[ii,jj]` gives the time from merger `ii` *since the previous merger* which
-    each BH `jj` ({IN_BH,OUT_BH}) participated in.  `nextTime[ii]` gives the time until the 'out'
+    each BH `jj` ({BH_IN,BH_OUT}) participated in.  `nextTime[ii]` gives the time until the 'out'
     BH from merger `ii` mergers mergers again.
 
     All array entries (mergers) without repeat matches maintain their default value --- which
@@ -67,7 +67,7 @@ def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
         last_ind = sort_inds[ii]
 
         # Get the output ID from this merger
-        outid = ids[last_ind, OUT_BH]
+        outid = ids[last_ind, BH_OUT]
 
         ## Iterate over all Later Mergers ##
         #  use a while loop so we can break out of it
@@ -77,7 +77,7 @@ def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
             next_ind = sort_inds[jj]
 
             # If previous merger goes into this one; save relationships
-            for BH in [IN_BH, OUT_BH]:
+            for BH in [BH_IN, BH_OUT]:
 
                 if( ids[next_ind,BH] == outid ):
 

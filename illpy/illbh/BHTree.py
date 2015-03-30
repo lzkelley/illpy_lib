@@ -229,9 +229,9 @@ def analyzeTree(tree, verbose=VERBOSE):
     if( verbose ): print " - - - %d Mergers" % (numMergers)
 
     # Find number of unique merger BHs (i.e. no previous mergers)
-    inds = np.where( (last[:,IN_BH] < 0) & (last[:,OUT_BH] < 0) & (next[:] < 0) )
+    inds = np.where( (last[:,BH_IN] < 0) & (last[:,BH_OUT] < 0) & (next[:] < 0) )
     numTwoIsolated = len(inds[0])
-    inds = np.where( ((last[:,IN_BH] < 0) ^ (last[:,OUT_BH] < 0)) & (next[:] < 0) )                 # 'xor' comparison
+    inds = np.where( ((last[:,BH_IN] < 0) ^ (last[:,BH_OUT] < 0)) & (next[:] < 0) )                 # 'xor' comparison
     numOneIsolated = len(inds[0])
     
     if( verbose ): 
@@ -312,8 +312,8 @@ def countFutureMergers( next, ind ):
 
 def countPastMergers( last, ind, verbose=False ):
     
-    last_in  = last[ind, IN_BH]
-    last_out = last[ind, OUT_BH]
+    last_in  = last[ind, BH_IN]
+    last_out = last[ind, BH_OUT]
     
     num_in   = 0
     num_out  = 0

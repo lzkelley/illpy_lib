@@ -7,16 +7,16 @@
 import numpy as np
 cimport numpy as np
 
-from BHConstants import IN_BH, OUT_BH
-from BHConstants import DETAILS_BEFORE as BEF
-from BHConstants import DETAILS_AFTER  as AFT
-from BHConstants import DETAILS_FIRST  as FST
+from BHConstants import BH_IN, BH_OUT
+from BHConstants import BH_BEFORE as BEF
+from BHConstants import BH_AFTER  as AFT
+from BHConstants import BH_FIRST  as FST
 
 
 def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[long,   ndim=2] mid, 
-                               np.ndarray[double, ndim=1] mtime,  np.ndarray[long,   ndim=3] lind,
-                               np.ndarray[double, ndim=3] ltime,  np.ndarray[int,    ndim=3] mnew,
-                               np.ndarray[long,   ndim=1] detid,  np.ndarray[double, ndim=1] dtime  ):
+                               np.ndarray[double, ndim=1] mtime,   np.ndarray[long,   ndim=3] lind,
+                               np.ndarray[double, ndim=3] ltime,   np.ndarray[int,    ndim=3] mnew,
+                               np.ndarray[long,   ndim=1] detid,   np.ndarray[double, ndim=1] dtime ):
     """
     Match merger BHs to details entries based on IDs and merger times.
 
@@ -42,7 +42,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[lo
     targets : IN, <long>[N]
         Array of indices corresponding to 'target' merger systems to be matched.
     mid : IN, <long>[M,2]
-        Array of Merger BH IDs. Columns correspond to the 'in' and 'out' BHs (`IN_BH` / `OUT_BH`)
+        Array of Merger BH IDs. Columns correspond to the 'in' and 'out' BHs (`BH_IN` / `BH_OUT`)
     mtime : IN, <double>[M]
         Array of times (scalefactors) of merger events.  The 'before' and 'after' events occur
         around this time
@@ -86,7 +86,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[lo
     ### Iterate over Each Target Merger Binary System ###
     
     ### Iterate over Each Type of BH ###
-    for BH in [IN_BH, OUT_BH]:
+    for BH in [BH_IN, BH_OUT]:
 
         # Sort *target* mergers first by ID, then by Merger Time
         s_targets = np.lexsort( (mtime[targets], mid[targets,BH]) )
@@ -148,7 +148,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[lo
             ## Find 'after' Match
             #  Find the *earliest* detail ID match *after* the merger time
             #  Only exists if this is the 'out' BH
-            if( BH == OUT_BH ):
+            if( BH == BH_OUT ):
 
                 s_after_match = s_before_match                                                      # Has to come after the 'before' match
                 if( s_after_match < numDetails-2 ):

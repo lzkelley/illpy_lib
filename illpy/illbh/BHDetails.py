@@ -633,7 +633,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         for BEF_AFT in [DETAILS_BEFORE, DETAILS_AFTER]:
 
             # Both 'in' and 'out' BHs
-            for IN_OUT in [IN_BH, OUT_BH]:
+            for IN_OUT in [BH_IN, BH_OUT]:
                 # Select only successful matches
                 inds = np.where( detInds[:,IN_OUT,BEF_AFT] >= 0 )[0]
                 #useInds = np.squeeze(detInds[inds,IN_OUT,BEF_AFT])
