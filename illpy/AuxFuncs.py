@@ -398,7 +398,7 @@ def findBins(target, bins, thresh=DT_THRESH):
 
     # Print warning on error
     if( low == None or high == None ):
-        print "[AuxBlackholeFuncs.findBins] target = %e, bins = {%e,%e}; low,high = %s,%s !" % \
+        print "AuxFuncs.findBins: target = %e, bins = {%e,%e}; low,high = %s,%s !" % \
             ( target, bins[0], bins[-1], str(low), str(high) )
         raise RuntimeError("Could not find bins!")
 
