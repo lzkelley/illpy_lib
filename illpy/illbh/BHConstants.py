@@ -48,8 +48,10 @@ INT = np.int32
 FLT = np.float32
 DBL = np.float64
 LNG = np.int64
+ULNG = np.uint64
 
 
+TYPE_ID = ULNG
 
 NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
 NUM_BH_TIMES = 3                                                                                    # There are 3 times, {DETAIL_BEFORE, DETAIL_AFTER, DETAIL_F
@@ -70,6 +72,7 @@ MERGERS_MAP_STOM  = 's2m'
 MERGERS_MAP_MTOS  = 'm2s'
 MERGERS_MAP_ONTOP = 'ontop'
 
+MERGERS_PHYSICAL_KEYS = [ MERGERS_IDS, MERGERS_SCALES, MERGERS_MASSES ]
 
 
 # Index of [N,2] arrays corresponding to each BH
@@ -165,6 +168,12 @@ def GET_MERGERS_RAW_COMBINED_FILENAME(run):
 def GET_MERGERS_RAW_MAPPED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _MERGERS_RAW_MAPPED_FILENAME
+    return fname
+
+
+def GET_MERGERS_FIXED_FILENAME(run):
+    fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _MERGERS_FIXED_FILENAME
     return fname
 
 
