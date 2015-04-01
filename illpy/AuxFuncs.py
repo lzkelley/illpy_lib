@@ -703,6 +703,8 @@ def npzToDict(npz):
     newDict : <dict>, output dictionary with key-values from npz file.
 
     """
+    if( type(npz) is str ): npz = np.load(npz)
+        
     newDict = { key : npz[key] for key in npz.keys() }
     return newDict
 
