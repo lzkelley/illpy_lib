@@ -6,6 +6,8 @@ Provide common constants and hard-settings.
 
 ### General Illustris ###
 
+NUM_SNAPS = 136
+
 ILLUSTRIS_RUN_NAMES  = { 1: 'L75n1820FP',
                          2: 'L75n910FP' ,
                          3: 'L75n455FP'  }
@@ -34,8 +36,11 @@ SH_SFR          = "SubhaloSFR"
 SH_PHOTO        = "SubhaloStellarPhotometrics"
 SH_VEL_DISP     = "SubhaloVelDisp"
 SH_LEN_TYPE     = "SubhaloLenType"
+SH_GROUP_NUM    = "SubhaloGrNr"
+SH_FILENAME     = "filebase"
 
 SUBFIND_PARAMETERS = [ SH_BH_MASS, SH_HALFMASS_RAD, SH_MASS_TYPE, SH_SFR, SH_PHOTO, SH_VEL_DISP, \
-                       SH_LEN_TYPE ]
+                       SH_LEN_TYPE, SH_GROUP_NUM ]
 
 
+SH_SNAPSHOT_NUM = "snapshot"
