@@ -9,4 +9,4 @@ __status__ = "Development"
 
 import Constants
 import SubhaloFinder
-
+from StellarLifetimes import StellarLifetimes
