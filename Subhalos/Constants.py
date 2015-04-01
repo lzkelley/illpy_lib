@@ -3,6 +3,7 @@ Provide common constants and hard-settings.
 
 """
 
+import numpy as np
 
 TYPE_ID     = np.uint64
 TYPE_SCALAR = np.float64
