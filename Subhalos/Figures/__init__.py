@@ -7,6 +7,6 @@ __email__ = "lkelley@cfa.harvard.edu"
 __status__ = "Development"
 
 
-
 import FigA01_Subfind_SFR     as figa01
 import FigA02_Branches_SFR    as figa02
+import FigA03_EplusA_Selected as figa03
