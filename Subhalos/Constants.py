@@ -4,6 +4,10 @@ Provide common constants and hard-settings.
 """
 
 
+TYPE_ID     = np.uint64
+TYPE_SCALAR = np.float64
+
+
 ### General Illustris ###
 
 NUM_SNAPS = 136
@@ -26,6 +30,7 @@ SL_SNAP_NUM     = "SnapNum"
 SL_SUBFIND_ID   = "SubfindID"
 
 SUBLINK_PARAMETERS = [ SL_SNAP_NUM, SL_SUBFIND_ID ]
+SUBLINK_PARAMETER_TYPES = [ TYPE_ID, TYPE_ID ]
 
 ### Subfind Catalog Parameters ###
 
@@ -39,8 +44,17 @@ SH_LEN_TYPE     = "SubhaloLenType"
 SH_GROUP_NUM    = "SubhaloGrNr"
 SH_FILENAME     = "filebase"
 
-SUBFIND_PARAMETERS = [ SH_BH_MASS, SH_HALFMASS_RAD, SH_MASS_TYPE, SH_SFR, SH_PHOTO, SH_VEL_DISP, \
-                       SH_LEN_TYPE, SH_GROUP_NUM ]
+SUBFIND_PARAMETERS = [ SH_BH_MASS,  SH_HALFMASS_RAD, SH_MASS_TYPE, SH_SFR, SH_PHOTO, 
+                       SH_VEL_DISP, SH_LEN_TYPE,     SH_GROUP_NUM ]
+
+SUBFIND_PARAMETER_TYPES = [ TYPE_SCALAR, TYPE_SCALAR, TYPE_SCALAR, TYPE_SCALAR, TYPE_SCALAR, 
+                            TYPE_SCALAR, TYPE_ID, TYPE_ID ]
 
 
 SH_SNAPSHOT_NUM = "snapshot"
+
+### Additional Data for Branches ###
+BRANCH_RUN      = "run"
+BRANCH_INDS     = "indices"
+BRANCH_CREATED  = "created"
+BRANCH_SNAPS    = "snapshots"
