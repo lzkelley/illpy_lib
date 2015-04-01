@@ -58,7 +58,7 @@ COL_SFR = '0.3'
 DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a02_ill-%d_branches_sfr.png'
 
 
-def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=True):
+def plotFigA02_Branches_SFR(run, branches, his, los, weights, fname=None, verbose=True):
 
     if( verbose ): print " - - FigA02_Branches_SFR.plotFigA02_Branches_SFR()"
 
@@ -66,6 +66,8 @@ def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=T
 
     sfr = branches[SH_SFR]
     numSubhalos = len(sfr)
+    snaps = np.concatenate([his,los])
+    div = np.average([his[-1],los[0]])
 
     '''
     cosmo = Cosmology()
@@ -81,16 +83,18 @@ def plotFigA02_Branches_SFR(run, snaps, branches, weights, fname=None, verbose=T
 
 
     inds = np.argsort(weights)
+    #inds = np.random.choice(inds, size=1000)
 
     cfunc, cnorm, cmap = pfunc.cmapColors([np.min(weights), np.max(weights)])
 
 
     ## Plot Scatter SFR versus BH Mass
     lines, names = figa02_sfr_lines(ax[0,0], snaps, sfr[inds], cfunc(weights[inds]))
+    ax[0,0].axvline(div, color='k', ls='--', lw=LW)
 
 
     ## Plot Scatter SFR versus BH Mass
-    figa02_weights_hist(ax[0,1], weights[inds])
+    figa02_weights_hist(ax[0,1], weights[inds], cfunc)
 
 
     cbax = fig.add_axes([0.92, 0.2, 0.02, 0.6])
@@ -152,7 +156,7 @@ def figa02_sfr_lines(ax, snaps, sfr, weights):
 
 
 
-def figa02_weights_hist(ax, weights, num=NUM_BINS):
+def figa02_weights_hist(ax, weights, colFunc, num=NUM_BINS):
 
     lines = []
     names = []
@@ -170,11 +174,16 @@ def figa02_weights_hist(ax, weights, num=NUM_BINS):
     bins = np.logspace( *np.log10(extr), num=num )
 
     # Plot
-    ax.hist(weights, bins=bins, orientation='vertical', log=True, color='blue', lw=LW2)
+    nums, bins, patches = ax.hist(weights, bins=bins, orientation='vertical', log=True, color='blue', lw=LW2)
+
+    binAves = np.array([ np.average([bins[ii],bins[ii+1]]) for ii in range(len(bins)-1) ])
+    binCols = colFunc(binAves)
+
+    for col, pat in zip(binCols,patches):
+        pat.set_color(col)
 
     ax.set_xlim(extr)
 
-    print stats
     lens = len(stats)
 
     for ii,st in enumerate(stats):
