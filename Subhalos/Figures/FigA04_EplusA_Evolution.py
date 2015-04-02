@@ -13,7 +13,7 @@ NUM_BINS = 20
 VERBOSE = True
 
 
-FIG_SIZE = [12, 14]
+FIG_SIZE = [12, 18]
 LEFT     = 0.1
 RIGHT    = 0.9
 BOT      = 0.05
@@ -21,7 +21,7 @@ TOP      = 0.93
 HSPACE   = 0.4
 WSPACE   = 0.4
 
-NROWS    = 5
+NROWS    = 7
 NCOLS    = 3
 
 FS = 10
@@ -37,62 +37,100 @@ COL   = [ '0.5',  'red']
 ALPHA = [ 0.5,    0.8   ]
 
 
-def plotFigA04_EplusA_Evolution(run, cat, inds_epa, inds_oth, weights,
-                                others=None, fname=None, verbose=VERBOSE):
+def plotFigA04_EplusA_Evolution(run, catOld, catNew, inds_old_epa, inds_old_oth, inds_new_epa, inds_new_oth, 
+                                weightsEPA, others=None, fname=None, verbose=VERBOSE):
 
     if( verbose ): print " - - FigA04_EplusA_Evolution.plotFigA04_EplusA_Evolution()"
 
-    ### Set Parameters ###
-    numSubhalos = len(weights)
-    numOths     = len(inds_oth)
-    numEpas     = len(inds_epa)
+    assert len(inds_old_epa) == len(inds_new_epa), "'epa' inds old and new must match!"
+    assert len(inds_old_oth) == len(inds_new_oth), "'oth' inds old and new must match!"
 
-    # Sort EpA subhalos by BH Mass
-    mbh = cat[SH_BH_MASS][inds_epa]
-    inds = np.argsort(mbh)
-    inds_epa = inds_epa[inds]
+    ### Set Parameters ###
+    numSubhalos = len(weightsEPA)
+    numOths     = len(inds_old_oth)
+    numEpas     = len(inds_old_epa)
+
+    # Sort EpA subhalos by WeightsEPA (this should be the case already, but make sure
+    inds = np.argsort(weightsEPA)
+    old_epa = np.array(inds_old_epa[inds])
+    new_epa = np.array(inds_new_epa[inds])
 
     if( fname  is None ): fname = DEF_FNAME % (run)
     if( others is None ): others = numOths
-    if( others > len(inds_oth) ): others = numOths
 
-    # Select all or a subset of ``non_inds`` to compare with ``inds``
-    if( others < numOths ): others = np.random.choice( list(inds_oth), size=others)
-    else:                   others = inds_oth
-    others = np.array(others)
+    if( others > len(inds_old_oth) ): others = numOths
+
+    if( others < numOths ): 
+        old_oth = np.random.choice( list(inds_old_oth), size=others)
+        new_oth = np.random.choice( list(inds_new_oth), size=others)
+    else:
+        old_oth = inds_old_oth
+        new_oth = inds_new_oth
+
+    old_oth = np.array(old_oth)
+    new_oth = np.array(new_oth)
 
 
 
     ### Get Target Parameters for 'other' (non-EpA) and 'epa' Galaxies ###
 
     # Radii
-    rads_st   = [ cat[SH_RAD_TYPE][others,   PARTICLE_TYPE_STAR]*DIST_CONV,
-                  cat[SH_RAD_TYPE][inds_epa, PARTICLE_TYPE_STAR]*DIST_CONV ]
-    rads_dm   = [ cat[SH_RAD_TYPE][others,   PARTICLE_TYPE_DM]*DIST_CONV,
-                  cat[SH_RAD_TYPE][inds_epa, PARTICLE_TYPE_DM]*DIST_CONV ]
+    rads_st_new   = [ catNew[SH_RAD_TYPE][new_oth, PARTICLE_TYPE_STAR]*DIST_CONV,
+                      catNew[SH_RAD_TYPE][new_epa, PARTICLE_TYPE_STAR]*DIST_CONV ]
+    rads_st_old   = [ catOld[SH_RAD_TYPE][old_oth, PARTICLE_TYPE_STAR]*DIST_CONV,
+                      catOld[SH_RAD_TYPE][old_epa, PARTICLE_TYPE_STAR]*DIST_CONV ]
 
+    rads_dm_new   = [ catNew[SH_RAD_TYPE][new_oth, PARTICLE_TYPE_DM]*DIST_CONV,
+                      catNew[SH_RAD_TYPE][new_epa, PARTICLE_TYPE_DM]*DIST_CONV ]
+    rads_dm_old   = [ catOld[SH_RAD_TYPE][old_oth, PARTICLE_TYPE_DM]*DIST_CONV,
+                      catOld[SH_RAD_TYPE][old_epa, PARTICLE_TYPE_DM]*DIST_CONV ]
+    
     # Masses
-    mass_bh   = [ cat[SH_BH_MASS][others  ]*MASS_CONV,
-                  cat[SH_BH_MASS][inds_epa]*MASS_CONV ]
-    mass_st   = [ cat[SH_MASS_TYPE][others,   PARTICLE_TYPE_STAR]*MASS_CONV,
-                  cat[SH_MASS_TYPE][inds_epa, PARTICLE_TYPE_STAR]*MASS_CONV ]
-    mass_gas  = [ cat[SH_MASS_TYPE][others,   PARTICLE_TYPE_GAS ]*MASS_CONV,
-                  cat[SH_MASS_TYPE][inds_epa, PARTICLE_TYPE_GAS ]*MASS_CONV ]
+    mass_bh_new   = [ catNew[SH_BH_MASS][new_oth]*MASS_CONV,
+                      catNew[SH_BH_MASS][new_epa]*MASS_CONV ]
+    mass_bh_old   = [ catOld[SH_BH_MASS][old_oth]*MASS_CONV,
+                      catOld[SH_BH_MASS][old_epa]*MASS_CONV ]
 
-    dens_st   = [ ms/np.power(rs,3.0) for ms,rs in zip(mass_st, rads_st) ]
+    mass_st_new   = [ catNew[SH_MASS_TYPE][new_oth, PARTICLE_TYPE_STAR]*MASS_CONV,
+                      catNew[SH_MASS_TYPE][new_epa, PARTICLE_TYPE_STAR]*MASS_CONV ]
+    mass_st_old   = [ catOld[SH_MASS_TYPE][old_oth, PARTICLE_TYPE_STAR]*MASS_CONV,
+                      catOld[SH_MASS_TYPE][old_epa, PARTICLE_TYPE_STAR]*MASS_CONV ]
 
-    gas_frac  = [ mg/(ms+mg) for ms,mg in zip(mass_st, mass_gas) ]
+    mass_gas_new  = [ catNew[SH_MASS_TYPE][new_oth, PARTICLE_TYPE_GAS ]*MASS_CONV,
+                      catNew[SH_MASS_TYPE][new_epa, PARTICLE_TYPE_GAS ]*MASS_CONV ]
+    mass_gas_old  = [ catOld[SH_MASS_TYPE][old_oth, PARTICLE_TYPE_GAS ]*MASS_CONV,
+                      catOld[SH_MASS_TYPE][old_epa, PARTICLE_TYPE_GAS ]*MASS_CONV ]
+
+
+    dens_st_new   = [ ms/np.power(rs,3.0) for ms,rs in zip(mass_st_new, rads_st_new) ]
+    dens_st_old   = [ ms/np.power(rs,3.0) for ms,rs in zip(mass_st_old, rads_st_old) ]
+
+    gas_frac_new  = [ mg/(ms+mg) for ms,mg in zip(mass_st_new, mass_gas_new) ]
+    gas_frac_old  = [ mg/(ms+mg) for ms,mg in zip(mass_st_old, mass_gas_old) ]
+
 
     # Star Formation Rates
-    sfr       = [ cat[SH_SFR][others], cat[SH_SFR][inds_epa] ]
-    sfr_sp    = [ rat/mst for rat, mst in zip(sfr, mass_st) ]
+    sfr_new       = [ catNew[SH_SFR][new_oth], catNew[SH_SFR][new_epa] ]
+    sfr_old       = [ catOld[SH_SFR][old_oth], catOld[SH_SFR][old_epa] ]
+
+    sfr_sp_new    = [ rat/mst for rat, mst in zip(sfr_new, mass_st_new) ]
+    sfr_sp_old    = [ rat/mst for rat, mst in zip(sfr_old, mass_st_old) ]
 
     # Photometric Bands
-    photo_gg  = [ cat[SH_PHOTO][others, PHOTO_g], cat[SH_PHOTO][inds_epa, PHOTO_g] ]
-    photo_rr  = [ cat[SH_PHOTO][others, PHOTO_r], cat[SH_PHOTO][inds_epa, PHOTO_r] ]
-    photo_ii  = [ cat[SH_PHOTO][others, PHOTO_i], cat[SH_PHOTO][inds_epa, PHOTO_i] ]
-    photo_gmr = [ photo_gg[0]-photo_rr[0], photo_gg[1]-photo_rr[1] ]
-    photo_gmi = [ photo_gg[0]-photo_ii[0], photo_gg[1]-photo_ii[1] ]
+    photo_gg_new  = [ catNew[SH_PHOTO][new_oth, PHOTO_g], catNew[SH_PHOTO][new_epa, PHOTO_g] ]
+    photo_gg_old  = [ catOld[SH_PHOTO][old_oth, PHOTO_g], catOld[SH_PHOTO][old_epa, PHOTO_g] ]
+
+    photo_rr_new  = [ catNew[SH_PHOTO][new_oth, PHOTO_r], catNew[SH_PHOTO][new_epa, PHOTO_r] ]
+    photo_rr_old  = [ catOld[SH_PHOTO][old_oth, PHOTO_r], catOld[SH_PHOTO][old_epa, PHOTO_r] ]
+
+    photo_ii_new  = [ catNew[SH_PHOTO][new_oth, PHOTO_i], catNew[SH_PHOTO][new_epa, PHOTO_i] ]
+    photo_ii_old  = [ catOld[SH_PHOTO][old_oth, PHOTO_i], catOld[SH_PHOTO][old_epa, PHOTO_i] ]
+
+    photo_gmr_new = [ photo_gg_new[0]-photo_rr_new[0], photo_gg_new[1]-photo_rr_new[1] ]
+    photo_gmr_old = [ photo_gg_old[0]-photo_rr_old[0], photo_gg_old[1]-photo_rr_old[1] ]
+
+    photo_gmi_new = [ photo_gg_new[0]-photo_ii_new[0], photo_gg_new[1]-photo_ii_new[1] ]
+    photo_gmi_old = [ photo_gg_old[0]-photo_ii_old[0], photo_gg_old[1]-photo_ii_old[1] ]
 
 
     # Get unique color for each EpA subhalo
@@ -105,34 +143,50 @@ def plotFigA04_EplusA_Evolution(run, cat, inds_epa, inds_oth, weights,
     plt.subplots_adjust(left=LEFT, right=RIGHT, bottom=BOT, hspace=HSPACE, top=TOP, wspace=WSPACE)
 
 
-    # Plot Masses
-    labels = [ "BH Mass [Msol]", "Stellar Mass [Msol]" ]
-    figa04_row(ax[0,:], mass_bh, mass_st, labels,
+    # Plot Stellar Mass --- Row 0
+    labels = [ "Stellar Mass [Msol] Z=0.1", "Stellar Mass [Msol] Z=0.0" ]
+    figa04_row(ax[0,:], mass_st_old, mass_st_new, labels,
                cols=cols, verbose=verbose)
 
-    # Plot Star Formation Rates
-    labels = [ "SFR [Msol/yr]", "S-SFR [Msol/yr/Msol]" ]
-    figa04_row(ax[1,:], sfr, sfr_sp, labels,
+    # Plot BH Mass --- Row 1
+    name = "BH Mass [Msol]"
+    labels = [ "%s Z=0.1" % name, "%s Z=0.0" % name ]
+    figa04_row(ax[1,:], mass_bh_old, mass_bh_new, labels,
                cols=cols, verbose=verbose)
 
-    # Plot (g-r) vs. r
-    labels = [ "r [Mag]", "g-r [Mag]" ]
-    figa04_row(ax[2,:], photo_rr, photo_gmr, labels,
-               xreverse=True, scale='linear', cols=cols, verbose=verbose)
-
-    # Plot Radii
-    labels = [ "Stellar HM Radii [kpc]", "DM HM Radii [kpc]" ]
-    figa04_row(ax[3,:], rads_st, rads_dm, labels,
+    # Plot SFR --- Row 2
+    labels = [ "SFR [Msol/yr] Z=0.1", "SFR [Msol/yr] Z=0.0" ]
+    figa04_row(ax[2,:], sfr_old, sfr_new, labels,
                cols=cols, verbose=verbose)
 
-    # Plot Gas-Fraction and Stellar Density
-    labels = [ "Gas Fraction (Mass)", "Stellar Density [Msol/kpc^3]" ]
-    figa04_row(ax[4,:], gas_frac, dens_st, labels,
+    # Plot Specific-SFR --- Row 3
+    name = "S-SFR [Msol/yr/Msol]"
+    labels = [ "%s Z=0.1" % name, "%s Z=0.0" % name ]
+    figa04_row(ax[3,:], sfr_sp_old, sfr_sp_new, labels,
                cols=cols, verbose=verbose)
+
+    # Plot Stellar Radius --- Row 4
+    name = "Star HM Radius [kpc]"
+    labels = [ "%s Z=0.1" % name, "%s Z=0.0" % name ]
+    figa04_row(ax[4,:], rads_st_old, rads_st_new, labels,
+               cols=cols, verbose=verbose)
+
+    # Plot Gas Fraction --- Row 5
+    name = "Gas Frac"
+    labels = [ "%s Z=0.1" % name, "%s Z=0.0" % name ]
+    figa04_row(ax[5,:], gas_frac_old, gas_frac_new, labels,
+               cols=cols, verbose=verbose)
+
+
+    # Plot Color --- Row 6
+    name = "Color (g-r) [Mag]"
+    labels = [ "%s Z=0.1" % name, "%s Z=0.0" % name ]
+    figa04_row(ax[6,:], photo_gmr_old, photo_gmr_new, labels,
+               scale='linear', xreverse=True, cols=cols, verbose=verbose)
 
 
     # Add Title
-    textStr = "E-plus-A vs. Others\nRedshift Z = 0.0"
+    textStr = "E-plus-A vs. Others\nRedshift Z = 0.1 vs. Z = 0.0"
     text = fig.text(0.5, 0.98, textStr, fontsize=FS_TITLE, transform=plt.gcf().transFigure,
                     verticalalignment='top', horizontalalignment='center')
 
