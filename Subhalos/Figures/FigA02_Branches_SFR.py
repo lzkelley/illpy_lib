@@ -40,19 +40,6 @@ NUM_BINS = 20
 
 PERCENTILES = [10,50,90]
 
-'''
-NUM = 40
-
-
-AXIS_BH      = 0
-AXIS_STELLAR = 1
-AXIS_TOTAL   = 2
-
-AXIS_TYPES = [ AXIS_BH, AXIS_STELLAR, AXIS_TOTAL ]
-
-COL_SFR_SP = 'red'
-'''
-
 COL_SFR = '0.3'
 
 DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a02_ill-%d_branches_sfr.png'
