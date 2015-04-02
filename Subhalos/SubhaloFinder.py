@@ -25,11 +25,13 @@ SFR_CUT = 0.9
 VERBOSE = True
 PLOT    = True
 
-SELECT_NUM = 10
+SELECT_NUM = 20
 
 TARGET_LOOKBACK_TIMES = [ 1.5e9, 1.5e8 ]                                                            # [years]
-TARGET_STELLAR_MASSES = [ 2.0, 3.0 ]
-TARGET_SFR_AGE        = 8.0e8
+TARGET_STELLAR_MASSES = [ 2.0, 3.0 ]                                                                # [msol]
+TARGET_SFR_AGE        = 8.0e8                                                                       # [years]
+BH_MASS_CUT           = 1.0e6                                                                       # [msol]
+
 
 MIN_STAR_PARTICLES = 10
 MIN_GAS_PARTICLES  = 20
@@ -62,13 +64,13 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     # Determine Starting Snapshot
     if( verbose ): print " - Find Target Snapshot" 
     hiSnaps, loSnaps = targetSnapshots(masses=TARGET_STELLAR_MASSES, cosmo=cosmo, verbose=verbose)
-    firstSnap = np.min(np.concatenate([hiSnaps, loSnaps]))
-    lastSnap  = np.max(np.concatenate([hiSnaps, loSnaps]))
-    if( verbose ): print " - - Earliest snapshot = %d; Latest = %d" % (firstSnap, lastSnap)
+    snapFirst = np.min(np.concatenate([hiSnaps, loSnaps]))
+    snapLast  = np.max(np.concatenate([hiSnaps, loSnaps]))
+    if( verbose ): print " - - Earliest snapshot = %d; Latest = %d" % (snapFirst, snapLast)
 
     ### Load target snapshot subhalo catalog ###
-    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (firstSnap)
-    catFirst = loadSubhaloCatalog(run, firstSnap, keys=SUBFIND_PARAMETERS, verbose=verbose)
+    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapFirst)
+    catFirst = loadSubhaloCatalog(run, snapFirst, keys=SUBFIND_PARAMETERS, verbose=verbose)
     numSubhalos = len(catFirst[SH_SFR])
     if( verbose ): print " - - Loaded catalog with %d subhalos" % (numSubhalos)
 
@@ -105,7 +107,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     if( not loadsave ):
         if( verbose ): print " - - Reloading subhalo branches from merger tree"
-        branches, snaps, subhaloInds = getSubhaloBranches(run, inds, tree, firstSnap, verbose=verbose)
+        branches, snaps, subhaloInds = getSubhaloBranches(run, inds, tree, snapFirst, verbose=verbose)
         illpy.AuxFuncs.saveDictNPZ(branches, saveFile, verbose=verbose)
 
 
@@ -116,7 +118,6 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Get Weights for Quality of EplusA Galaxies ###
     weightsSFR = weight_sfrChange(branches, hiSnaps, loSnaps, cosmo=cosmo, verbose=verbose)
-    #weightsSFRAge = weight_sfrAge(branches, TARGET_SFR_AGE, hiSnaps, loSnaps, cosmo=cosmo, verbose=verbose)
 
 
     if( plot ): Figures.figa02.plotFigA02_Branches_SFR(run, branches, hiSnaps, loSnaps, weightsSFR)
@@ -126,21 +127,23 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     # Get the indices of the other 'oth' Subhalos
     inds_oth = list(set(range(len(weightsSFR))).difference(inds_epa))
 
+    weightsEPA = weightsSFR[inds_epa]
+
     ### Get Subfind ID numbers for Subhalos at final Snapshot ###
     shinds_epa = np.array(branches[SL_SUBFIND_ID][inds_epa,-1])
     shinds_oth = np.array(branches[SL_SUBFIND_ID][inds_oth,-1])
 
 
     ### Load Final snapshot subhalo catalog ###
-    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (firstSnap)
-    catLast = loadSubhaloCatalog(run, lastSnap, keys=SUBFIND_PARAMETERS, verbose=verbose)
+    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapFirst)
+    catLast = loadSubhaloCatalog(run, snapLast, keys=SUBFIND_PARAMETERS, verbose=verbose)
     numSubhalos = len(catLast[SH_SFR])
     if( verbose ): print " - - Loaded catalog with %d subhalos" % (numSubhalos)
 
+    # Plot EplusA Galaxies at Redshift z = 0.0
+    if( plot ): Subhalos.Figures.figa03.plotFigA03_EplusA_Selected(run, catLast, shinds_epa, shinds_oth, weightsEPA)
 
-    #if( plot ): Figures.figa03.plotFigA03_
-
-    return run, firstSnap, lastSnap, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, shinds_epa, shinds_oth
+    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, shinds_epa, shinds_oth
 
 
 
@@ -164,55 +167,7 @@ def selectTop(args, num=10, verbose=VERBOSE):
 
 
 
-def weight_sfrAge(epas, targetAge, his, los, cosmo=None, verbose=VERBOSE):
-    """
-
-    """
-
-    if( verbose ): print " - - SubhaloFinder.weight_sfrAge()"
-
-    if( cosmo is None ): cosmo = Cosmology()
-
-    snaps = np.concatenate([his,los])
-    first = np.min(snaps)
-
-    sfr = epas[SH_SFR]
-    hiInds = his - first
-    loInds = los - first
-
-    ### Get Time Between Snapshots ###
-    #   zeroth duration corresponds to time UP-TO zeroth snapshot
-    durSnaps  = np.concatenate([[first-1],snaps])
-    durScales = cosmo.snapshotTimes(durSnaps)
-    durAges   = cosmo.age(durScales)
-    durs      = np.diff(durAges)
-
-    #    get lookback times to each snapshot
-    scales  = cosmo.snapshotTimes(snaps)
-    lbTimes = cosmo.lookbackTime(scales)
-
-    # Estimate Mass of Stars Formed
-    starsFormed = sfr*durs/YEAR
-    sfrAgeAve = np.sum(starsFormed*lbTimes,axis=1)/np.sum(starsFormed, axis=1)
-
-    if( verbose ): 
-        print " - - - Looking at snapshots : ", snaps
-        print " - - - Lookback Time Range  : %.3f, %.3f [Gyr]" % (lbTimes[0]/GYR, lbTimes[-1]/GYR)
-        print " - - - Target Age           :     %.3f [Gyr]" % (targetAge*YEAR/GYR)
-        print " - - - Average, ave-sfr-age :     %.3f [Gyr]" % (np.average(sfrAgeAve)/GYR)
-
-
-    # Weights are difference of average SFR age with target Age (given in years)
-    weights = np.fabs( np.diff(sfrAgeAve - targetAge*YEAR) )
-    
-    return weights
-
-# weight_sfrAge()
-
-
-
-
-def weight_sfrChange(epas, his, los, cosmo=None, verbose=VERBOSE):
+def weight_sfrChange(branches, his, los, cosmo=None, verbose=VERBOSE):
 
     if( verbose ): print " - - SubhaloFinder.weight_sfrChange()"
 
@@ -221,7 +176,7 @@ def weight_sfrChange(epas, his, los, cosmo=None, verbose=VERBOSE):
     snaps = np.concatenate([his,los])
     first = np.min(snaps)
 
-    sfr = epas[SH_SFR]
+    sfr = branches[SH_SFR]
     hiInds = his - first
     loInds = los - first
 
@@ -276,9 +231,10 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
     # Get sample branch to determine shapes of parameters
     desc = tree.get_future_branch(target, inds[0], keysel=useKeys)
 
-
     # Initialize dictionary with zeros arrays for each parameter
     branches = {}
+    keyStr = ""
+    count = 0
     for key,typ in zip(useKeys, useTypes):
         val = getattr(desc, key)
         shp = np.shape(val)
@@ -286,7 +242,16 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
         if( len(shp) == 1 ): branches[key] = np.zeros( [numSubhalos, branchLens],         dtype=typ )
         else:                branches[key] = np.zeros( [numSubhalos, branchLens, shp[1]], dtype=typ )
 
+        if( count%5 == 0 ): keyStr += " - - - "
+        keyStr += "'%s', " % (key)
+        count += 1
+
     # } key
+
+
+    if( verbose ): 
+        print " - - Retrieving branch parameters for :"
+        print keyStr
 
     
     ### Find Branches for Subhalos and Store Parameters ###
@@ -295,6 +260,7 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
     numMissing = 0
     numNaked = 0
     numZeroSFR = 0
+    numCutBH = 0
     badInds = []
     if( verbose ): print " - - - Finding branches for %d subhalos" % (len(inds))
     for ii,subh in enumerate(inds):
@@ -335,14 +301,34 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
             continue
 
 
+        # Make sure BH is above cutoff mass at all snapshots (really just the first matters)
+        if( any(getattr(desc, SH_BH_MASS)*MASS_CONV < BH_MASS_CUT) ):
+            numCutBH += 1
+            badInds.append(ii)
+            continue
+
         # Sort by snapshot number
         sort = np.argsort(nums)
 
         # Store Parameters
         for key in useKeys:
-            branches[key][ii] = getattr(desc, key)[sort]                                                # In CHRONOLOGICAL order
+            param = getattr(desc, key)
+            branches[key][ii] = param[sort]                                                         # In CHRONOLOGICAL order
 
     # } ii
+
+
+    ### Remove Mergers ###
+    numMergers = 0
+    # Get subhalo ID numbers for last snapshot
+    endInds = branches[SL_SUBFIND_ID][:,-1]
+    # Remove IDs which appear more than once
+    for ii, ind in enumerate(endInds):
+        # Only search beyond test entry, so that last case of duplicate entry remains
+        found = np.where( endInds[ii:] == ind )[0]
+        if( len(found) > 1 ): 
+            badInds.append(ii)
+            numMergers += 1
 
 
     ### Cleanup bad Subhalos (no branches) ###
@@ -359,10 +345,14 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
 
                 
     if( verbose ): 
-        print " - - - - Retrieved %d branches with (%d missing, %d lacking, %d zero SFR)" % \
-            (len(branches[SH_SFR]), numMissing, numNaked, numZeroSFR)
-        if( numZeroSFR > 0 ): print " - - - - - Zero SFR at Subhalo %d" % (badSFR)
-
+        print " - - - - Retrieved %d subhalo branches" % (len(branches[SH_SFR]))
+        print " - - - - - Missing  : %d" % (numMissing)
+        print " - - - - - Lacking  : %d" % (numNaked)
+        out = " - - - - - Zero SFR : %d" % (numZeroSFR)
+        if( numZeroSFR > 0 ): out += "; e.g. Subhalo %d" % (badSFR)
+        print out
+        print " - - - - - Mergers  : %d" % (numMergers)
+        print " - - - - - Small BH : %d  (Below %.2e [Msol])" % (numCutBH, BH_MASS_CUT)
 
     return branches, branchSnaps, goodInds
 
