@@ -37,19 +37,18 @@ COL   = [ '0.5',  'red']
 ALPHA = [ 0.5,    0.8   ]
 
 
-def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weights,
+def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weightsEPA,
                                others=None, fname=None, verbose=VERBOSE):
 
     if( verbose ): print " - - FigA03_EplusA_Selected.plotFigA03_EplusA_Selected()"
 
     ### Set Parameters ###
-    numSubhalos = len(weights)
+    numSubhalos = len(weightsEPA)
     numOths     = len(inds_oth)
     numEpas     = len(inds_epa)
 
-    # Sort EpA subhalos by BH Mass
-    mbh = cat[SH_BH_MASS][inds_epa]
-    inds = np.argsort(mbh)
+    # Sort EpA subhalos by Weights (this should be the case already, but make sure
+    inds = np.argsort(weightsEPA)
     inds_epa = inds_epa[inds]
 
     if( fname  is None ): fname = DEF_FNAME % (run)
@@ -97,7 +96,6 @@ def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weights,
 
     # Get unique color for each EpA subhalo
     cols = pfunc.setColorCycle(numEpas)
-
 
     ### Create Figure and Axes ###
 
