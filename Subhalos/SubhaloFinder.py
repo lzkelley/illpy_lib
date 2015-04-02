@@ -129,9 +129,15 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     weightsEPA = weightsSFR[inds_epa]
 
-    ### Get Subfind ID numbers for Subhalos at final Snapshot ###
-    shinds_epa = np.array(branches[SL_SUBFIND_ID][inds_epa,-1])
-    shinds_oth = np.array(branches[SL_SUBFIND_ID][inds_oth,-1])
+    ### Get Subfind ID numbers for Subhalos ###
+    
+    # first snapshot
+    old_epa = np.array(branches[SL_SUBFIND_ID][inds_epa, 0])
+    old_oth = np.array(branches[SL_SUBFIND_ID][inds_oth, 0])
+
+    # final snapshot
+    new_epa = np.array(branches[SL_SUBFIND_ID][inds_epa,-1])
+    new_oth = np.array(branches[SL_SUBFIND_ID][inds_oth,-1])
 
 
     ### Load Final snapshot subhalo catalog ###
@@ -140,10 +146,17 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     numSubhalos = len(catLast[SH_SFR])
     if( verbose ): print " - - Loaded catalog with %d subhalos" % (numSubhalos)
 
-    # Plot EplusA Galaxies at Redshift z = 0.0
-    if( plot ): Subhalos.Figures.figa03.plotFigA03_EplusA_Selected(run, catLast, shinds_epa, shinds_oth, weightsEPA)
+    ### Plot EplusA ###
+    if( plot ): 
+        # Plot EplusA Galaxies at Redshift z = 0.0
+        Figures.figa03.plotFigA03_EplusA_Selected(run, catLast, new_epa, new_oth, weightsEPA)
+        # Plot EplusA Galaxies Change in properties over Redshift
+        Figures.figa04.plotFigA04_EplusA_Evolution(run, catFirst, catLast, old_epa, old_oth, 
+                                                   new_epa, new_oth, weightsEPA)
 
-    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, shinds_epa, shinds_oth
+    
+
+    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth
 
 
 
@@ -259,6 +272,7 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
 
     numMissing = 0
     numNaked = 0
+    numMassless = 0
     numZeroSFR = 0
     numCutBH = 0
     badInds = []
@@ -292,6 +306,15 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
             badInds.append(ii)
             continue
 
+        # Make sure subhalo has mass in particles in all future snapshots
+        massTypes = getattr(desc, SH_MASS_TYPE)
+        if( any(massTypes[:, PARTICLE_TYPE_GAS ] <= 0.0 ) or 
+            any(massTypes[:, PARTICLE_TYPE_STAR] <= 0.0 ) or
+            any(massTypes[:, PARTICLE_TYPE_BH  ] <= 0.0 )   ):
+            numMassless += 1
+            badInds.append(ii)
+            continue
+
         # Make sure SFR is never uniformly Zero
         sfr = getattr(desc, SH_SFR)
         if( any(sfr <= 0.0) ):
@@ -299,7 +322,6 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
             badInds.append(ii)
             if( badSFR < 0 ): badSFR = subh
             continue
-
 
         # Make sure BH is above cutoff mass at all snapshots (really just the first matters)
         if( any(getattr(desc, SH_BH_MASS)*MASS_CONV < BH_MASS_CUT) ):
@@ -342,7 +364,6 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
     branches[BRANCH_INDS]    = goodInds
     branches[BRANCH_CREATED] = datetime.now().ctime()
     branches[BRANCH_SNAPS]   = branchSnaps
-
                 
     if( verbose ): 
         print " - - - - Retrieved %d subhalo branches" % (len(branches[SH_SFR]))
@@ -353,6 +374,7 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
         print out
         print " - - - - - Mergers  : %d" % (numMergers)
         print " - - - - - Small BH : %d  (Below %.2e [Msol])" % (numCutBH, BH_MASS_CUT)
+        print " - - - - - Massless : %d" % (numMassless)
 
     return branches, branchSnaps, goodInds
 
