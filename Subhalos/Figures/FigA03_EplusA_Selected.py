@@ -16,8 +16,8 @@ VERBOSE = True
 FIG_SIZE = [12, 14]
 LEFT     = 0.1
 RIGHT    = 0.9
-BOT      = 0.1
-TOP      = 0.95
+BOT      = 0.05
+TOP      = 0.93
 HSPACE   = 0.4
 WSPACE   = 0.4
 
@@ -40,7 +40,7 @@ ALPHA = [ 0.5,    0.8   ]
 def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weights,
                                others=None, fname=None, verbose=VERBOSE):
 
-    if( verbose ): print " - - FigA01_Subfind_SFR.plotFigA03_EplusA_Selected()"
+    if( verbose ): print " - - FigA03_EplusA_Selected.plotFigA03_EplusA_Selected()"
 
     ### Set Parameters ###
     numSubhalos = len(weights)
@@ -132,8 +132,9 @@ def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weights,
 
 
     # Add Title
-    ax[0,0].set_title("E-plus-A Redshift Z = 0.0", size=FS_TITLE)
-    
+    textStr = "E-plus-A vs. Others\nRedshift Z = 0.0"
+    text = fig.text(0.5, 0.98, textStr, fontsize=FS_TITLE, transform=plt.gcf().transFigure,
+                    verticalalignment='top', horizontalalignment='center')
 
     # Save Figure
     fig.savefig(fname)
@@ -147,21 +148,15 @@ def plotFigA03_EplusA_Selected(run, cat, inds_epa, inds_oth, weights,
 
 def figa03_row(ax, xx, yy, labels, xreverse=False, scale=SCALE, cols=None, verbose=VERBOSE):
 
-    if( verbose ): print " - - - FigA03_EplusA_Selected.figa03_row()"
-    if( verbose ): print " - - - - '%s' and '%s'" % (labels[0], labels[1])
-
     figa03_scatter(ax[0], xx, yy, labels, xreverse=xreverse, scale=scale, cols=cols, verbose=verbose)
     figa03_hist(ax[1], xx, labels[0], scale=scale, verbose=verbose)
     figa03_hist(ax[2], yy, labels[1], scale=scale, verbose=verbose)
-
 
     return
 
 
 
 def figa03_scatter(ax, xx, yy, labels, xreverse=False, scale=SCALE, cols=None, verbose=VERBOSE):
-
-    if( verbose ): print " - - - FigA03_EplusA_Selected.figa03_scatter()"
 
     pfunc.setAxis(ax, axis='x', fs=FS, c='black', label=labels[0], scale=scale)
     pfunc.setAxis(ax, axis='y', fs=FS, c='black', label=labels[1], scale=scale)
@@ -181,8 +176,6 @@ def figa03_scatter(ax, xx, yy, labels, xreverse=False, scale=SCALE, cols=None, v
 
 
 def figa03_hist(ax, data, label, scale=SCALE, verbose=VERBOSE):
-
-    if( verbose ): print " - - - FigA03_EplusA_Selected.figa03_hist()"
 
     # Setup Axes
     pfunc.setAxis(ax, axis='x', fs=FS, label=label, scale=scale)
