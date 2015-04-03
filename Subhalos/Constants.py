@@ -82,12 +82,35 @@ BRANCH_SNAPS                  = "snapshots"
 
 
 ### EplusA Snapshot Particle Data ###
-EPA_SUBHALOS                  = "subhalo_particles"
-EPA_RUN                       = "run"
-EPA_INDICES                   = "indices"
-EPA_SNAPSHOT                  = "snapshot"
-EPA_CREATED                   = "created"
+SUBHALO_ID                        = "id"
+SUBHALO_RUN                       = "run"
+SUBHALO_SNAPSHOT                  = "snapshot"
+SUBHALO_CREATED                   = "created"
 
+SUBHALO_BH_MASS                   = "BH_Mass"
+SUBHALO_BH_HSML                   = "BH_Hsml"
+SUBHALO_BH_MDOT                   = "BH_Mdot"
+SUBHALO_STELLAR_PHOTOS            = "GFM_StellarPhotometrics"
+SUBHALO_FORM_TIME                 = "GFM_StellarFormationTime"
+SUBHALO_PARENT                    = "ParentID"
+SUBHALO_SUBFIND_HSML              = "SubfindHsml"
+SUBHALO_SUBFIND_VDISP             = "SubfindVelDisp"
+SUBHALO_FILENAME                  = "filename"
+SUBHALO_HSML                      = "hsml"
+SUBHALO_MASS                      = "mass"
+SUBHALO_MASSES                    = "masses"
+SUBHALO_NPART                     = "npart_loaded"
+SUBHALO_POS                       = "pos"
+SUBHALO_POT                       = "pot"
+SUBHALO_DENS                      = "rho"
+SUBHALO_SFR                       = "sfr"
+SUBHALO_VEL                       = "vel"
+
+SNAPSHOT_PROPERTIES = [ SUBHALO_BH_MASS, SUBHALO_BH_HSML, SUBHALO_BH_MDOT, SUBHALO_STELLAR_PHOTOS, 
+                        SUBHALO_FORM_TIME, SUBHALO_PARENT, SUBHALO_SUBFIND_HSML, SUBHALO_SUBFIND_VDISP,
+                        SUBHALO_FILENAME, SUBHALO_HSML, SUBHALO_MASS, SUBHALO_MASSES, 
+                        SUBHALO_NPART, SUBHALO_POS, SUBHALO_POT, SUBHALO_DENS, 
+                        SUBHALO_SFR, SUBHALO_VEL ]
 
 
 ### Intermediate Save Files ###
