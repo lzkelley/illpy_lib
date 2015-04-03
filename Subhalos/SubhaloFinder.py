@@ -15,10 +15,14 @@ import readsubfHDF5
 import illpy
 from illpy import Cosmology
 from illpy.Constants import *
+from illpy import AuxFuncs as aux
 from Constants import *
+
 
 import Figures
 from StellarLifetimes import StellarLifetimes
+
+import arepo
 
 RUN     = 3
 SFR_CUT = 0.9
@@ -39,8 +43,6 @@ MIN_BH_PARTICLES   = 1
 
 MIN_NUM_SUBHALOS   = 10
 
-
-BRANCH_SAVE        = "ill-%d_branches.npz"
 
 
 def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
@@ -154,9 +156,98 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
         Figures.figa04.plotFigA04_EplusA_Evolution(run, catFirst, catLast, old_epa, old_oth, 
                                                    new_epa, new_oth, weightsEPA)
 
+
+
+    ### Load EplusA Galaxies' Particles from Redshift 0.0 ###
+    if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
+    epas = loadEPASubhaloParticles(run, new_epa, snapLast, verbose=verbose)
     
 
     return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth
+
+
+
+def loadEPASubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
+
+    if( verbose ): print " - - SubhaloFinder.loadEPASubhaloParticles()"
+
+    if( verbose ): print " - - - Loading %d subhalos' particle data" % (len(subhaloInds))
+
+    groupCat = None
+    
+    epas = []
+    for ii,shind in enumerate(subhaloInds):
+        fileName = SUBHALO_PARTICLES_FILENAMES(run, snapNum, shind)
+        if( verbose ): print " - - - - %d : Subhalo %d - '%s'" % (ii, shind, fileName)
+
+        if( loadsave ):
+            if( os.path.exists(fileName) ):
+                if( verbose ): print " - - - - - Loading from previous save"
+                #subhaloData = np.load(fileName)
+                subhaloData = aux.npzToDict(fileName)
+            else:
+                print "``loadsave`` file '%s' does not exist!" % (fileName)
+                loadsave = False
+
+
+        if( not loadsave ):
+            if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
+            subhaloData, groupCat = _getEPASubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
+            #np.savez(fileName, subhaloData)
+            aux.saveDictNPZ(subhaloData, fileName, verbose=True)
+
+
+        epas.append(subhaloData)
+
+    # } ii
+
+
+    epas = np.array(epas)
+    return epas
+
+
+
+def _getEPASubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
+
+    if( verbose ): print " - - SubhaloFinder._getEPASubhaloParticles()"
+
+    # Get snapshot file path and filename
+    snapshotPath = ILLUSTRIS_OUTPUT_SNAPSHOT_FIRST_FILENAME(run, snapNum)
+
+    ### If Group Catalog is not Provided, load it ###
+    if( groupCat is None ):
+
+        # Get group catalog file path and filename
+        groupPath = ILLUSTRIS_OUTPUT_GROUP_FIRST_FILENAME(run, snapNum)
+
+        # Load subfind catalog
+        if( verbose ): print " - - - Loading subfind catalog from '%s'" % (groupPath)
+        groupCat = arepo.Subfind(groupPath, combineFiles=True)
+
+
+
+    ### Load Snapshot Data ###
+
+    # Create filter for target subhalo
+    filter = [ arepo.filter.Halo(groupCat, subhalo=subhaloInd) ]
+    # Load snapshot
+    if( verbose ): print " - - - Loading snapshot data"
+    data = arepo.Snapshot(snapshotPath, filter=filter, fields=SNAPSHOT_PROPERTIES,
+                          combineFiles=True, verbose=False )
+
+
+    ### Convert Snapshot Data into Dictionary ###
+
+    dataDict = {}
+    for snapKey in SNAPSHOT_PROPERTIES:
+        dataDict[snapKey] = getattr(data, snapKey)
+
+    dataDict[SUBHALO_ID]       = subhaloInd
+    dataDict[SUBHALO_RUN]      = run
+    dataDict[SUBHALO_SNAPSHOT] = snapNum
+    dataDict[SUBHALO_CREATED]  = datetime.now().ctime()
+
+    return dataDict, groupCat
 
 
 
