@@ -147,9 +147,10 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Select Some Other Non-EplusA 'Null' Subhalos ###
     if( verbose ): print " - Selecting Non-EplusA 'null' comparison Halos"
-    new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
+    #new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
+    new_null = new_oth[:COMPARE_NUM]
+    if( verbose ): print " - - Selecting %d: %s" % (len(new_null), str(new_null))
     nulls = loadSubhaloParticles(run, new_null, snapLast, verbose=verbose)
-
 
 
     '''
@@ -167,8 +168,6 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
 
     if( verbose ): print " - - SubhaloFinder.loadSubhaloParticles()"
-
-    if( verbose ): print " - - - Loading %d subhalos' particle data" % (len(subhaloInds))
 
     groupCat = None
     
