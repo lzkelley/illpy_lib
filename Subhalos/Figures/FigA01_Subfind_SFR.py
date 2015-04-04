@@ -36,7 +36,7 @@ AXIS_TOTAL   = 2
 
 AXIS_TYPES = [ AXIS_BH, AXIS_STELLAR, AXIS_TOTAL ]
 
-DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a01_run-%d_subfind_sfr.png'
+DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a01_ill-%d_subfind_sfr.png'
 
 COL_SFR = 'blue'
 COL_SFR_SP = 'red'
