@@ -50,6 +50,7 @@ MIN_NUM_SUBHALOS   = 10
 def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     if( verbose ): print "SubhaloFinder.py"
+    startMain = datetime.now()
 
     treePath = ILLUSTRIS_TREE_PATHS(run)
     cut = SFR_CUT
@@ -62,8 +63,10 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load Merger Tree ###
     if( verbose ): print " - Loading Merger Tree"
+    start = datetime.now()
     tree = readtreeHDF5.TreeDB(treePath)
-
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded after %s" % (str(stop-start))
 
     # Determine Starting Snapshot
     if( verbose ): print " - Find Target Snapshot" 
@@ -74,9 +77,11 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load target snapshot subhalo catalog ###
     if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapFirst)
+    start = datetime.now()
     catFirst = loadSubhaloCatalog(run, snapFirst, keys=SUBFIND_PARAMETERS, verbose=verbose)
     numSubhalos = len(catFirst[SH_SFR])
-    if( verbose ): print " - - Loaded catalog with %d subhalos" % (numSubhalos)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded catalog with %d subhalos after %s" % (numSubhalos, str(stop-start))
 
 
     # Find valid subhalos
@@ -92,15 +97,19 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
         Figures.figa01.plotFigA01_Subfind_SFR( run, cat_sfr, cat_mass_type, cat_mass_bh )
 
 
+    ### Load Branches ###
+
     if( verbose ): print " - Loading Subhalo Branches for %d subhalos" % (len(inds))
+    start = datetime.now()
     branches = loadSubhaloBranches(run, inds, tree, snapFirst, loadsave=loadsave, verbose=verbose)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded after %s" % (str(stop-start))
 
 
-    ### Select Subhalos Based on Star Formation Rate ###
     #sfrInds, sfrs = sfrSubhalos(catFirst, inds, cut=cut, verbose=verbose)
 
 
-    ### Get Weights for Quality of EplusA Galaxies ###
+    # Get Weights for Quality of EplusA Galaxies
     weightsSFR = weight_sfrChange(branches, hiSnaps, loSnaps, cosmo=cosmo, verbose=verbose)
 
 
@@ -126,9 +135,12 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load Final snapshot subhalo catalog ###
     if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapFirst)
+    start = datetime.now()
     catLast = loadSubhaloCatalog(run, snapLast, keys=SUBFIND_PARAMETERS, verbose=verbose)
     numSubhalos = len(catLast[SH_SFR])
-    if( verbose ): print " - - Loaded catalog with %d subhalos" % (numSubhalos)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded catalog with %d subhalos after %s" % (numSubhalos, str(stop-start))
+
 
     ### Plot EplusA ###
     if( plot ): 
@@ -142,7 +154,10 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load EplusA Galaxies' Particles from Redshift 0.0 ###
     if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
+    start = datetime.now()
     epas = loadSubhaloParticles(run, snapLast, new_epa, verbose=verbose)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded %d subhalos after %s" % (len(epas), str(stop-start))    
 
 
     ### Select Some Other Non-EplusA 'Null' Subhalos ###
@@ -150,7 +165,10 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     #new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
     new_null = new_oth[:COMPARE_NUM]
     if( verbose ): print " - - Selecting %d: %s" % (len(new_null), str(new_null))
+    start = datetime.now()
     nulls = loadSubhaloParticles(run, snapLast, new_null, verbose=verbose)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded %d subhalos after %s" % (len(nulls), str(stop-start))
 
 
     '''
@@ -159,9 +177,15 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
             Figures.figa05.plotFigA05_Subhalo(run, epaID, epas[ii])
     '''
 
+    stopMain = datetime.now()
+    if( verbose ): print " - Done after %s" % (str(stopMain-startMain))
+    
+
+    return run, snapFirst, snapLast, catFirst, catLast, inds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth, new_null
+
+# main()
 
 
-    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth, new_null
 
 
 
@@ -201,6 +225,7 @@ def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBO
     subhalos = np.array(subhalos)
     return subhalos
 
+# loadSubhaloParticles()
 
 
 def _getSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
@@ -372,7 +397,7 @@ def _getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=M
         if( len(shp) == 1 ): branches[key] = np.zeros( [numSubhalos, branchLens],         dtype=typ )
         else:                branches[key] = np.zeros( [numSubhalos, branchLens, shp[1]], dtype=typ )
 
-        if( count%5 == 0 ): keyStr += " - - - "
+        if( count%5 == 0 ): keyStr += "\n - - - "
         keyStr += "'%s', " % (key)
         count += 1
 
