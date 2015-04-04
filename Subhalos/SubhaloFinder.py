@@ -29,7 +29,9 @@ SFR_CUT = 0.9
 VERBOSE = True
 PLOT    = True
 
-SELECT_NUM = 20
+SELECT_NUM  = 20
+COMPARE_NUM = 20
+
 
 TARGET_LOOKBACK_TIMES = [ 1.5e9, 1.5e8 ]                                                            # [years]
 TARGET_STELLAR_MASSES = [ 2.0, 3.0 ]                                                                # [msol]
@@ -90,28 +92,8 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
         Figures.figa01.plotFigA01_Subfind_SFR( run, cat_sfr, cat_mass_type, cat_mass_bh )
 
 
-    #inds = inds[:100]
-
-    ### Get Branches of Target Halos ###
-    if( verbose ): print " - Loading branches for %d selected subhalos" % (len(inds))
-    saveFile = BRANCH_SAVE % (run)
-
-    if( loadsave ):
-        if( verbose ): print " - - Loading branches from save '%s'" % (saveFile)
-        if( not os.path.exists(saveFile) ):
-            print "``loadsave`` file '%s' does not exist!" % (saveFile)
-            loadsave = False
-        else:
-            branches = illpy.AuxFuncs.npzToDict(saveFile)
-            snaps = branches[BRANCH_SNAPS]
-            subhaloInds = branches[BRANCH_INDS]
-
-
-    if( not loadsave ):
-        if( verbose ): print " - - Reloading subhalo branches from merger tree"
-        branches, snaps, subhaloInds = getSubhaloBranches(run, inds, tree, snapFirst, verbose=verbose)
-        illpy.AuxFuncs.saveDictNPZ(branches, saveFile, verbose=verbose)
-
+    if( verbose ): print " - Loading Subhalo Branches for %d subhalos" % (len(inds))
+    branches = loadSubhaloBranches(run, inds, tree, snapFirst, loadsave=loadsave, verbose=verbose)
 
 
     ### Select Subhalos Based on Star Formation Rate ###
@@ -160,22 +142,37 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load EplusA Galaxies' Particles from Redshift 0.0 ###
     if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
-    epas = loadEPASubhaloParticles(run, new_epa, snapLast, verbose=verbose)
-    
-
-    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth
+    epas = loadSubhaloParticles(run, new_epa, snapLast, verbose=verbose)
 
 
+    ### Select Some Other Non-EplusA 'Null' Subhalos ###
+    if( verbose ): print " - Selecting Non-EplusA 'null' comparison Halos"
+    new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
+    nulls = loadSubhaloParticles(run, new_null, snapLast, verbose=verbose)
 
-def loadEPASubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
 
-    if( verbose ): print " - - SubhaloFinder.loadEPASubhaloParticles()"
+
+    '''
+    if( plot ):
+        for ii,epaID in enumerate(new_epa):
+            Figures.figa05.plotFigA05_Subhalo(run, epaID, epas[ii])
+    '''
+
+
+
+    return run, snapFirst, snapLast, catFirst, catLast, inds, subhaloInds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth, new_null
+
+
+
+def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
+
+    if( verbose ): print " - - SubhaloFinder.loadSubhaloParticles()"
 
     if( verbose ): print " - - - Loading %d subhalos' particle data" % (len(subhaloInds))
 
     groupCat = None
     
-    epas = []
+    subhalos = []
     for ii,shind in enumerate(subhaloInds):
         fileName = SUBHALO_PARTICLES_FILENAMES(run, snapNum, shind)
         if( verbose ): print " - - - - %d : Subhalo %d - '%s'" % (ii, shind, fileName)
@@ -183,7 +180,6 @@ def loadEPASubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VE
         if( loadsave ):
             if( os.path.exists(fileName) ):
                 if( verbose ): print " - - - - - Loading from previous save"
-                #subhaloData = np.load(fileName)
                 subhaloData = aux.npzToDict(fileName)
             else:
                 print "``loadsave`` file '%s' does not exist!" % (fileName)
@@ -192,24 +188,23 @@ def loadEPASubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VE
 
         if( not loadsave ):
             if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
-            subhaloData, groupCat = _getEPASubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
-            #np.savez(fileName, subhaloData)
+            subhaloData, groupCat = _getSubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
             aux.saveDictNPZ(subhaloData, fileName, verbose=True)
 
 
-        epas.append(subhaloData)
+        subhalos.append(subhaloData)
 
     # } ii
 
 
-    epas = np.array(epas)
-    return epas
+    subhalos = np.array(subhalos)
+    return subhalos
 
 
 
-def _getEPASubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
+def _getSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
 
-    if( verbose ): print " - - SubhaloFinder._getEPASubhaloParticles()"
+    if( verbose ): print " - - SubhaloFinder._getSubhaloParticles()"
 
     # Get snapshot file path and filename
     snapshotPath = ILLUSTRIS_OUTPUT_SNAPSHOT_FIRST_FILENAME(run, snapNum)
@@ -305,9 +300,39 @@ def weight_sfrChange(branches, his, los, cosmo=None, verbose=VERBOSE):
 
 
 
+def loadSubhaloBranches(run, inds, tree, target, loadsave=True, verbose=VERBOSE):
 
-def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, 
-                       nbh=MIN_BH_PARTICLES, verbose=VERBOSE):
+    if( verbose ): print " - - SubhaloFinder.loadSubhaloBranches()"
+
+    saveFile = SUBHALO_BRANCHES_FILENAMES(run)
+
+    if( loadsave ):
+        if( verbose ): print " - - - Loading branches from save '%s'" % (saveFile)
+        if( not os.path.exists(saveFile) ):
+            print "``loadsave`` file '%s' does not exist!" % (saveFile)
+            loadsave = False
+        else:
+            branches = illpy.AuxFuncs.npzToDict(saveFile)
+            #snaps = branches[BRANCH_SNAPS]
+            #subhaloInds = branches[BRANCH_INDS]
+
+
+    if( not loadsave ):
+        if( verbose ): print " - - Reloading subhalo branches from merger tree"
+        #branches, snaps, subhaloInds = getSubhaloBranches(run, inds, tree, snapFirst, verbose=verbose)
+        branches = _getSubhaloBranches(run, inds, tree, target, verbose=verbose)
+        illpy.AuxFuncs.saveDictNPZ(branches, saveFile, verbose=verbose)
+
+
+    return branches
+
+# loadSubhaloBranches()
+
+
+
+
+def _getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, 
+                        nbh=MIN_BH_PARTICLES, verbose=VERBOSE):
 
     if( verbose ): print " - - SubhaloFinder.getSubhaloBranches()"
     numSubhalos = len(inds)
@@ -467,7 +492,9 @@ def getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MI
         print " - - - - - Small BH : %d  (Below %.2e [Msol])" % (numCutBH, BH_MASS_CUT)
         print " - - - - - Massless : %d" % (numMassless)
 
-    return branches, branchSnaps, goodInds
+
+    # return branches, branchSnaps, goodInds
+    return branches
 
 # } getSubhaloBranches()
 
