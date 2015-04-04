@@ -87,30 +87,32 @@ SUBHALO_RUN                       = "run"
 SUBHALO_SNAPSHOT                  = "snapshot"
 SUBHALO_CREATED                   = "created"
 
-SUBHALO_BH_MASS                   = "BH_Mass"
-SUBHALO_BH_HSML                   = "BH_Hsml"
-SUBHALO_BH_MDOT                   = "BH_Mdot"
-SUBHALO_STELLAR_PHOTOS            = "GFM_StellarPhotometrics"
-SUBHALO_FORM_TIME                 = "GFM_StellarFormationTime"
-SUBHALO_PARENT                    = "ParentID"
-SUBHALO_SUBFIND_HSML              = "SubfindHsml"
-SUBHALO_SUBFIND_VDISP             = "SubfindVelDisp"
-SUBHALO_FILENAME                  = "filename"
-SUBHALO_HSML                      = "hsml"
-SUBHALO_MASS                      = "mass"
-SUBHALO_MASSES                    = "masses"
-SUBHALO_NPART                     = "npart_loaded"
-SUBHALO_POS                       = "pos"
-SUBHALO_POT                       = "pot"
-SUBHALO_DENS                      = "rho"
-SUBHALO_SFR                       = "sfr"
-SUBHALO_VEL                       = "vel"
+SNAPSHOT_BH_MASS                  = "BH_Mass"
+SNAPSHOT_BH_HSML                  = "BH_Hsml"
+SNAPSHOT_BH_MDOT                  = "BH_Mdot"
+SNAPSHOT_STELLAR_PHOTOS           = "GFM_StellarPhotometrics"
+SNAPSHOT_FORM_TIME                = "GFM_StellarFormationTime"
+SNAPSHOT_PARENT                   = "ParentID"
+SNAPSHOT_SUBFIND_HSML             = "SubfindHsml"
+SNAPSHOT_SUBFIND_VDISP            = "SubfindVelDisp"
+SNAPSHOT_FILENAME                 = "filename"
+SNAPSHOT_HSML                     = "hsml"
+SNAPSHOT_MASS                     = "mass"
+SNAPSHOT_MASSES                   = "masses"
+SNAPSHOT_NPART                    = "npart_loaded"
+SNAPSHOT_POS                      = "pos"
+SNAPSHOT_POT                      = "pot"
+SNAPSHOT_DENS                     = "rho"
+SNAPSHOT_SFR                      = "sfr"
+SNAPSHOT_VEL                      = "vel"
+SNAPSHOT_EINT                     = "internalenergy"
 
-SNAPSHOT_PROPERTIES = [ SUBHALO_BH_MASS, SUBHALO_BH_HSML, SUBHALO_BH_MDOT, SUBHALO_STELLAR_PHOTOS, 
-                        SUBHALO_FORM_TIME, SUBHALO_PARENT, SUBHALO_SUBFIND_HSML, SUBHALO_SUBFIND_VDISP,
-                        SUBHALO_FILENAME, SUBHALO_HSML, SUBHALO_MASS, SUBHALO_MASSES, 
-                        SUBHALO_NPART, SUBHALO_POS, SUBHALO_POT, SUBHALO_DENS, 
-                        SUBHALO_SFR, SUBHALO_VEL ]
+
+SNAPSHOT_PROPERTIES = [ SNAPSHOT_BH_MASS, SNAPSHOT_BH_HSML, SNAPSHOT_BH_MDOT, SNAPSHOT_STELLAR_PHOTOS, 
+                        SNAPSHOT_FORM_TIME, SNAPSHOT_PARENT, SNAPSHOT_SUBFIND_HSML, SNAPSHOT_SUBFIND_VDISP,
+                        SNAPSHOT_FILENAME, SNAPSHOT_HSML, SNAPSHOT_MASS, SNAPSHOT_MASSES, 
+                        SNAPSHOT_NPART, SNAPSHOT_POS, SNAPSHOT_POT, SNAPSHOT_DENS, 
+                        SNAPSHOT_SFR, SNAPSHOT_VEL, SNAPSHOT_EINT ]
 
 
 ### Intermediate Save Files ###
