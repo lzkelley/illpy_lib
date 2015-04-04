@@ -142,7 +142,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load EplusA Galaxies' Particles from Redshift 0.0 ###
     if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
-    epas = loadSubhaloParticles(run, new_epa, snapLast, verbose=verbose)
+    epas = loadSubhaloParticles(run, snapLast, new_epa, verbose=verbose)
 
 
     ### Select Some Other Non-EplusA 'Null' Subhalos ###
@@ -150,7 +150,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     #new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
     new_null = new_oth[:COMPARE_NUM]
     if( verbose ): print " - - Selecting %d: %s" % (len(new_null), str(new_null))
-    nulls = loadSubhaloParticles(run, new_null, snapLast, verbose=verbose)
+    nulls = loadSubhaloParticles(run, snapLast, new_null, verbose=verbose)
 
 
     '''
@@ -169,6 +169,7 @@ def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBO
 
     if( verbose ): print " - - SubhaloFinder.loadSubhaloParticles()"
 
+    if( verbose ): print " - - - Loading %d subhalos" % (len(subhaloInds))
     groupCat = None
     
     subhalos = []
@@ -176,16 +177,17 @@ def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBO
         fileName = SUBHALO_PARTICLES_FILENAMES(run, snapNum, shind)
         if( verbose ): print " - - - - %d : Subhalo %d - '%s'" % (ii, shind, fileName)
 
-        if( loadsave ):
+        loadsave_flag = loadsave
+        if( loadsave_flag ):
             if( os.path.exists(fileName) ):
                 if( verbose ): print " - - - - - Loading from previous save"
                 subhaloData = aux.npzToDict(fileName)
             else:
                 print "``loadsave`` file '%s' does not exist!" % (fileName)
-                loadsave = False
+                loadsave_flag = False
 
 
-        if( not loadsave ):
+        if( not loadsave_flag ):
             if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
             subhaloData, groupCat = _getSubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
             aux.saveDictNPZ(subhaloData, fileName, verbose=True)
