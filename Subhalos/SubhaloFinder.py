@@ -134,7 +134,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
 
     ### Load Final snapshot subhalo catalog ###
-    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapFirst)
+    if( verbose ): print " - Loading Subhalo Catalog for Snapshot %d" % (snapLast)
     start = datetime.now()
     catLast = loadSubhaloCatalog(run, snapLast, keys=SUBFIND_PARAMETERS, verbose=verbose)
     numSubhalos = len(catLast[SH_SFR])
@@ -181,7 +181,9 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     if( verbose ): print " - Done after %s" % (str(stopMain-startMain))
     
 
-    return run, snapFirst, snapLast, catFirst, catLast, inds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth, new_null
+    #return run, snapFirst, snapLast, catFirst, catLast, inds, tree, branches, snaps, hiSnaps, loSnaps, weightsSFR, weightsEPA, old_epa, old_oth, new_epa, new_oth, new_null
+
+    return epas, nulls, new_epa, new_null
 
 # main()
 
