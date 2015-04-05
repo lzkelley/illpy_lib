@@ -221,11 +221,49 @@ def zToA(z, a0=1.0):
 ###  =============  MATH  ==============  ###
 ###  ===================================  ###
 
-def frexp10(xx): 
+
+def histogram(args, bins, weights=None, scale=None, ave=False):
+
+    if( ave ):
+        assert weights is not None, "To average over each bin, ``weights`` must be provided!"
+
+    hist,edge = np.histogram( args, bins=bins, weights=weights )
+
+    # Find the average of each weighed bin instead.
+    if( ave and weights is not None ):
+        hist = [ hh/nn if nn > 0 else 0.0
+                 for hh,nn in zip(hist,np.histogram( args, bins=bins)[0]) ]
+
+    hist = np.array(hist)
+
+    # Rescale the bin values
+    if( scale != None ):
+        hist *= scale
+
+    return hist
+
+
+def extrema(args, nonzero=False):
+    if( nonzero ): useMin = np.min( args[np.nonzero(args)] )
+    else:          useMin = np.min(args)
+    extr = np.array([useMin, np.max(args)])
+    return extr
+
+
+def space(args, num=100, log=True):
+
+    extr = extrema(args)
+    if( log ): bins = np.logspace( *np.log10(extr), num=num)
+    else:      bins = np.linspace( *extr,           num=num)
+
+    return bins
+
+
+def frexp10(xx):
     """
     Decompose the given number into a mantissa and exponent for scientific notation.
     """
-    exponent = int(np.log10(xx)) 
+    exponent = int(np.log10(xx))
     mantissa = xx / np.power(10.0, exponent)
     return mantissa, exponent
 
@@ -234,12 +272,12 @@ def nonzeroMin(arr):
     """
     Set all less-than or equal to zero values to the otherwise minimum value.
     """
-    
+
     fix = np.array(arr)
-    
+
     good = np.where( fix >  0.0 )[0]
     bad  = np.where( fix <= 0.0 )[0]
-    
+
     fix[bad] = np.min( fix[good] )
     return fix
 
@@ -251,7 +289,7 @@ def minmax(arr):
     """
     return np.min(arr), np.max(arr)
 
-    
+
 def avestd(arr):
     """
     Get the average and standard deviation of the given array.
@@ -335,10 +373,10 @@ def groupIndices(arr, bins, right=True):
     for ii in range(nums):
 
         # If bins give *right* edges
-        if( right ): 
+        if( right ):
             if( ii > 0 ): inds = np.where((arr > bins[ii-1]) & (arr <= bins[ii]))[0]
             else:         inds = np.where(arr <= bins[ii])[0]
-            
+
         # If bins give *left* edges
         else:
             if( ii < nums-1 ): inds = np.where((arr >= bins[ii]) & (arr < bins[ii+1]))[0]
@@ -415,15 +453,15 @@ def stringArray(arr, format='%.2f'):
     return out
 
 def statusString(count, total, durat=None):
-    """ 
-    Return a description of the status and completion of an iteration. 
+    """
+    Return a description of the status and completion of an iteration.
 
     If ``durat`` is provided it is used as the duration of time that the
     iterations have been going.  This time is used to estimate the time
     to completion.  ``durat`` can either be a `datetime.timedelta` object
     of if it is a scalar (int or float) then it will be converted to
     a `datetime.timedelta` object for string formatting purposes.
-    
+
     Parameters
     ----------
     count : int, number of iterations completed (e.g. [0...9])
@@ -434,7 +472,7 @@ def statusString(count, total, durat=None):
     # Calculate Percentage completed
     frac = 1.0*count/(total-1)
     stat = '%.2f%%' % (100*frac)
-    
+
     if( durat != None ):
         # Make sure `durat` is a datetime.timedelta object
         if( type(durat) is not datetime.timedelta ): durat = datetime.timedelta(seconds=durat)
@@ -454,7 +492,7 @@ def statusString(count, total, durat=None):
 def bytesString(bytes, precision=1):
     """
     Return a humanized string representation of a number of bytes.
-    
+
     Arguments
     ---------
     bytes : <scalar>, number of bytes
@@ -504,14 +542,14 @@ def combineFiles(inFilenames, outFilename, verbose=False):
     inFilenames : iterable<str>, list of input file names
     outFilename : <str>, output file name
     verbose : <bool> (optional=_VERBOSE), print verbose output
-    
+
     Returns
 
     """
 
     precision = 2
 
-    
+
     if( verbose ): print " - - AuxFuncs.combineFiles()"
     # Make sure outfile path exists
     checkPath(outFilename)
@@ -524,11 +562,11 @@ def combineFiles(inFilenames, outFilename, verbose=False):
 
     # Open output file for writing
     with open(outFilename, 'w') as outfil:
-        
+
         # Iterate over input files
         for inname in inFilenames:
             inSize += os.path.getsize(inname)
-            
+
             if( verbose ):
                 if( count % interval == 0 or count == nums):
                     sys.stdout.write('\r - - - %.2f%% Complete' % (100.0*count/nums))
@@ -539,7 +577,7 @@ def combineFiles(inFilenames, outFilename, verbose=False):
 
             # Open input file for reading
             with open(inname, 'r') as infil:
-            
+
                 # Iterate over input file lines
                 for line in infil:
                     outfil.write(line)
@@ -559,11 +597,11 @@ def combineFiles(inFilenames, outFilename, verbose=False):
 
     if( verbose ): print " - - - Total input size = %s, output size = %s" % (inStr, outStr)
 
-    return 
+    return
 
 
 
-def saveDictNPZ(dataDict, savefile, verbose=False):
+def dictToNPZ(dataDict, savefile, verbose=False):
     """
     Save the given dictionary to the given npz file.
 
@@ -603,7 +641,7 @@ def getFileSize(fnames, precision=1):
 
     ftype = type(fnames)
     if( ftype is not list and ftype is not np.ndarray ): fnames = [ fnames ]
-    
+
     byteSize = 0.0
     for fil in fnames: byteSize += os.path.getsize(fil)
 
@@ -632,7 +670,7 @@ def iterableNotString(args):
     """
     Check if the arguments is iterable and not a string.
     """
-    
+
     # if NOT iterable, return false
     if( not np.iterable(args) ): return False
     # if string, return False
@@ -649,7 +687,7 @@ def estimateLines(files):
 
     lineSize = 0.0
     count = 0
-    AVE_OVER = 20                                                                                   
+    AVE_OVER = 20
     with open(files[0], 'rb') as file:
         # Average size of `AVE_OVER` lines
         for line in file:
@@ -686,25 +724,25 @@ def checkPath(tpath):
     path,name = os.path.split(tpath)
     if( len(path) > 0 ):
         if( not os.path.isdir(path) ): os.makedirs(path)
-        
-    return 
+
+    return
 
 
 def npzToDict(npz):
     """
     Given a numpy npz file, convert it to a dictionary with the same keys and values.
-    
+
     Arguments
     ---------
     npz : <NpzFile>, input dictionary-like object
-    
+
     Returns
     -------
     newDict : <dict>, output dictionary with key-values from npz file.
 
     """
     if( type(npz) is str ): npz = np.load(npz)
-        
+
     newDict = { key : npz[key] for key in npz.keys() }
     return newDict
 
