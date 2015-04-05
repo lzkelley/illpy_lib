@@ -30,7 +30,7 @@ VERBOSE = True
 PLOT    = True
 
 SELECT_NUM  = 20
-COMPARE_NUM = 20
+COMPARE_NUM = 40
 
 
 TARGET_LOOKBACK_TIMES = [ 1.5e9, 1.5e8 ]                                                            # [years]
@@ -154,6 +154,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Load EplusA Galaxies' Particles from Redshift 0.0 ###
     if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
+    if( verbose ): print " - - EplusA Catalog Indices : %s" % (str(new_epa))
     start = datetime.now()
     epas = loadSubhaloParticles(run, snapLast, new_epa, verbose=verbose)
     stop = datetime.now()
@@ -162,13 +163,17 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     ### Select Some Other Non-EplusA 'Null' Subhalos ###
     if( verbose ): print " - Selecting Non-EplusA 'null' comparison Halos"
-    #new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
-    new_null = new_oth[:COMPARE_NUM]
+    new_null = np.random.choice(new_oth, size=COMPARE_NUM, replace=False)
+    #new_null = new_oth[:COMPARE_NUM]
     if( verbose ): print " - - Selecting %d: %s" % (len(new_null), str(new_null))
     start = datetime.now()
     nulls = loadSubhaloParticles(run, snapLast, new_null, verbose=verbose)
     stop = datetime.now()
     if( verbose ): print " - - Loaded %d subhalos after %s" % (len(nulls), str(stop-start))
+
+
+    ### Save Numbers of EplusA and Null Subhalos ###
+    #saveSubhaloNumbers(run, snapLast, new_epa, new_null, verbose=verbose)
 
 
     '''
@@ -188,7 +193,40 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 # main()
 
 
+'''
+def saveSubhaloNumbers(run, snap, nums_epa, nums_null, verbose=VERBOSE):
+    
+    if( verbose ): print " - - SubhaloFinder.saveSubhaloNumbers()"
 
+    # Load save filename
+    saveFile   = SUBHALO_FILENAMES_NUMBERS_FILENAMES(run, snap)
+    names_epa  = np.array([])
+    names_null = np.array([])
+    nums_epa   = np.array(nums_epa )
+    nums_null  = np.array(nums_null)
+
+    if( os.path.exists(saveFile) ):
+        dat = np.load(saveFile)
+        names_epa  = dat.epas
+        names_null = dat.nulls
+        nums_epa   = np.concatenate([ dat.epas,  names_epa  ])
+        nums_null  = np.concatenate([ dat.nulls, names_null ])
+
+
+    # Convert numbers to filenames
+    temp_epa   = np.array([ SUBHALO_PARTICLES_FILENAMES(run, snap, epa ) for epa  in nums_epa  ])
+    temp_null  = np.array([ SUBHALO_PARTICLES_FILENAMES(run, snap, null) for null in nums_null ])
+    names_epa  = np.concatenate([names_epa,  temp_epa ])
+    names_null = np.concatenate([names_null, temp_null])
+
+    # Save to NPZ file
+    np.savez(saveFile, run=run, snap=snap, epas=names_epa, nulls=names_null, 
+             nums_epas=nums_epa, nums_nulls=nums_null)
+
+    if( verbose ): print " - - - Saved Subhalo filenames and numbers to '%s'" % (saveFile)
+
+    return 
+'''
 
 
 def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
@@ -255,9 +293,11 @@ def _getSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOS
     filter = [ arepo.filter.Halo(groupCat, subhalo=subhaloInd) ]
     # Load snapshot
     if( verbose ): print " - - - Loading snapshot data"
+    start = datetime.now()
     data = arepo.Snapshot(snapshotPath, filter=filter, fields=SNAPSHOT_PROPERTIES,
                           combineFiles=True, verbose=False )
-
+    stop = datetime.now()
+    if( verbose ): print " - - - - Loaded after %s" % (str(stop-start))
 
     ### Convert Snapshot Data into Dictionary ###
 
