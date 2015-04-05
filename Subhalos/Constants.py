@@ -122,6 +122,10 @@ _SUBHALO_PARTICLES_FILENAME_BASE = "ill-%d_snap-%d_subhalo-%d.npz"
 
 _SUBHALO_BRANCHES_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_branches.npz"
 
+_SUBHALO_FILENAMES_NUMBERS_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-names-numbers.npz"
+
+_SUBHALO_RADIAL_PROFILES_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-profiles_%s.npz"
+
 
 def SUBHALO_PARTICLES_FILENAMES(run, snap, subhalo): 
     fileName  = _SUBHALO_PARTICLES_PATH_BASE % (ILLUSTRIS_RUN_NAMES[run], snap)
@@ -131,4 +135,14 @@ def SUBHALO_PARTICLES_FILENAMES(run, snap, subhalo):
 
 def SUBHALO_BRANCHES_FILENAMES(run):
     fileName = _SUBHALO_BRANCHES_SAVE_BASE % (ILLUSTRIS_RUN_NAMES[run], run)
+    return fileName
+
+
+def SUBHALO_FILENAMES_NUMBERS_FILENAMES(run, snap):
+    fileName = _SUBHALO_FILENAMES_NUMBERS_SAVE_BASE % (ILLUSTRIS_RUN_NAMES[run], run, snap)
+    return fileName
+
+
+def SUBHALO_RADIAL_PROFILES_FILENAMES(run, snap, name):
+    fileName = _SUBHALO_RADIAL_PROFILES_SAVE_BASE % (ILLUSTRIS_RUN_NAMES[run], run, snap, name)
     return fileName
