@@ -14,6 +14,7 @@ import numpy as np
 ### Physical Constants ###
 
 HPAR                  = 0.704                                                                       # Hubble parameter little h
+PC                    = 3.085678e+18                                                                # 1 pc  in cm
 KPC                   = 3.085678e+21                                                                # 1 kpc in cm
 MSOL                  = 1.989e+33                                                                   # 1 M_sol in g
 MPRT                  = 1.673e-24                                                                   # 1 proton mass in g
@@ -66,3 +67,12 @@ PARTICLE_TYPE_STAR    = 4
 PARTICLE_TYPE_BH      = 5
 PARTICLE_NAMES        = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
 
+# Indices for Different Photometric Bands
+PHOTO_U               = 0
+PHOTO_B               = 1
+PHOTO_V               = 2
+PHOTO_K               = 3
+PHOTO_g               = 4
+PHOTO_r               = 5
+PHOTO_i               = 6
+PHOTO_z               = 7
