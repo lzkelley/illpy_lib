@@ -55,7 +55,7 @@ PROFILE_VERSION   = 'version'
 
 
 
-def main(run=RUN, snap=SNAP, verbose=VERBOSE, plot=PLOT):
+def main(run=RUN, snap=SNAP, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
     if( verbose ): print "Analyzer.py"
     startMain = datetime.now()
@@ -63,14 +63,28 @@ def main(run=RUN, snap=SNAP, verbose=VERBOSE, plot=PLOT):
     # Create Radial Bins
     bins = np.logspace( *np.log10(RAD_EXTREMA), num=NUM_RAD_BINS+1 )
 
-    numsEpas  = NUMS_EPAS[run][:4]
-    numsNulls = NUMS_NULLS[run][:4]
+    numsEpas  = NUMS_EPAS[run]
+    numsNulls = NUMS_NULLS[run]
+
+
+    ### Load E+A Subhalo Profiles ###
 
     if( verbose ): print " - Loading EplusA Profiles"
     start = datetime.now()
-    profsEpas = loadProfiles(run, snap, numsEpas, bins, "epas", loadsave=False, verbose=verbose)
+    profsEpas = loadProfiles(run, snap, numsEpas, bins, "epas", loadsave=loadsave, verbose=verbose)
     stop = datetime.now()
     if( verbose ): print " - - Loaded after %s" % (str(stop-start))
+
+
+    ### Load Null Subhalo Profiles ###
+
+    if( verbose ): print " - Loading EplusA Profiles"
+    start = datetime.now()
+    profsNulls = loadProfiles(run, snap, numsNulls, bins, "nulls", loadsave=loadsave, verbose=verbose)
+    stop = datetime.now()
+    if( verbose ): print " - - Loaded after %s" % (str(stop-start))
+
+
 
     stopMain = datetime.now()
     if( verbose ): print " - Done after %s" % (str(stopMain-startMain))
@@ -86,10 +100,19 @@ def loadProfiles(run, snap, nums, bins, name, loadsave=True, verbose=VERBOSE):
     if( verbose ): print " - - Analzyer.loadProfiles()"
 
     fileName = SUBHALO_RADIAL_PROFILES_FILENAMES(run, snap, name)
+
+    ### Try To Load Existing Save File ###
+
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (fileName)
         if( os.path.exists(fileName) ):
             profiles = aux.npzToDict(fileName)
+            # Make sure 'version' matches
+            profVers = profiles[PROFILE_VERSION]
+            if( profVers != _VERSION ):
+                print "Loaded '%s' version %s, current %s" % (profVers, _VERSION)
+                loadsave = False
+
         else:
             print "``fileName`` '%s' does not exist!" % (fileName)
             loadsave = False
@@ -158,8 +181,12 @@ def getSubhaloRadialProfiles(data, bins=None, verbose=VERBOSE):
     nstars    = data[SNAPSHOT_NPART][PARTICLE_TYPE_STAR]
 
     ### Get Positions and Radii of Each Particle ###
-
-    posBH     = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_BH  ]]
+    bhmass = data[SNAPSHOT_BH_MASS]
+    posBH = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_BH  ]]
+    # If there are multiple BHs, use the most-massive as the CoM
+    if( len(bhmass) > 1 ):
+        bhind = np.argmax(bhmass)
+        posBH = posBH[bhind]
 
     # Subtract off BH position (i.e. define BH as center)
     posGas    = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_GAS ]] - posBH
