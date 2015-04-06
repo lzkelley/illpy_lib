@@ -9,4 +9,6 @@ __status__ = "Development"
 
 import Constants
 import SubhaloFinder
+import Analyzer
+import Figures
 from StellarLifetimes import StellarLifetimes
