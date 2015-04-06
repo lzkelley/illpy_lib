@@ -115,6 +115,20 @@ SNAPSHOT_PROPERTIES = [ SNAPSHOT_BH_MASS, SNAPSHOT_BH_HSML, SNAPSHOT_BH_MDOT, SN
                         SNAPSHOT_SFR, SNAPSHOT_VEL, SNAPSHOT_EINT ]
 
 
+
+### Subhalo Profiles ###
+
+PROFILE_BIN_EDGES = 'bin_edges'
+PROFILE_BIN_AVES  = 'bin_aves'
+PROFILE_GAS       = 'gas'
+PROFILE_STARS     = 'stars'
+PROFILE_DM        = 'dm'
+PROFILE_COLS      = 'cols'
+PROFILE_CREATED   = 'created'
+PROFILE_VERSION   = 'version'
+
+
+
 ### Intermediate Save Files ###
 
 _SUBHALO_PARTICLES_PATH_BASE     = BASE_PATH + "data/%s/subhalos/snap_%d/"
