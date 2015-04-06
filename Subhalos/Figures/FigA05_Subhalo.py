@@ -2,11 +2,18 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
+from .. Constants import *
+from .. Analyzer import getSubhaloRadialProfiles
+
 import PlotFuncs as pfunc
 import illpy
 from illpy.Constants import *
+from illpy import AuxFuncs as aux
 
-FIG_SIZE = [12, 8]
+
+NUM_RAD_BINS = 40
+
+FIG_SIZE = [10, 6]
 LEFT     = 0.1
 RIGHT    = 0.9
 BOTTOM   = 0.1
@@ -19,7 +26,7 @@ FS_TITLE = 16
 FS_LEGEND = 10
 LW = 2.0
 
-PS = 20                                                                                              # Point-size
+PS = 40                                                                                              # Point-size
 ALPHA = 0.4
 
 SCALE = 'log'
@@ -27,35 +34,52 @@ SCALE = 'log'
 DASHES = [8,4]
 DOTS = [3,2]
 
-DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a05_run-%d_subhalo-%d.png'
+DEF_FNAME = '/n/home00/lkelley/illustris/EplusA/Subhalos/output/subhalos/fig-a05_ill-%d_subhalo-%d.png'
 
+
+PART_TYPES = [ PARTICLE_TYPE_GAS, PARTICLE_TYPE_DM, PARTICLE_TYPE_STAR, PARTICLE_TYPE_BH ]
+
+
+
+distConv = DIST_CONV*1000/KPC                                                                       # Convert simulation units to [pc]
+densConv = DENS_CONV*np.power(PC, 3.0)/MSOL                                                         # Convert simulation units to [msol/pc^3]
+
+
+COL_GAS   = 'green'
+COL_STAR  = 'red'
+COL_DM    = '0.25'
+COL_BH    = 'black'
+
+MARK_GAS  = 'o'
+MARK_STAR = '*'
+MARK_DM   = '^'
+
+
+CMAP = plt.cm.jet
 
 def plotFigA05_Subhalo(run, num, data, fname=None, verbose=True):
 
     if( verbose ): print " - - FigA05_Subhalo.plotFigA05_Subhalo()"
 
-    if( fname is None ): fname = DEF_FNAME % (run)
+    if( fname is None ): fname = DEF_FNAME % (run, num)
 
 
-    numParts = data.npart_loaded
-    cumNumParts = np.concatenate([[0],np.cumsum(numParts)])
-    slices = [ slice( cumNumParts[ii], cumNumParts[ii+1] ) for ii in range(len(numParts)) ]
+    '''
+    #DM_MASS = data.masses[PARTICLE_TYPE_DM]
 
-    print "numParts = ", numParts
-    print "cumulative = ", cumNumParts
-    print "slices = ", slices
-    
-    return
-
+    posGas   = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_GAS ]]
+    posDM    = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_DM  ]]
+    posStars = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_STAR]]
+    posBH    = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_BH  ]]
+    '''
     
     ### Create Figure and Axes ###
-    fig, ax = plt.subplots(figsize=FIG_SIZE, nrows=2, ncols=2, squeeze=False)
+    fig, ax = plt.subplots(figsize=FIG_SIZE, nrows=1, ncols=1, squeeze=False)
     plt.subplots_adjust(left=LEFT, right=RIGHT, bottom=BOTTOM, hspace=HSPACE, top=TOP, wspace=WSPACE)
 
+    figa05_profiles_radial(ax[0,0], data, slices)
 
-    ## Plot Scatter SFR versus BH Mass
-    figa05_profles(ax[0,0], data)
-
+    #figa05_project_particles(ax[1,1], data, slices, PARTICLE_TYPE_STAR)
 
     # Add Legend
     '''
@@ -72,50 +96,90 @@ def plotFigA05_Subhalo(run, num, data, fname=None, verbose=True):
 
 
 
-def figa05_profiles(ax, args, sfr, sfr_sp=None, which=AXIS_BH, stats=None, stats_sp=None):
+def figa05_profiles_radial(ax0, data, slices):
 
     ### Configure Axes ###
-    xlabel = ""
+    xlabel = "Radius [pc]"
+    ylabel = r"Density [$M_\odot$/pc$^3$]"
+    pfunc.setAxis(ax0, axis='x', fs=FS, label=xlabel, scale=SCALE)
+    pfunc.setAxis(ax0, axis='y', fs=FS, label=ylabel, scale=SCALE)
+    #ax1 = pfunc.twinAxis(ax0, scale='linear', grid=False)
+
+    # Load Profiles
+    rads, hg, hs, hd, hc = getSubhaloRadialProfiles(data)
+    hc = np.array(hc)
+    cfunc, cnorm, cmap = pfunc.cmapColors([0.3, np.max(hc)], scale='linear', cmap=CMAP)
+    starCols = cfunc(hc)
+
+    # Plot Profiles
+    ax0.scatter(rads, hg, marker=MARK_GAS,  color=COL_GAS,  s=PS, alpha=ALPHA)
+    #ax0.scatter(rads, hs, marker=MARK_STAR, color=COL_STAR, s=PS, alpha=ALPHA)
+    ax0.scatter(rads, hs, marker=MARK_STAR, color=starCols, s=PS, alpha=ALPHA)
+    ax0.scatter(rads, hd, marker=MARK_DM,   color=COL_DM,   s=PS, alpha=ALPHA)
+
+    cbax = ax0.figure.add_axes([0.92, 0.2, 0.02, 0.6])
+    cb = mpl.colorbar.ColorbarBase(cbax, cmap=cmap, norm=cnorm, orientation='vertical')
+
+    return
+
+
+
+'''
+def figa05_project_particles(ax, data, slices, part):
+
+    ### Configure Axes ###
+    xlabel = "Radius [pc]"
     ylabel = ""
-    pfunc.setAxis(ax, axis='x', fs=FS, label=xlabel, scale=SCALE)
-    pfunc.setAxis(ax, axis='y', fs=FS, label=ylabel, scale=SCALE)
+    pfunc.setAxis(ax, axis='x', fs=FS, label=xlabel, scale='linear')
+    pfunc.setAxis(ax, axis='y', fs=FS, label=ylabel, scale='linear')
 
+    ngas     = data[SNAPSHOT_NPART][PARTICLE_TYPE_GAS]
+    nstars   = data[SNAPSHOT_NPART][PARTICLE_TYPE_STAR]
 
-    ### Plot SFR ###
+    # Get Positions of Particles
+    posBH = data[SNAPSHOT_POS][slices[PARTICLE_TYPE_BH]]
+    pos = (data[SNAPSHOT_POS][slices[part]] - posBH)*distConv
+    nums = len(pos)
+    maxPos = np.max( pos.flatten() )
 
-    s1 = ax.scatter(args, sfr, lw=LW, c=COL_SFR, marker='o', s=PS, alpha=ALPHA)
-    dots.append(s1)
-    names.append('SFR')
+    # Get weighting function
+    if(   part == PARTICLE_TYPE_GAS  ): val = data[SNAPSHOT_DENS][slices[part]]*densConv
+    elif( part == PARTICLE_TYPE_DM   ): val = [ data[SNAPSHOT_MASSES][part]*MASS_CONV ]*nums
+    elif( part == PARTICLE_TYPE_STAR ): val = data[SNAPSHOT_MASS][ngas:(ngas+nstars)]*MASS_CONV
+    elif( part == PARTICLE_TYPE_BH   ): val = [ data[SNAPSHOT_MASS][(ngas+nstars):] ]*nums
+    else: raise RuntimeError("Unknown ``part`` = %s" % (str(part)))
+
+    # Load effective sizes (smoothing lengths)
+    size = data[SNAPSHOT_SUBFIND_HSML][slices[part]]*distConv/10.0
     
+    minVal = np.min(val)
+    maxVal = np.max(val)
+    logScale = lambda xx: (np.log10(xx)-np.log10(minVal))/(np.log10(maxVal)-np.log10(minVal))
 
-    ### Plot Specific SFR on Second Axis ###
-
-    if( sfr_sp is not None ):
-        y2label = r'Specific SFR [(Msol/yr)/Msol]'
-        ax2 = pfunc.twinAxis(ax, twin='x', fs=FS, label=y2label, scale=SCALE, c=COL_SFR_SP, grid=False)
-        s2 = ax2.scatter(args, sfr_sp, lw=LW, c=COL_SFR_SP, marker='o', s=PS, alpha=ALPHA)
-        dots.append(s2)
-        names.append('Specific SFR')
-
-        if( stats_sp is not None ):
-            for st in stats_sp:
-                l1 = ax2.axhline(st, ls='-', lw=2*LW, color='0.5', alpha=0.5)
-                l1 = ax2.axhline(st, ls='--', lw=LW, color=COL_SFR_SP)
-                l1.set_dashes(DASHES)
-
-
-    if( stats is not None ):
-        for st in stats:
-            l1 = ax.axhline(st, ls='-', lw=2*LW, color='0.5')
-            l1 = ax.axhline(st, ls='--', lw=LW, color=COL_SFR)
-            l1.set_dashes(DASHES)
+    if(   part == PARTICLE_TYPE_GAS  ): 
+        scaleVal = logScale
+        col = COL_GAS
+    elif( part == PARTICLE_TYPE_DM   ): 
+        scaleVal = lambda xx: 0.2
+        col = COL_DM
+    elif( part == PARTICLE_TYPE_STAR ): 
+        scaleVal = logScale
+        col = COL_STAR
+    elif( part == PARTICLE_TYPE_BH   ): 
+        scaleVal = lambda xx: 0.5
+        col = COL_BH
 
 
+    for xx, vv, ss in zip(pos, val, size):
+        circ = plt.Circle((xx[0],xx[1]), ss, alpha=scaleVal(vv), color=col)
+        ax.add_artist(circ)
 
-    # Set xlimits to extrema
-    xlim = [np.min(args), np.max(args)]
-    ax.set_xlim(xlim)
 
-    return dots, names
+    ax.set_xlim([-maxPos,maxPos])
+    ax.set_ylim([-maxPos,maxPos])
+
+    return
+'''        
+
 
 
