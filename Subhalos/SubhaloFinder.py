@@ -254,7 +254,7 @@ def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBO
         if( not loadsave_flag ):
             if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
             subhaloData, groupCat = _getSubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
-            aux.saveDictNPZ(subhaloData, fileName, verbose=True)
+            aux.dictToNPZ(subhaloData, fileName, verbose=True)
 
 
         subhalos.append(subhaloData)
@@ -389,7 +389,7 @@ def loadSubhaloBranches(run, inds, tree, target, loadsave=True, verbose=VERBOSE)
         if( verbose ): print " - - Reloading subhalo branches from merger tree"
         #branches, snaps, subhaloInds = getSubhaloBranches(run, inds, tree, snapFirst, verbose=verbose)
         branches = _getSubhaloBranches(run, inds, tree, target, verbose=verbose)
-        illpy.AuxFuncs.saveDictNPZ(branches, saveFile, verbose=verbose)
+        aux.dictToNPZ(branches, saveFile, verbose=verbose)
 
 
     return branches
