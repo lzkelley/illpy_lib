@@ -45,8 +45,6 @@ import numpy as np
 from BHConstants import *
 
 from .. import AuxFuncs as aux
-from .. import Constants as const
-from .. import illcosmo
 
 from datetime import datetime
 
@@ -58,15 +56,15 @@ from datetime import datetime
 
 
 
-def processDetails(run, verbose=VERBOSE):
+def processDetails(run, loadsave=True, verbose=VERBOSE):
 
     if( verbose ): print " - - BHDetails.processDetails()"
 
     # Organize Details by Snapshot Time; create new, temporary ASCII Files
-    tempFiles = organizeDetails(run, verbose=verbose)
+    tempFiles = organizeDetails(run, loadsave=loadsave, verbose=verbose)
     
     # Create Dictionary Details Files
-    saveFiles = formatDetails(run, verbose=verbose)
+    saveFiles = formatDetails(run, loadsave=loadsave, verbose=verbose)
 
     return
 
@@ -172,6 +170,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
     if( verbose ): print " - - BHDetails._reorganizeBHDetailsFiles()"
 
     # Load cosmology
+    from illpy import illcosmo
     cosmo = illcosmo.Cosmology()
     snapScales = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot
 
@@ -587,7 +586,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         ### Form List(s) of Target BH IDs ###
 
         # Add mergers from next snapshot
-        if( snap < const.NUM_SNAPS-1 ):
+        if( snap < NUM_SNAPS-1 ):
             next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
             if( len(next) > 0 ): search = np.concatenate( (search, next) )
 
@@ -688,7 +687,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
 def _getPrecision(args):
     diffs  = np.diff(args)
-    minDiff = np.min( diffs[np.nonzero(diffs)] )
+    minDiff = np.min( np.fabs(diffs[np.nonzero(diffs)]) ) 
     order = int(np.log10(0.49*minDiff))
     return order
 
