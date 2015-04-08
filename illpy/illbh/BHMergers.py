@@ -47,6 +47,9 @@ Raises
 
 Notes
 -----
+ - 'Raw Mergers' : these are mergers directly from the illustris files with NO modifications or
+                   filtering of any kind.
+
    The underlying data is in the illustris bh merger files, 'blackhole_mergers_<#>.txt', which are
    processed by `_loadMergersFromIllustris()`.  Each line of the input files is processed by
    `_parseMergerLine()` which returns the redshift ('time') of the merger, and the IDs and masses
@@ -72,29 +75,6 @@ from BHConstants import *
 from .. import Cosmology
 from .. import AuxFuncs as aux
 
-
-
-'''
-def main(run=RUN, verbose=VERBOSE):
-"""
-    Load mergers from raw illustris files, save to intermediate npz files.
-
-    Arguments
-    ---------
-    run : int, Illustris simulation number {1,3}; default: `RUN`
-    verbose : bool, verbose output during execution; default: `VERBOSE`
-
-    """
-
-    if( verbose ): print "\nBHMergers.py\n"
-    if( verbose ): print " - Run '%d'" % (run)
-
-    run = 3
-
-    mergers = processMergers(run, verbose)
-
-    return
-'''
 
 
 
@@ -161,7 +141,7 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
 
 
 
-def loadMappedMergers(run, verbose=VERBOSE, remap=False ):
+def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
     """
     Load or create Mapped Mergers Dictionary as needed.
     """
@@ -170,27 +150,30 @@ def loadMappedMergers(run, verbose=VERBOSE, remap=False ):
 
     mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run)
 
-    if( not os.path.exists(mappedFilename) ):
-        if( verbose ): print " - - - Mapped file '%s' does not exist" % (mappedFilename)
-        remap = True
-
-
     ### Try to Load Existing Mapped Mergers ###
-    if( not remap ):
-        mergersMapped = np.load(mappedFilename)
-        mergersMapped = aux.npzToDict(mergersMapped)
-        if( verbose ): print " - - - Loaded from '%s'" % (mappedFilename)
-        loadVers = mergersMapped[MERGERS_VERSION]
-        # Make sure version matches, otherwise re-create mappings
-        if( loadVers != VERSION ):
-            loadTime = mergersMapped[MERGERS_CREATED]
-            print "BHMergers.loadMappedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-            print "BHMergers.loadMappedMergers() : VERSION %f, remapping!" % (VERSION)
-            remap = True
+    if( loadsave ):
+        if( verbose ): print " - - - Loading saved data from '%s'" % (mappedFilename)
+
+        # If file exists, load data
+        if( os.path.exists(mappedFilename) ):
+            mergersMapped = aux.npzToDict(mappedFilename)
+            if( verbose ): print " - - - Dictionary Loaded"
+            loadVers = mergersMapped[MERGERS_VERSION]
+            # Make sure version matches, otherwise re-create mappings
+            if( loadVers != VERSION ):
+                loadTime = mergersMapped[MERGERS_CREATED]
+                print "BHMergers.loadMappedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
+                print "BHMergers.loadMappedMergers() : VERSION %f, recreating new version!" % (VERSION)
+                loadsave = False
+
+        else:
+            print " - - - Mapped file '%s' does not exist" % (mappedFilename)
+            loadsave = False
+
 
 
     ### Recreate Mappings ###
-    if( remap ):
+    if( not loadsave ):
 
         # Load Raw Mergers
         scales, ids, masses, filename = loadRawMergers(run, verbose=verbose)
@@ -214,61 +197,83 @@ def loadMappedMergers(run, verbose=VERBOSE, remap=False ):
                           MERGERS_MAP_ONTOP : ontop,
                           }
 
-        aux.saveDictNPZ(mergersMapped, mappedFilename, verbose)
+        aux.dictToNPZ(mergersMapped, mappedFilename, verbose)
 
 
     return mergersMapped
 
+# loadMappedMergers()
 
 
-def loadFixedMergers(run, verbose=VERBOSE):
+
+def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
     
     if( verbose ): print " - - BHMergers.loadFixedMergers()"
 
     fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run)
 
-    if( not os.path.exists(fixedFilename) ):
-        if( verbose ): print " - - - Mapped file '%s' does not exist" % (fixedFilename)
-        remap = True
-
-
     ### Try to Load Existing Mapped Mergers ###
-    if( not remap ):
-        mergersFixed = np.load(fixedFilename)
-        mergersFixed = aux.npzToDict(mergersFixed)
-        if( verbose ): print " - - - Loaded from '%s'" % (fixedFilename)
-        loadVers = mergersFixed[MERGERS_VERSION]
-        # Make sure version matches, otherwise re-create mappings
-        if( loadVers != VERSION ):
-            loadTime = mergersFixed[MERGERS_CREATED]
-            print "BHMergers.loadFixedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-            print "BHMergers.loadFixedMergers() : VERSION %f, remapping!" % (VERSION)
-            remap = True
+    if( loadsave ):
+        if( verbose ): print " - - - Loading from save '%s'" % (fixedFilename)
+        if( os.path.exists(fixedFilename) ):
+            mergersFixed = aux.npzToDict(fixedFilename)
+            if( verbose ): print " - - - Loaded from '%s'" % (fixedFilename)
+            loadVers = mergersFixed[MERGERS_VERSION]
+            # Make sure version matches, otherwise re-create mappings
+            if( loadVers != VERSION ):
+                loadTime = mergersFixed[MERGERS_CREATED]
+                print "BHMergers.loadFixedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
+                print "BHMergers.loadFixedMergers() : VERSION %f, recreating!" % (VERSION)
+                loadsave = False
+                
+        else:
+            print " - - - '%s' does not exist.  Recreating." % (fixedFilename)
+            loadsave = False
 
 
-    ### Recreate Mappings ###
-    if( remap ):
 
-        # Load Raw Mergers
+    ### Recreate Fixed Mergers ###
+    if( not loadsave ):
+
+        # Load Mapped Mergers
         mergersMapped = loadMappedMergers(run, verbose=verbose)
-
+        # Fix Mergers
         mergersFixed = _fixMergers(run, mergersMapped, verbose=verbose)
-
-
-        aux.saveDictNPZ(mergersFixed, fixedFilename, verbose)
+        # Save
+        aux.dictToNPZ(mergersFixed, fixedFilename, verbose)
 
 
     return mergersFixed
 
+# loadFixedMergers()
+
 
 
 def _fixMergers(run, mergers, verbose=VERBOSE):
+    """
+    Filter and 'fix' input merger catalog.
+
+    This includes:
+     - Remove duplicate entries
+     - [TO-DO: FIX MERGER MASSES]
+
+    Arguments
+    ---------
+    run : <int>, illustris simulation number {1,3}
+    mergers : <dict>, input dictionary of unfiltered merger events
+    verbose : <bool>, optional=VERBOSE, print verbose output
+
+    Returns
+    -------
+    fixedMergers : <dict>, filtered merger dictionary
+
+    """
+
 
     if( verbose ): print " - - BHMergers._fixMergers()"
 
     # Make copy to modify
     fixedMergers = dict(mergers)
-
 
     ### Find and Remove Repeats ###
     ids = fixedMergers[MERGERS_IDS]
@@ -280,11 +285,13 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     badInds = []
     numMismatch = 0
 
-    # Iterate over all entries
+    if( verbose ): print " - - - Examining %d merger entries" % (len(sort))
+
+    ### Iterate over all entries ###
+
     for ii in xrange(len(sort)-1):
         
         this = ids[sort[ii]]
-
         jj = ii+1
 
         # Look through all examples of same BH_IN
@@ -294,14 +301,15 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
 
                 # Double check that time also matches
                 if( scales[sort[ii]] != scales[sort[jj]] ):
+                    '''
                     print 'sort[%d] = %d  matches  sort[%d] = %d' % (ii, sort[ii], jj, sort[jj])
                     print ids[sort[ii]]
                     print ids[sort[jj]]
                     print scales[sort[ii]]
                     print scales[sort[jj]]
                     print "\n"
+                    '''
                     numMismatch += 1
-                    #raise RuntimeError("Seemingly Duplicate IDs don't have matching times!")
 
                 badInds.append(sort[ii])
                 break
@@ -311,10 +319,10 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
         # } while
 
     # } ii
+
             
-    # print "\nBad Inds = ", badInds
-    print "numMismatch = ", numMismatch
-    print "len(badInds) = ", len(badInds)
+    if( verbose ): print " - - - Total number of duplicates = %d" % (len(badInds))
+    if( verbose ): print " - - - Number with mismatched times = %d" % (numMismatch)
 
     ### Remove Duplicate Entries ###
     for key in MERGERS_PHYSICAL_KEYS:
@@ -326,13 +334,14 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     fixedMergers[MERGERS_MAP_STOM ] = mapS2M
     fixedMergers[MERGERS_MAP_ONTOP] = ontop
     
-    # Change number and creation date
+    # Change number, creation date, and version
     oldNum = len(mergers[MERGERS_SCALES])
     newNum = len(fixedMergers[MERGERS_SCALES])
     fixedMergers[MERGERS_NUM] = newNum
     fixedMergers[MERGERS_CREATED] = datetime.now().ctime()
+    fixedMergers[MERGERS_VERSION] = VERSION
 
-    if( verbose ): print " - - - Num Mergers %d ==> %d" % (oldNum, newNum)
+    if( verbose ): print " - - - Number of Mergers %d ==> %d" % (oldNum, newNum)
 
     return fixedMergers
 
@@ -435,6 +444,7 @@ def _parseMergerLine(line):
 
     return time, out_id, out_mass, in_id, in_mass
 
+# _parseMergerLine()
 
 
 def _mapToSnapshots(scales, verbose=VERBOSE):
@@ -499,6 +509,8 @@ def _mapToSnapshots(scales, verbose=VERBOSE):
     if( verbose ): print " - - - %d (%.2f) ontop mergers" % (numOntop, 1.0*numOntop/nums)
 
     return mapM2S, mapS2M, ontop
+
+# _mapToSnapshots()
 
 
 
