@@ -1,5 +1,10 @@
+"""
+Constants for Blackhole related functions and submodules.
 
-import os
+
+"""
+
+
 import numpy as np
 from glob import glob
 
@@ -13,30 +18,30 @@ VERSION = 0.21
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
-_ILLUSTRIS_MERGERS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
-                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
-                            1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/" ]
-                            }
+_ILLUSTRIS_MERGERS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
+                                    2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
+                                    1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/" ]
+                                    }
 
-_ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
-                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
-                            1 : "" }
+_ILLUSTRIS_DETAILS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
+                                    2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
+                                    1 : "" }
 
 
 ### Post-Processing Parameters ###
-_PROCESSED_DIR                  = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
+#_PROCESSED_DIR                  = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
+_PROCESSED_DIR                  = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
 _MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
 _MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
 _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
-
 
 _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
 _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
@@ -156,7 +161,6 @@ def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
 
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
 
-
     filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
     files = []
     if( type(filesDir) != list ): filesDir = [ filesDir ]
@@ -202,20 +206,3 @@ def GET_DETAILS_SAVE_FILENAME(run, snap):
     fname += _DETAILS_SAVE_FILENAME % (run, snap, VERSION)
     return fname
 
-
-
-
-
-
-
-
-
-
-
-
-
-'''
-GET_PROCESSED_DIR = lambda run: _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-GET_MERGERS_PROCESSED_DIR = lambda run: _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-GET_DETAILS_PROCESSED_DIR = lambda run: _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-'''
