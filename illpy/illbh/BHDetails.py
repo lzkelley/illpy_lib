@@ -255,14 +255,13 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
         print " - - - Total temp size = '%s', average = '%s'" % (sizeStr, aveSizeStr)
 
 
-    inLines = aux.countLines(rawFilenames)
-    outLines = aux.countLines(tempFilenames)
+    inLines = aux.countLines(rawFilenames, progress=True)
+    outLines = aux.countLines(tempFilenames, progress=True)
     if( verbose ): print " - - - Input lines = %d, Output lines = %d" % (inLines, outLines)
     if( inLines != outLines ): 
         print "in  file: ", rawFilenames[0]
         print "out file: ", tempFilenames[0]
         raise RuntimeError("WARNING: input lines = %d, output lines = %d!" % (inLines, outLines))
-
 
 
     return
