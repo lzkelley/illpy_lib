@@ -23,7 +23,7 @@ import warnings
 import os
 import sys
 import types
-import datetime
+from datetime import datetime
 import matplotlib                  as mpl
 from matplotlib import pyplot      as plt
 
@@ -651,17 +651,34 @@ def getFileSize(fnames, precision=1):
 
 
 
-def countLines(files):
+def countLines(files, progress=False):
     """ Count the number of lines in the given file """
 
     # If string, or otherwise not-iterable, convert to list
     if( not iterableNotString(files) ): files = [ files ]
 
+    if( progress ):
+        numFiles = len(files)
+        if( numFiles < 100 ): interval = 1
+        else:                 interval = np.int(np.floor(numFiles/100.0))
+        start = datetime.now()
+
     nums = 0
     # Iterate over each file
-    for fil in files:
+    for ii,fil in enumerate(files):
         # Count number of lines
         nums += sum(1 for line in open(fil))
+
+        # Print progresss
+        if( progress ):
+            now = datetime.now()
+            dur = now-start
+
+            statStr = aux.statusString(ii+1, numFiles, dur)
+            sys.stdout.write('\r - - - %s' % (statStr))
+            sys.stdout.flush()
+            if( ii+1 == numFiles ): sys.stdout.write('\n')
+
 
     return nums
 
