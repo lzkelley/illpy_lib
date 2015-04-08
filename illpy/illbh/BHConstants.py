@@ -5,7 +5,7 @@ from glob import glob
 
 
 VERBOSE = True
-VERSION = 0.2
+VERSION = 0.21
 
 
 ### Illustris Parameters ###
@@ -161,7 +161,7 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_RAW_COMBINED_FILENAME % (run, VERSION)
+    fname += _MERGERS_RAW_COMBINED_FILENAME % (run)
     return fname
 
 
