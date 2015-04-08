@@ -51,31 +51,6 @@ from .. import illcosmo
 from datetime import datetime
 
 
-### Default Runtime Parameters ###
-RUN = 3                                                                                             # Default Illustris run to load {1,3}
-VERBOSE = True                                                                                      # Print verbose output during execution
-
-REDO_TEMP = False                                                                                   # Re-create temporary files
-REDO_SAVE = False                                                                                   # Re-create NPZ save files
-CLEAN_TEMP = False                                                                                  # Delete temporary files after NPZ are created
-
-# Where to find the 'raw' Illustris Merger files
-_DETAILS_FILE_DIRS = { 3:'/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/' }
-_DETAILS_FILE_NAMES = "blackhole_details_*.txt"                                                     # Glob regex to match details files
-
-_PRINT_INTERVAL = 2e4                                                                               # Interval at which to print status
-
-
-# Where to save intermediate files
-_DETAILS_DIR = "ill-%d_bh-details/"
-_DET_TEMP_NAME = "ill-%d_details_snap-%d_temp.txt"
-_DET_SAVE_NAME = "ill-%d_details_snap-%d.npz"
-
-details_temp_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_TEMP_NAME % (x,y))
-details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAVE_NAME % (x,y))
-
-
-
 
 ###  ===================================  ###
 ###  =============  MAIN  ==============  ###
@@ -83,146 +58,187 @@ details_save_filename = lambda x,y: DATA_PATH + (_DETAILS_DIR % (x)) + (_DET_SAV
 
 
 
-def main(run=RUN, verbose=VERBOSE, redo_temp=REDO_TEMP, redo_save=REDO_SAVE):
+def processDetails(run, verbose=VERBOSE):
 
-    if( verbose ): print "\nBHDetails.py\n"
+    if( verbose ): print " - - BHDetails.processDetails()"
 
-    ### Load Variables and Parameters ###
+    # Organize Details by Snapshot Time; create new, temporary ASCII Files
+    tempFiles = organizeDetails(run, verbose=verbose)
+    
+    # Create Dictionary Details Files
+    saveFiles = formatDetails(run, verbose=verbose)
 
-    # Load cosmology
-    cosmo = illcosmo.Cosmology()
-    snapTimes = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot
+    return
 
-    ### Organize Details by Snapshot Time; create new, temporary ASCII Files ###
+# processDetails()
 
-    # See if all temp files already exist
-    tempFiles = [ details_temp_filename(run, snap) for snap in xrange(cosmo.num) ]
-    tempExist = aux.filesExist(tempFiles)
+
+
+
+def organizeDetails(run, loadsave=True, verbose=VERBOSE):
+
+    if( verbose ): print " - - BHDetails.organizeDetails()"
+
+    tempFiles = [ GET_DETAILS_TEMP_FILENAME(run, snap) for snap in xrange(NUM_SNAPS) ]
+
+    # Check if all temp files already exist
+    if( loadsave ):
+        tempExist = aux.filesExist(tempFiles)
+        if( not tempExist ):
+            if( verbose ): print " - - - Temp files do not exist '%s'" % (tempFiles[0])
+            loadsave = False
+
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
-    if( not tempExist or redo_temp ):
+    if( not loadsave ):
 
         # Get Illustris BH Details Filenames
-        if( verbose ): print " - Finding Illustris BH Details files"
-        detailsFiles = _getIllustrisDetailsFilenames(run, verbose)
-        if( len(detailsFiles) < 1 ): raise RuntimeError("Error no details files found!!")
+        if( verbose ): print " - - - Finding Illustris BH Details files"
+        rawFiles = GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
+        if( len(rawFiles) < 1 ): raise RuntimeError("Error no details files found!!")
 
         # Reorganize into temp files
-        if( verbose ): print " - Reorganizing details into temporary files"
-        _reorganizeBHDetails(detailsFiles, snapTimes, run, verbose=verbose)
-
-    else:
-        if( verbose ):
-            print " - All temporary files already exist."
-            note = ("   NOTE: if you would like to RE-create the temprary files, using the raw\n"
-                    "         Illustris `blackhole_details_#` files, then rerun BHDetails.py\n"
-                    "         with the ``REDO_TEMP`` flag set to ``True``.")
-            print note
+        if( verbose ): print " - - - Reorganizing details into temporary files"
+        _reorganizeBHDetailsFiles(run, rawFiles, tempFiles, verbose=verbose)
 
 
     # Confirm all temp files exist
     tempExist = aux.filesExist(tempFiles)
 
     # If files are missing, raise error
-    if( not tempExist ):
-        print "Temporary Files missing!  First file = '%s'" % (tempFiles[0])
+    if( tempExist ):
+        if( verbose ): print " - - - Temp files exist"
+    else:
+        print "Temporary Files still missing!  '%s'" % (tempFiles[0])
         raise RuntimeError("Temporary Files missing!")
 
 
+    return tempFiles
+
+# organizeDetails()
+
+
+
+def formatDetails(run, loadsave=True, verbose=VERBOSE):
+    
+    if( verbose ): print " - - BHDetails.formatDetails()"
+
     # See if all npz files already exist
-    saveFiles = [ details_save_filename(run, snap) for snap in xrange(cosmo.num) ]
-    saveExist = aux.filesExist(saveFiles)
+    saveFilenames = [ GET_DETAILS_SAVE_FILENAME(run, snap) for snap in xrange(NUM_SNAPS) ]
 
-    ### Convert temp ASCII Files, to new Details object files ###
+    # Check if all save files already exist, and correct versions
+    if( loadsave ):
+        saveExist = aux.filesExist(saveFilenames)
+        if( saveExist ):
+            dets = loadBHDetails(run, 0)
+            loadVers = dets[DETAILS_VERSION]
+            if( loadVers != VERSION ):
+                print "BHDetails.formatDetails() : loaded version %s from '%s'" % (str(loadVers), dets[DETAILS_FILE])
+                print "BHDetails.formatDetails() : current version %s" % (str(VERSION))
+                print "BHDetails.formatDetails() : re-converting Details files !!!"
+                loadsave = False
 
-    # If NPZ files don't exist, or we WANT to redo them, create NPZ files
-    if( not saveExist or redo_save ):
+        else:
+            print "BHDetails.formatDetails() : Save files do not exist e.g. '%s'" % (saveFilenames[0])
+            print "BHDetails.formatDetails() : converting raw Details files !!!"
+            loadsave = False
 
-        if( verbose ): print " - Converting temporary files to NPZ"
-        _convertDetailsASCIItoNPZ(cosmo.num, run, verbose=verbose)
 
-    else:
-        if( verbose ):
-            print " - All NPZ save files already exist."
-            note = ("   NOTE: if you would like to RE-create the npz save files, using the\n"
-                    "         existing temp files, then rerun BHDetails.py with the\n"
-                    "         ``REDO_SAVE`` flag set to ``True``.\n"
-                    "         To also re-create the temp files, use ``REDO_TEMP``.\n")
-            print note
+    if( not loadsave ):
+
+        if( verbose ): print " - - - Converting temporary files to NPZ"
+        _convertDetailsASCIItoNPZ(run, verbose=verbose)
 
 
     # Confirm save files exist
-    saveExist = aux.filesExist(saveFiles)
+    saveExist = aux.filesExist(saveFilenames)
 
     # If files are missing, raise error
+    if( saveExist ):
+        if( verbose ): print " - - - Save files exist."
     if( not saveExist ):
-        print "Save (NPZ) Files missing!  First file = '%s'" % (saveFiles[0])
-        raise RuntimeError("Save (NPZ) Files missing!")
-
-    return
-
-# main()
+        print "Save Files missing!  e.g. '%s'" % (saveFilenames[0])
+        raise RuntimeError("Save Files missing!")
 
 
+    return saveFilenames
 
+# formatDetails()
 
 
 
-###  =====================================================  ###
-###  ===========  PREPARE INTERMEDIATE FILES  ============  ###
-###  =====================================================  ###
+def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE):
 
+    if( verbose ): print " - - BHDetails._reorganizeBHDetailsFiles()"
 
+    # Load cosmology
+    cosmo = illcosmo.Cosmology()
+    snapScales = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot
 
-def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
-
-    numOldFiles = len(detFiles)
-
-    if( verbose ):
-        print " - - Counting lines in Illustris Details files"
-        numLines = aux.estimateLines(detFiles)
-        print " - - - Estimate %d (%.1e) lines in %d files" % (numLines, numLines, numOldFiles)
+    numRaw = len(rawFilenames)
 
 
     ### Open new ASCII, Temp details files ###
-    if( verbose ): print " - - Opening new files"
-    tempFiles = [ details_temp_filename(run,snap) for snap in xrange(len(times)) ]
     # Make sure path is okay
-    aux.checkPath(tempFiles[0])
-    tempFiles = [ open(tfil, 'w') for tfil in tempFiles ]
+    aux.checkPath(tempFilenames[0])
+    # Open each temp file
+    tempFiles = [ open(tfil, 'w') for tfil in tempFilenames ]
+    numTemp = len(tempFiles)
+
+
+    if( verbose ): print " - - - Organizing %d raw files into %d temp files" % (numRaw, numTemp)
 
     ### Iterate over all Illustris Details Files ###
-    if( verbose ): print " - - Sorting details into times of snapshots"
-    start = datetime.datetime.now()
-    count = 0
-    for ii,oldname in enumerate(detFiles):
+    if( verbose ): print " - - - Sorting details into times of snapshots"
+    start = datetime.now()
+    for ii,rawName in enumerate(rawFilenames):
 
-        # Iterate over each entry in file
-        for dline in open(oldname):
-            detTime = _DOUBLE( dline.split()[1] )
-            # Find the time bin given left edges (hence '-1'); include right-edges ('right=True')
-            snapNum = np.digitize([detTime], times, right=True) - 1
+        detLines = []
+        detScales = []
+        # Load all lines and entry scale-factors from raw details file
+        for dline in open(rawName):
+            detLines.append(dline)
+            # Extract scale-factor from line
+            detScale = DBL( dline.split()[1] )
+            detScales.append(detScale)
 
-            # Write line to apropriate file
-            tempFiles[snapNum].write( dline )
 
-            count += 1
+        # Convert to array
+        detLines  = np.array(detLines)
+        detScales = np.array(detScales)
+        # Get required precision in matching entry times (scales)
+        prec = _getPrecision(detScales)
 
-            # Print Progress
-            if( verbose ):
+        # Round snapshot scales to desired precision
+        roundScales = np.around(snapScales, -prec)
 
-                if( count % _PRINT_INTERVAL == 0 or count == numLines):
-                    # Find out current duration
-                    now = datetime.datetime.now()
-                    dur = now-start                                                                 # 'timedelta' object
+        # Find snapshots following each entry (right-edge) or equal (include right: 'right=True')
+        snapBins = np.digitize(detScales, roundScales, right=True)
 
-                    # Print status and time to completion
-                    statStr = aux.statusString(count, numLines, dur)
-                    sys.stdout.write('\r - - - %s' % (statStr))
-                    sys.stdout.flush()
+        # For each Snapshot, write appropriate lines
+        for jj in xrange(len(tempFiles)):
 
-            # } verbose
-        # } dline
+            inds = np.where( snapBins == jj )[0]
+            if( len(inds) > 0 ):
+                tempFiles[jj].writelines( detLines[inds] )
+
+        # } jj
+
+
+
+        # Print Progress
+        if( verbose ):
+            # Find out current duration
+            now = datetime.now()
+            dur = now-start
+
+            # Print status and time to completion
+            statStr = aux.statusString(ii+1, numRaw, dur)
+            sys.stdout.write('\r - - - - %s' % (statStr))
+            sys.stdout.flush()
+
+        # } verbose
+
     # } ii
 
     if( verbose ): sys.stdout.write('\n')
@@ -233,74 +249,84 @@ def _reorganizeBHDetails(detFiles, times, run, verbose=VERBOSE):
         newdf.close()
         fileSizes += os.path.getsize(newdf.name)
 
-    aveSize = fileSizes/(1.0*len(tempFiles))
+    if( verbose ): 
+        aveSize = fileSizes/(1.0*len(tempFiles))
+        sizeStr = aux.bytesString(fileSizes)
+        aveSizeStr = aux.bytesString(aveSize)
+        print " - - - Total temp size = '%s', average = '%s'" % (sizeStr, aveSizeStr)
 
-    sizeStr = aux.bytesString(fileSizes)
-    aveSizeStr = aux.bytesString(aveSize)
-    if( verbose ): print " - - Total temp file size = '%s', average = '%s'" % (sizeStr, aveSizeStr)
+
+    inLines = aux.countLines(rawFilenames)
+    outLines = aux.countLines(tempFilenames)
+    if( verbose ): print " - - - Input lines = %d, Output lines = %d" % (inLines, outLines)
+    if( inLines != outLines ): 
+        print "in  file: ", rawFilenames[0]
+        print "out file: ", tempFilenames[0]
+        raise RuntimeError("WARNING: input lines = %d, output lines = %d!" % (inLines, outLines))
+
+
 
     return
 
 
 
-def _convertDetailsASCIItoNPZ(numSnaps, run, verbose=VERBOSE):
+def _convertDetailsASCIItoNPZ(run, verbose=VERBOSE):
 
-    start = datetime.datetime.now()
+    start = datetime.now()
     filesSize = 0.0
     sav = None
 
-    for snap in xrange(numSnaps):
+    ### Iterate over all Snapshots, convert from ASCII to NPZ ###
 
-        tmp = details_temp_filename(run, snap)
-        sav = details_save_filename(run, snap)
+    # Go through snapshots in random order to make better estimate of duration
+    allSnaps = np.arange(NUM_SNAPS)
+    np.random.shuffle(allSnaps)
+
+    for ii,snap in enumerate(allSnaps):
+
+        tmp = GET_DETAILS_TEMP_FILENAME(run, snap)
+        sav = GET_DETAILS_SAVE_FILENAME(run, snap)
 
         # Load details from ASCII File
-        ids, times, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
+        ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
         # Store details in dictionary
         details = { DETAILS_NUM : len(ids),
                     DETAILS_RUN : run,
                     DETAILS_SNAP : snap,
-                    DETAILS_CREATED : datetime.datetime.now().ctime(),
-                    DETAILS_IDS    : ids,
-                    DETAILS_TIMES  : times,
-                    DETAILS_MASSES : masses,
-                    DETAILS_MDOTS  : mdots,
-                    DETAILS_RHOS   : rhos,
-                    DETAILS_CS     : cs }
+                    DETAILS_CREATED : datetime.now().ctime(),
+                    DETAILS_VERSION : VERSION,
+                    DETAILS_FILE    : sav,
+                    
+                    DETAILS_IDS     : ids,
+                    DETAILS_SCALES  : scales,
+                    DETAILS_MASSES  : masses,
+                    DETAILS_MDOTS   : mdots,
+                    DETAILS_RHOS    : rhos,
+                    DETAILS_CS      : cs }
 
-        np.savez(sav, **details)
-        if( not os.path.exists(sav) ):
-            raise RuntimeError("Could not save to file '%s'!!" % (sav) )
-
+        # Save Dictionary
+        aux.dictToNPZ(details, sav)
 
         # Find and report progress
         if( verbose ):
             filesSize += os.path.getsize(sav)
 
-            now = datetime.datetime.now()
+            now = datetime.now()
             dur = now-start
 
-            statStr = aux.statusString(snap+1, numSnaps, dur)
+            statStr = aux.statusString(ii+1, NUM_SNAPS, dur)
             sys.stdout.write('\r - - - %s' % (statStr))
             sys.stdout.flush()
-            if( snap+1 == numSnaps ): sys.stdout.write('\n')
+            if( ii+1 == NUM_SNAPS ): sys.stdout.write('\n')
 
     # } snap
 
     if( verbose ):
-        aveFileSize = filesSize / numSnaps
+        aveFileSize = filesSize / NUM_SNAPS
         totSize = aux.bytesString(filesSize)
         aveSize = aux.bytesString(aveFileSize)
         print " - - - Saved Details NPZ files.  Total size = %s, Ave Size = %s" % (totSize, aveSize)
-        print " - - - - Last : '%s'" % (sav)
-
-    if( CLEAN_TEMP ):
-        if( verbose ): print " - - - Removing temporary files"
-        for snap in range(numSnaps):
-            os.remove( details_temp_filename(run, snap) )
-    else:
-        if( verbose ): print " - - - Temporary files are NOT being removed."
 
 
     return
@@ -314,12 +340,12 @@ def _loadBHDetails_ASCII(asciiFile, verbose=VERBOSE):
     nums = len(lines)
 
     # Allocate storage
-    ids    = np.zeros(nums, dtype=_LONG)
-    times  = np.zeros(nums, dtype=_DOUBLE)
-    masses = np.zeros(nums, dtype=_DOUBLE)
-    mdots  = np.zeros(nums, dtype=_DOUBLE)
-    rhos   = np.zeros(nums, dtype=_DOUBLE)
-    cs     = np.zeros(nums, dtype=_DOUBLE)
+    ids    = np.zeros(nums, dtype=LNG)
+    times  = np.zeros(nums, dtype=DBL)
+    masses = np.zeros(nums, dtype=DBL)
+    mdots  = np.zeros(nums, dtype=DBL)
+    rhos   = np.zeros(nums, dtype=DBL)
+    cs     = np.zeros(nums, dtype=DBL)
 
     count = 0
     # Iterate over lines, storing only those with content (should be all)
@@ -365,23 +391,7 @@ def _parseIllustrisBHDetailsLine(instr):
     # First element is 'BH=########', trim to just the id number
     args[0] = args[0].split("BH=")[-1]
 
-    return _LONG(args[0]), _DOUBLE(args[1]), _DOUBLE(args[2]), _DOUBLE(args[3]), _DOUBLE(args[4]), _DOUBLE(args[5])
-
-
-
-
-def _getIllustrisDetailsFilenames(run=RUN, verbose=VERBOSE):
-    detailsDir = _DETAILS_FILE_DIRS[run]
-    if( verbose ): print " - - Searching for run '%d' in '%s'" % (run, detailsDir)
-    detailsFilenames = detailsDir + _DETAILS_FILE_NAMES
-    detailsFiles = sorted(glob(detailsFilenames))
-    if( verbose ): print " - - - Found %d files" % (len(detailsFiles))
-    return detailsFiles
-
-
-
-
-
+    return LNG(args[0]), DBL(args[1]), DBL(args[2]), DBL(args[3]), DBL(args[4]), DBL(args[5])
 
 
 
@@ -394,10 +404,10 @@ def _getIllustrisDetailsFilenames(run=RUN, verbose=VERBOSE):
 
 
 
-def loadBHDetails_NPZ(run, snap):
-    detsName = details_save_filename(run,snap)
-    dat = np.load(detsName)
-    return dat
+def loadBHDetails(run, snap):
+    detsName = GET_DETAILS_SAVE_FILENAME(run, snap)
+    dets = aux.npzToDict(detsName)
+    return dets
 
 
 def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
@@ -453,7 +463,7 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     # If details not provided for this snapshot, load them
     if( details == None ):
         if( verbose ): print " - - - No details provided, loading for snapshot %d" % (snap)
-        details = loadBHDetails_NPZ(run, snap)
+        details = loadBHDetails(run, snap)
         if( verbose ): print " - - - - Loaded %d details" % (details[DETAILS_NUM])
 
     # Make sure these details match target snapshot and run
@@ -530,7 +540,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
     the previous snapshot for the last valid entry for the BH that couldn't be
     found in the current snapshot... that's annoying.
     Instead
-    
+
     """
 
 
@@ -546,12 +556,12 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
     ### Initialize Output Arrays ###
     # array[merger, in/out, bef/aft]
-    detID   = -1*np.ones([numMergers, 2, 2], dtype=_LONG)
-    detTime = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE) 
-    detMass = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
-    detMDot = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
-    detRho  = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
-    detCS   = -1*np.ones([numMergers, 2, 2], dtype=_DOUBLE)
+    detID   = -1*np.ones([numMergers, 2, 2], dtype=LNG)
+    detTime = -1*np.ones([numMergers, 2, 2], dtype=DBL)
+    detMass = -1*np.ones([numMergers, 2, 2], dtype=DBL)
+    detMDot = -1*np.ones([numMergers, 2, 2], dtype=DBL)
+    detRho  = -1*np.ones([numMergers, 2, 2], dtype=DBL)
+    detCS   = -1*np.ones([numMergers, 2, 2], dtype=DBL)
 
     # Create dictionary of details for mergers
     mergDets = { DETAILS_IDS    : detID,
@@ -577,10 +587,10 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         ### Form List(s) of Target BH IDs ###
 
         # Add mergers from next snapshot
-        if( snap < const.NUM_SNAPS-1 ): 
+        if( snap < const.NUM_SNAPS-1 ):
             next = np.array(mergers[MERGERS_MAP_STOM][snap+1])
             if( len(next) > 0 ): search = np.concatenate( (search, next) )
-        
+
         # Add mergers from previous snapshot
         if( snap > 0 ):
             prev = np.array(mergers[MERGERS_MAP_STOM][snap-1])
@@ -591,7 +601,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         searchNum = len(search)
 
         # Get all details (IDs and times) for this snapshot
-        dets     = loadBHDetails_NPZ(run, snap)
+        dets     = loadBHDetails(run, snap)
         detIDs   = dets[DETAILS_IDS]
         detTimes = dets[DETAILS_TIMES]
 
@@ -664,7 +674,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
         # Print progress
         count += len(bhids)
         if( verbose ):
-            now = datetime.now()        
+            now = datetime.now()
             statStr = aux.statusString(count, 3*2*numMergers, now-start)
             sys.stdout.write('\r - - - %s' % (statStr))
             sys.stdout.flush()
@@ -676,6 +686,11 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
 
 
+def _getPrecision(args):
+    diffs  = np.diff(args)
+    minDiff = np.min( diffs[np.nonzero(diffs)] )
+    order = int(np.log10(0.49*minDiff))
+    return order
 
 
-if __name__ == "__main__": main()
+
