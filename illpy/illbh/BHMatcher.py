@@ -4,6 +4,7 @@ Routines to match BH Mergers with BH Details entries based on times and IDs.
 
 """
 
+import os
 import numpy as np
 
 from datetime import datetime
@@ -20,9 +21,6 @@ from .. import Constants
 from .. import AuxFuncs as aux
 
 
-RUN = 3
-VERBOSE = True
-
 
 FST = BH_FIRST
 BEF = BH_BEFORE
@@ -36,42 +34,83 @@ AFT = BH_AFTER
 
 
 
-def main(run=RUN, verbose=VERBOSE):
+def main(run, verbose=VERBOSE):
 
     if( verbose ): print " - BHMatcher.py"
-
-    # Set Basic Parameters
-    mergers = BHMergers.loadMergers(run)
-    numMergers = mergers[MERGERS_NUM]
-
-    # Get Details for Mergers
-    if( verbose ): print " - - Matching Mergers to Details"
     start = datetime.now()
-    mergerDetails = detailsForMergers(mergers, run, verbose=verbose)
-    stop = datetime.now()
-    if( verbose ): print " - - - Mergers matched after %s" % (str(stop-start))
 
-    # Save merger details
-    saveFile = 'ill-%d_matched-merger-details_new.npz' % (run)
-    aux.saveDictNPZ(mergerDetails, saveFile, verbose=verbose)
+    # Load Mergers
+    mergers = BHMergers.loadFixedMergers(run)
+    numMergers = mergers[MERGERS_NUM]
+    if( verbose ): print " - - %d Mergers loaded" % (numMergers)
 
+    # Load Matching Details
+    mergerDetails = loadMergerDetails(run, mergers=mergers, verbose=verbose)
+    
     # Check Matches
     if( verbose ): print " - - Checking Matches"
-    start = datetime.now()
     checkMatches(mergerDetails, mergers)
+
     stop = datetime.now()
-    if( verbose ): print " - - - Checked after %s" % (str(stop-start))
-
-
-    if( verbose ): print " - Done"
+    if( verbose ): print " - Done after %s" % (str(stop-start))
 
     return
 
 
 
+def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
+
+    if( verbose ): print " - - BHMatcher.loadMergerDetails()"
+
+    saveFile = GET_MERGER_DETAILS_FILENAME(run)
+
+    ### Try to Load Existing Merger Details ###
+    if( loadsave ):
+        if( verbose ): print " - - - Loading save from '%s'" % (saveFile)
+
+        # Make sure file exists
+        if( os.path.exists(saveFile) ):
+            mergerDetails = aux.npzToDict(saveFile)
+            if( verbose ): print " - - - Loaded Merger Details"
+
+            # Make sure versions match
+            loadVers = mergerDetails[DETAILS_VERSION]
+            if( loadVers != VERSION ):
+                print "BHMatcher.loadMergerDetails() : version %s from '%s'" % \
+                    (str(loadVers), saveFile)
+                print "BHMatcher.loadMergerDetails() : Current version %s" % (str(VERSION))
+                print "BHMatcher.loadMergerDetails() : Rematching !!!"
+                loadsave = False
+
+        else:
+            loadsave = False
+                
+
+    ### Re-match Mergers with Details ###
+    if( not loadsave ):
+        if( verbose ): print " - - - Rematching mergers and details"
+
+        if( mergers is None ): mergers = BHMergers.loadFixedMergers(run)
+        if( verbose ): print " - - - - %d Mergers" % (mergers[MERGERS_NUM])
+    
+        # Get Details for Mergers
+        mergerDetails = detailsForMergers(run, mergers, verbose=verbose)
+        # Add meta-data
+        mergDets[DETAILS_RUN]     = run
+        mergDets[DETAILS_CREATED] = datetime.now().ctime()
+        mergDets[DETAILS_VERSION] = VERSION
+        mergDets[DETAILS_FILE]    = saveFile
+
+        # Save merger details
+        aux.dictToNPZ(mergerDetails, saveFile, verbose=verbose)
 
 
-def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
+    return mergerDetails
+
+
+
+
+def detailsForMergers(run, mergers, verbose=VERBOSE):
     """
     Given a set of mergers, retrieve corresponding 'details' entries for BHs.
 
@@ -82,8 +121,6 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
     ---------
     mergers : dict, data arrays for mergers
     run : int, illustris run number {1,3}
-    snapNums : array_like(int) (optional : None), particular snapshots in which
-               to match.  If `None` then all snapshots are used.
     verbose : bool (optional : ``VERBOSE``), flag to print verbose output.
 
     
@@ -93,7 +130,7 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
 
     """
 
-    if( verbose ): print " - - detailsForMergers()"
+    if( verbose ): print " - - BHMatcher.detailsForMergers()"
 
     numMergers = mergers[MERGERS_NUM]
     numSnaps   = Constants.NUM_SNAPS
@@ -101,71 +138,51 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
     # Search for all Mergers in each snapshot (easier, though less efficient)
     targets = np.arange(numMergers)
 
-    ### Choose target snapshots based on input; NOTE: must iterate in reverse ###
-    # Default to all snapshots
-    if( snapNums == None        ):
-        snapNumbers = reversed(xrange(numSnaps))
-        numSnapsHere = numSnaps
-    # If a list is given, make sure it is in reverse order
-    elif( np.iterable(snapNums) ):
-        snapNumbers = reversed(sorted(snapNums))
-        numSnapsHere = len(snapNums)
-    # If a single number given, make iterable (list)
-    else:
-        snapNumbers = [ snapNums ]
-        numSnapsHere = 1
+    snapNumbers = reversed(xrange(numSnaps))
 
+    matchInds  = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=LNG)
+    matchTimes = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=DBL)
 
-    matchInds  = -1  *np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=np.int64)
-    matchTimes = -1.0*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=np.float64)
 
     ### Create Dictionary To Store Results ###
 
     mergDets = {}
+
     # Initialize Dictionary to Invalid entries (-1)
     for KEY in DETAILS_PHYSICAL_KEYS:
-        if( KEY == DETAILS_IDS ): 
-            mergDets[KEY] = -1 * np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=_LONG  )
-        else:
-            mergDets[KEY] = -1.0*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=_DOUBLE)
+        if( KEY == DETAILS_IDS ): useType = ULNG
+        else:                     useType = DBL
+        mergDets[KEY] = -1 * np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=useType)
 
 
-    ### Iterate over Target Snapshots ###
-    if( verbose ): print " - - - Iterating over %d snapshots" % (numSnapsHere)
+
+    ### Iterate over all Snapshots ###
     startAll = datetime.now()
-
-    #for ii,snum in enumerate(range(95,97)):
     for ii,snum in enumerate(snapNumbers):
         startOne = datetime.now()
-        if( verbose ): print " - - - Snapshot %d/%d   # %d" % (ii, numSnapsHere, snum)
 
         ## Load appropriate Details File ##
-        start = datetime.now()
-        dets = BHDetails.loadBHDetails_NPZ(run, snum)
-        stop = datetime.now()
-        if( verbose ): print " - - - - Details loaded after %s" % (str(stop-start))
+        dets = BHDetails.loadBHDetails(run, snum)
 
         # If there are no details here, continue to next iter, but save BHs
-        if( dets[DETAILS_NUM] == 0 ):
-            if( verbose ): print " - - - - No details for snapshot %d" % (snum)
-            continue
+        if( dets[DETAILS_NUM] == 0 ): continue
 
         # Reset which matches are new
-        matchNew  = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=np.int32)
+        matchNew  = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=LNG)
+
+        print type(mergers[MERGERS_IDS][0,0])
+        print type(dets[DETAILS_IDS][0])
+
 
         ## Load Details Information ##
-        start = datetime.now()
         numMatches = getDetailIndicesForMergers(targets, mergers[MERGERS_IDS], 
-                                                mergers[MERGERS_TIMES], matchInds,
+                                                mergers[MERGERS_SCALES], matchInds,
                                                 matchTimes, matchNew,
-                                                dets[DETAILS_IDS], dets[DETAILS_TIMES])
+                                                dets[DETAILS_IDS], dets[DETAILS_SCALES])
 
-        stop = datetime.now()
-        if( verbose ): print " - - - - Snapshot Mergers Matched after %s" % (str(stop-start))
 
         ### Store Matches Data ###
 
-        start = datetime.now()
         # iterate over in/out BHs
         for BH in [BH_IN,BH_OUT]:
             # Iterate over match times
@@ -183,18 +200,17 @@ def detailsForMergers(mergers, run, snapNums=None, verbose=VERBOSE):
 
         # } BH
 
-        stop = datetime.now()
-        if( verbose ): print " - - - - Merger-Details stored after %s" % (str(stop-start))
+        
+        if( progress ):
+            now = datetime.now()
+            dur = now-start
+            statStr = aux.statusString(ii+1, numSnaps, dur)
+            sys.stdout.write('\r - - - %s' % (statStr))
+            sys.stdout.flush()
+            if( ii+1 == numSnaps ): sys.stdout.write('\n')
 
-        stopOne = datetime.now()
-        if( verbose ):
-            print " - - - - - %d matched After %s / %s" % (numMatches, str(stopOne-startOne), str(stopOne-startAll))
 
     # } ii
-
-    # Add Meta data to merger details
-    mergDets[DETAILS_RUN] = run
-    mergDets[DETAILS_CREATED] = datetime.now().ctime()
 
     return mergDets
 
@@ -233,7 +249,7 @@ def checkMatches(matches, mergers):
         # Iterate over match times
         for FBA in [FST, BEF, AFT]:
 
-            inds = np.where( matches[DETAILS_TIMES][:,BH,FBA] >= 0.0 )[0]
+            inds = np.where( matches[DETAILS_SCALES][:,BH,FBA] >= 0.0 )[0]
             good[inds, BH, FBA] = True
             num_str += "%5d  " % (len(inds))
     
@@ -270,8 +286,8 @@ def checkMatches(matches, mergers):
 
         for ii in sel:
             sel_id = inds[ii]
-            tmat = matches[DETAILS_TIMES][sel_id,BH_OUT,:]
-            tt = mergers[MERGERS_TIMES][sel_id]
+            tmat = matches[DETAILS_SCALES][sel_id,BH_OUT,:]
+            tt = mergers[MERGERS_SCALES][sel_id]
             print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (sel_id, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
@@ -296,8 +312,8 @@ def checkMatches(matches, mergers):
 
         print "       %s : %s" % ( bh_str[BH], num_str )
         if( eg is not None ):
-            tmat = matches[DETAILS_TIMES][sel_id,BH_OUT,:]
-            tt = mergers[MERGERS_TIMES][sel_id]
+            tmat = matches[DETAILS_SCALES][sel_id,BH_OUT,:]
+            tt = mergers[MERGERS_SCALES][sel_id]
             print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
@@ -310,19 +326,19 @@ def checkMatches(matches, mergers):
         # Iterate over match times
         for FBA in [FST, BEF, AFT]:
 
-            dt = matches[DETAILS_TIMES][:,BH,FBA]
-            mt = mergers[MERGERS_TIMES]
+            dt = matches[DETAILS_SCALES][:,BH,FBA]
+            mt = mergers[MERGERS_SCALES]
 
             if( FBA in [FST,BEF] ): inds = np.where( (good[:,BH,FBA]) & (dt >= mt) )[0]
-            else:                 inds = np.where( (good[:,BH,FBA]) & (dt <  mt) )[0]
+            else:                   inds = np.where( (good[:,BH,FBA]) & (dt <  mt) )[0]
 
             num_str += "%5d  " % (len(inds))
             if( len(inds) > 0 ): eg = inds[0]
             
         print "       %s : %s" % ( bh_str[BH], num_str )
         if( eg is not None ):
-            tmat = matches[DETAILS_TIMES][eg,BH_OUT,:]
-            tt = mergers[MERGERS_TIMES][eg]
+            tmat = matches[DETAILS_SCALES][eg,BH_OUT,:]
+            tt = mergers[MERGERS_SCALES][eg]
             print "\t\t%5d : %+f  %+f  (%+f)  %+f" % (eg, tmat[FST], tmat[BEF], tt, tmat[AFT])
 
 
