@@ -33,19 +33,19 @@ loadFixedMergers              : load dictionary of merger events with mappings, 
 Mergers Dictionary
 ------------------
 { MERGERS_RUN       : <int>, illustris simulation number in {1,3}
-  MERGERS_NUM       : <int>, total number of mergers `N` ,
+  MERGERS_NUM       : <int>, total number of mergers `N`
   MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
-  MERGERS_CREATED   :
-  MERGERS_VERSION   :
+  MERGERS_CREATED   : <str>, 
+  MERGERS_VERSION   : <float>,
 
-  MERGERS_SCALES    : array(`N`, <int>), the time of each merger [scale-factor] ,
-  MERGERS_IDS       :
-  MERGERS_MASSES    :
+  MERGERS_SCALES    : <int>[N], the time of each merger [scale-factor]
+  MERGERS_IDS       : <ulong>[N,2],
+  MERGERS_MASSES    : <double>[N,2], 
 
-  MERGERS_MAP_MTOS  :
-  MERGERS_MAP_STOM  :
-  MERGERS_MAP_ONTOP :
-
+  MERGERS_MAP_MTOS  : <int>[N], 
+  MERGERS_MAP_STOM  : <int>[136,list], 
+  MERGERS_MAP_ONTOP : <int>[136,list], 
+}
 
 Examples
 --------
@@ -82,7 +82,6 @@ Notes
 """
 
 import os, sys
-from glob import glob
 from datetime import datetime
 import numpy as np
 
