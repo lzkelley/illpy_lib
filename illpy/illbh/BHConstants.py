@@ -11,7 +11,7 @@ from glob import glob
 from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
 
 VERBOSE = True
-VERSION = 0.21
+VERSION = 0.22
 
 
 ### Illustris Parameters ###
@@ -30,7 +30,13 @@ _ILLUSTRIS_MERGERS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/
 
 _ILLUSTRIS_DETAILS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
                                     2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
-                                    1 : "" }
+                                    1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_details/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_details/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
+                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/" ]
+                                    }
 
 
 ### Post-Processing Parameters ###
@@ -46,6 +52,7 @@ _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
 _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
 _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
+_MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
 
 
 TYPE_ID      = ULNG
@@ -204,5 +211,11 @@ def GET_DETAILS_TEMP_FILENAME(run, snap):
 def GET_DETAILS_SAVE_FILENAME(run, snap):
     fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _DETAILS_SAVE_FILENAME % (run, snap, VERSION)
+    return fname
+
+
+def GET_MERGER_DETAILS_FILENAME(run):
+    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _MERGER_DETAILS_FILENAME % (run, VERSION)
     return fname
 
