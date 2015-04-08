@@ -3,16 +3,13 @@ import os
 import numpy as np
 from glob import glob
 
+from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
 
 VERBOSE = True
 VERSION = 0.21
 
 
 ### Illustris Parameters ###
-_ILLUSTRIS_RUN_NAMES  = { 1 : "L75n1820FP",
-                          2 : "L75n910FP",
-                          3 : "L75n455FP" }
-
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
@@ -31,30 +28,25 @@ _ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/b
                             1 : "" }
 
 
-NUM_SNAPS = 135
-
-
 ### Post-Processing Parameters ###
-_PROCESSED_DIR = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
-_PROCESSED_MERGERS_DIR = _PROCESSED_DIR + "blackhole_mergers/"
-_PROCESSED_DETAILS_DIR = _PROCESSED_DIR + "blackhole_details/"
+_PROCESSED_DIR                  = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
+_PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
+_PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
 _MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
-_MERGERS_RAW_MAPPED_FILENAME = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
-_MERGERS_FIXED_FILENAME     = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
+_MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
+_MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
 
 
-INT = np.int32
-FLT = np.float32
-DBL = np.float64
-LNG = np.int64
-ULNG = np.uint64
+_DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
+_DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
 
-TYPE_ID = ULNG
+
+TYPE_ID      = ULNG
 
 NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
-NUM_BH_TIMES = 3                                                                                    # There are 3 times, {DETAIL_BEFORE, DETAIL_AFTER, DETAIL_F
+NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
 
 
 # Key Names for Mergers Dictionary
@@ -99,6 +91,7 @@ DETAILS_CREATED = 'created'
 DETAILS_VERSION = 'version'
 DETAILS_NUM     = 'num'
 DETAILS_SNAP    = 'snap'
+DETAILS_FILE    = 'filename'
 
 DETAILS_IDS     = 'id'
 DETAILS_SCALES  = 'scales'
@@ -155,8 +148,29 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
         files += someFiles
 
     if( verbose ): print " - - - %d Total Files" % (len(files))
-    
+
     return files
+
+
+def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
+
+    if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
+
+
+    filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
+    files = []
+    if( type(filesDir) != list ): filesDir = [ filesDir ]
+
+    for fdir in filesDir:
+        filesNames = fdir + _ILLUSTRIS_DETAILS_FILENAME_REGEX
+        someFiles = sorted( glob(filesNames) )
+        if( verbose ): print " - - - '%s' : %d files" % (fdir, len(someFiles))
+        files += someFiles
+
+    if( verbose ): print " - - - %d Total Files" % (len(files))
+
+    return files
+
 
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
@@ -175,6 +189,29 @@ def GET_MERGERS_FIXED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _MERGERS_FIXED_FILENAME % (run, VERSION)
     return fname
+
+
+def GET_DETAILS_TEMP_FILENAME(run, snap):
+    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _DETAILS_TEMP_FILENAME % (run, snap)
+    return fname
+
+
+def GET_DETAILS_SAVE_FILENAME(run, snap):
+    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _DETAILS_SAVE_FILENAME % (run, snap, VERSION)
+    return fname
+
+
+
+
+
+
+
+
+
+
+
 
 
 '''
