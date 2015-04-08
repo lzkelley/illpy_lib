@@ -41,18 +41,18 @@ GYR                   = 1.0e9*YEAR
 ### Numerical Constants ###
 
 INT  = np.int32
-LONG = np.int64
+LNG  = np.int64
 FLT  = np.float32
 DBL  = np.float64
-
+ULNG = np.uint64
 
 ### Illustris Constants ###
 
 NUM_SNAPS             = 136
 
-ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
-                          2 : "L75n910FP",
-                          3 : "L75n455FP" }
+_ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
+                           2 : "L75n910FP",
+                           3 : "L75n455FP" }
 
 
 _ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
