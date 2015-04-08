@@ -39,9 +39,9 @@ _PROCESSED_DIR = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
 _PROCESSED_MERGERS_DIR = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR = _PROCESSED_DIR + "blackhole_details/"
 
-_MERGERS_RAW_COMBINED_FILENAME  = "blackhole_mergers_combined.txt"
-_MERGERS_RAW_MAPPED_FILENAME = "blackhole_mergers_mapped.npz"
-_MERGERS_FIXED_FILENAME     = "blackhole_mergers_fixed.npz"
+_MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
+_MERGERS_RAW_MAPPED_FILENAME = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
+_MERGERS_FIXED_FILENAME     = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
 
 
 INT = np.int32
@@ -161,23 +161,24 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_RAW_COMBINED_FILENAME
+    fname += _MERGERS_RAW_COMBINED_FILENAME % (run, VERSION)
     return fname
 
 
 def GET_MERGERS_RAW_MAPPED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_RAW_MAPPED_FILENAME
+    fname += _MERGERS_RAW_MAPPED_FILENAME % (run, VERSION)
     return fname
 
 
 def GET_MERGERS_FIXED_FILENAME(run):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_FIXED_FILENAME
+    fname += _MERGERS_FIXED_FILENAME % (run, VERSION)
     return fname
 
 
+'''
 GET_PROCESSED_DIR = lambda run: _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
 GET_MERGERS_PROCESSED_DIR = lambda run: _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
 GET_DETAILS_PROCESSED_DIR = lambda run: _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-
+'''
