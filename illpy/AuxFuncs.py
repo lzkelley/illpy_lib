@@ -470,7 +470,7 @@ def statusString(count, total, durat=None):
     """
 
     # Calculate Percentage completed
-    frac = 1.0*count/(total-1)
+    frac = 1.0*count/(total)
     stat = '%.2f%%' % (100*frac)
 
     if( durat != None ):
@@ -716,6 +716,7 @@ def filesExist(files):
         if( not os.path.exists(fil) ):
             allExist = False
             break
+
 
     return allExist
 
