@@ -20,14 +20,31 @@ VERBOSE : bool, whether or not to print verbose output by default
 
 Functions
 ---------
-main : initialize the intermediate npz file
-loadMergers : load merger data as a dictionary
-
+processMergers                : perform all processing methods, assures that save files are all 
+                                constructed.
+loadRawMergers                : load all merger entries, sorted by scalefactor, directly from 
+                                illustris merger files - without any processing/filtering.
+loadMappedMergers             : load dictionary of merger events with associated mappings to and
+                                from snapshots.
+loadFixedMergers              : load dictionary of merger events with mappings, which have been
+                                processed and filtered.
+                                
 
 Mergers Dictionary
 ------------------
-{ MERGERS_NUM   : <int>, total number of mergers `N` ,
-  MERGERS_TIMES : array(`N`, <int>), the time of each merger [scale-factor] ,
+{ MERGERS_RUN       : <int>, illustris simulation number in {1,3}
+  MERGERS_NUM       : <int>, total number of mergers `N` ,
+  MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
+  MERGERS_CREATED   :
+  MERGERS_VERSION   :
+
+  MERGERS_SCALES    : array(`N`, <int>), the time of each merger [scale-factor] ,
+  MERGERS_IDS       :
+  MERGERS_MASSES    :
+
+  MERGERS_MAP_MTOS  :
+  MERGERS_MAP_STOM  :
+  MERGERS_MAP_ONTOP :
 
 
 Examples
@@ -49,6 +66,7 @@ Notes
 -----
  - 'Raw Mergers' : these are mergers directly from the illustris files with NO modifications or
                    filtering of any kind.
+
 
    The underlying data is in the illustris bh merger files, 'blackhole_mergers_<#>.txt', which are
    processed by `_loadMergersFromIllustris()`.  Each line of the input files is processed by
@@ -94,8 +112,6 @@ def processMergers(run, verbose=VERBOSE):
 
 
 
-
-
 def loadRawMergers(run, verbose=VERBOSE, recombine=False):
     """
     Load raw merger events into dictionary.
@@ -121,12 +137,12 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
 
 
     ### Load Raw Data from Merger Files ###
-    if( verbose ): print " - - Importing Merger Data"
+    if( verbose ): print " - - - Importing Merger Data"
     scales, ids, masses = _importRawMergers(combinedFilename, verbose=verbose)
 
 
     ### Sort Data by Time ###
-    if( verbose ): print " - - Sorting Data"
+    if( verbose ): print " - - - Sorting Data"
 
     # Find indices which sort by time
     inds = np.argsort(scales)
@@ -138,6 +154,7 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
 
     return scales, ids, masses, combinedFilename
 
+# loadRawMergers()
 
 
 
