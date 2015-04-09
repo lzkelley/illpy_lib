@@ -12,11 +12,14 @@ from BHConstants import BH_BEFORE as BEF
 from BHConstants import BH_AFTER  as AFT
 from BHConstants import BH_FIRST  as FST
 
+# A uint64 type (works with np.uint64)
+ctypedef unsigned long long ULNG
 
-def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[long,   ndim=2] mid, 
+
+def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[ULNG,   ndim=2] mid, 
                                np.ndarray[double, ndim=1] mtime,   np.ndarray[long,   ndim=3] lind,
-                               np.ndarray[double, ndim=3] ltime,   np.ndarray[int,    ndim=3] mnew,
-                               np.ndarray[long,   ndim=1] detid,   np.ndarray[double, ndim=1] dtime ):
+                               np.ndarray[double, ndim=3] ltime,   np.ndarray[long,   ndim=3] mnew,
+                               np.ndarray[ULNG,   ndim=1] detid,   np.ndarray[double, ndim=1] dtime ):
     """
     Match merger BHs to details entries based on IDs and merger times.
 
