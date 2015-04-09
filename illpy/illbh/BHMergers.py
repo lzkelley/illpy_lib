@@ -38,7 +38,7 @@ Mergers Dictionary
   MERGERS_CREATED   : <str>, 
   MERGERS_VERSION   : <float>,
 
-  MERGERS_SCALES    : <int>[N], the time of each merger [scale-factor]
+  MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
   MERGERS_IDS       : <ulong>[N,2],
   MERGERS_MASSES    : <double>[N,2], 
 
@@ -92,6 +92,8 @@ from BHConstants import *
 from .. import Cosmology
 from .. import AuxFuncs as aux
 
+
+VERSION = 0.21
 
 
 
@@ -164,7 +166,7 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
     if( verbose ): print " - - BHMergers.loadMappedMergers()"
 
-    mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run)
+    mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION)
 
     ### Try to Load Existing Mapped Mergers ###
     if( loadsave ):
@@ -226,7 +228,7 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
     
     if( verbose ): print " - - BHMergers.loadFixedMergers()"
 
-    fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run)
+    fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run, VERSION)
 
     ### Try to Load Existing Mapped Mergers ###
     if( loadsave ):
