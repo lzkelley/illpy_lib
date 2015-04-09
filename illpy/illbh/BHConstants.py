@@ -11,7 +11,7 @@ from glob import glob
 from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
 
 VERBOSE = True
-VERSION = 0.22
+#VERSION = 0.22
 
 
 ### Illustris Parameters ###
@@ -190,15 +190,15 @@ def GET_MERGERS_RAW_COMBINED_FILENAME(run):
     return fname
 
 
-def GET_MERGERS_RAW_MAPPED_FILENAME(run):
+def GET_MERGERS_RAW_MAPPED_FILENAME(run, version):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_RAW_MAPPED_FILENAME % (run, VERSION)
+    fname += _MERGERS_RAW_MAPPED_FILENAME % (run, version)
     return fname
 
 
-def GET_MERGERS_FIXED_FILENAME(run):
+def GET_MERGERS_FIXED_FILENAME(run, version):
     fname = _PROCESSED_MERGERS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGERS_FIXED_FILENAME % (run, VERSION)
+    fname += _MERGERS_FIXED_FILENAME % (run, version)
     return fname
 
 
@@ -208,14 +208,14 @@ def GET_DETAILS_TEMP_FILENAME(run, snap):
     return fname
 
 
-def GET_DETAILS_SAVE_FILENAME(run, snap):
+def GET_DETAILS_SAVE_FILENAME(run, snap, version):
     fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _DETAILS_SAVE_FILENAME % (run, snap, VERSION)
+    fname += _DETAILS_SAVE_FILENAME % (run, snap, version)
     return fname
 
 
-def GET_MERGER_DETAILS_FILENAME(run):
+def GET_MERGER_DETAILS_FILENAME(run, version):
     fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGER_DETAILS_FILENAME % (run, VERSION)
+    fname += _MERGER_DETAILS_FILENAME % (run, version)
     return fname
 
