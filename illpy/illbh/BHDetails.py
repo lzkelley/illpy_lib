@@ -49,7 +49,7 @@ from .. import AuxFuncs as aux
 from datetime import datetime
 
 
-VERSION = 0.22                                                                                      # Version of BHDetails
+VERSION = 0.23                                                                                      # Version of BHDetails
 
 _DEF_PRECISION = -8                                                                                 # Default precision
 
@@ -395,7 +395,7 @@ def _loadBHDetails_ASCII(asciiFile, verbose=VERBOSE):
     nums = len(lines)
 
     # Allocate storage
-    ids    = np.zeros(nums, dtype=LNG)
+    ids    = np.zeros(nums, dtype=TYPE_ID)
     times  = np.zeros(nums, dtype=DBL)
     masses = np.zeros(nums, dtype=DBL)
     mdots  = np.zeros(nums, dtype=DBL)
@@ -446,7 +446,7 @@ def _parseIllustrisBHDetailsLine(instr):
     # First element is 'BH=########', trim to just the id number
     args[0] = args[0].split("BH=")[-1]
 
-    return LNG(args[0]), DBL(args[1]), DBL(args[2]), DBL(args[3]), DBL(args[4]), DBL(args[5])
+    return TYPE_ID(args[0]), DBL(args[1]), DBL(args[2]), DBL(args[3]), DBL(args[4]), DBL(args[5])
 
 
 
@@ -666,7 +666,7 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
     ### Initialize Output Arrays ###
     # array[merger, in/out, bef/aft]
-    detID   = -1*np.ones([numMergers, 2, 2], dtype=LNG)
+    detID   = -1*np.ones([numMergers, 2, 2], dtype=TYPE_ID)
     detTime = -1*np.ones([numMergers, 2, 2], dtype=DBL)
     detMass = -1*np.ones([numMergers, 2, 2], dtype=DBL)
     detMDot = -1*np.ones([numMergers, 2, 2], dtype=DBL)
