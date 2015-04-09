@@ -49,6 +49,11 @@ from .. import AuxFuncs as aux
 from datetime import datetime
 
 
+VERSION = 0.22                                                                                      # Version of BHDetails
+
+_DEF_PRECISION = -8                                                                                 # Default precision
+
+
 
 ###  ===================================  ###
 ###  =============  MAIN  ==============  ###
@@ -122,7 +127,7 @@ def formatDetails(run, loadsave=True, verbose=VERBOSE):
     if( verbose ): print " - - BHDetails.formatDetails()"
 
     # See if all npz files already exist
-    saveFilenames = [ GET_DETAILS_SAVE_FILENAME(run, snap) for snap in xrange(NUM_SNAPS) ]
+    saveFilenames = [ GET_DETAILS_SAVE_FILENAME(run, snap, VERSION) for snap in xrange(NUM_SNAPS) ]
 
     # Check if all save files already exist, and correct versions
     if( loadsave ):
@@ -172,7 +177,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
     # Load cosmology
     from illpy import illcosmo
     cosmo = illcosmo.Cosmology()
-    snapScales = cosmo.snapshotTimes()                                                               # Scale-factor of each snapshot
+    snapScales = cosmo.snapshotTimes()                                                              # Scale-factor of each snapshot
 
     numRaw = len(rawFilenames)
 
@@ -192,8 +197,8 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
     start = datetime.now()
     for ii,rawName in enumerate(rawFilenames):
 
-        detLines = []
-        detScales = []
+        detLines = []                                                                               # Store each line of input details files
+        detScales = []                                                                              # Store each scale factor of entries
         # Load all lines and entry scale-factors from raw details file
         for dline in open(rawName):
             detLines.append(dline)
@@ -205,8 +210,17 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
         # Convert to array
         detLines  = np.array(detLines)
         detScales = np.array(detScales)
+
         # Get required precision in matching entry times (scales)
-        prec = _getPrecision(detScales)
+        try:
+            prec = _getPrecision(detScales)
+        # Set to a default value on error (not sure what's causing it)
+        except ValueError, err:
+            print "BHDetails._reorganizeBHDetailsFiles() : caught error '%s'" % (str(err))
+            print "\tii = %d; file = '%s'" % (ii, rawName)
+            print "\tlen(detScales) = ", len(detScales)
+            prec = _DEF_PRECISION
+
 
         # Round snapshot scales to desired precision
         roundScales = np.around(snapScales, -prec)
@@ -283,7 +297,7 @@ def _convertDetailsASCIItoNPZ(run, verbose=VERBOSE):
     for ii,snap in enumerate(allSnaps):
 
         tmp = GET_DETAILS_TEMP_FILENAME(run, snap)
-        sav = GET_DETAILS_SAVE_FILENAME(run, snap)
+        sav = GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
 
         # Load details from ASCII File
         ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
@@ -403,7 +417,7 @@ def _parseIllustrisBHDetailsLine(instr):
 
 
 def loadBHDetails(run, snap):
-    detsName = GET_DETAILS_SAVE_FILENAME(run, snap)
+    detsName = GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
     dets = aux.npzToDict(detsName)
     return dets
 
@@ -685,10 +699,17 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
 
 def _getPrecision(args):
-    diffs  = np.diff(args)
-    minDiff = np.min( np.fabs(diffs[np.nonzero(diffs)]) ) 
+    """
+
+    """
+
+    diffs = np.fabs(np.diff(sorted(args)))
+    inds  = np.nonzero(diffs)
+    if( len(inds) > 0 ): minDiff = np.min( diffs[inds] )
+    else:                minDiff = np.power(10.0, _DEF_PRECISION)
     order = int(np.log10(0.49*minDiff))
     return order
 
+# _getPrecision()
 
 
