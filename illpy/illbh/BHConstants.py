@@ -54,6 +54,11 @@ _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.n
 
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
 
+_BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
+
+
+
+
 
 TYPE_ID      = ULNG
 
@@ -112,13 +117,8 @@ DETAILS_MDOTS   = 'mdots'
 DETAILS_RHOS    = 'rhos'
 DETAILS_CS      = 'cs'
 
-
-
 DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_SCALES, DETAILS_MASSES,
                           DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
-
-
-
 
 
 ### BH Merger Tree ###
@@ -127,15 +127,13 @@ TREE_LAST         = 'last'
 TREE_NEXT         = 'next'
 TREE_LAST_TIME    = 'lastTime'
 TREE_NEXT_TIME    = 'nextTime'
-TREE_CREATED      = 'created'
-TREE_RUN          = 'run'
 TREE_NUM_FUTURE   = 'numFuture'
 TREE_NUM_PAST     = 'numPast'
 TREE_TIME_BETWEEN = 'timeBetween'
+
+TREE_CREATED      = 'created'
+TREE_RUN          = 'run'
 TREE_VERSION      = 'version'
-
-
-
 
 
 
@@ -219,3 +217,8 @@ def GET_MERGER_DETAILS_FILENAME(run, version):
     fname += _MERGER_DETAILS_FILENAME % (run, version)
     return fname
 
+
+def GET_BLACKHOLE_TREE_FILENAME(run, version):
+    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _BLACKHOLE_TREE_FILENAME % (run, version)
+    return fname
