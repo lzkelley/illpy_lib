@@ -23,7 +23,6 @@ import warnings
 import os
 import sys
 import types
-from datetime import datetime
 import matplotlib                  as mpl
 from matplotlib import pyplot      as plt
 
@@ -661,7 +660,7 @@ def countLines(files, progress=False):
         numFiles = len(files)
         if( numFiles < 100 ): interval = 1
         else:                 interval = np.int(np.floor(numFiles/100.0))
-        start = datetime.now()
+        start = datetime.datetime.now()
 
     nums = 0
     # Iterate over each file
@@ -671,7 +670,7 @@ def countLines(files, progress=False):
 
         # Print progresss
         if( progress ):
-            now = datetime.now()
+            now = datetime.datetime.now()
             dur = now-start
 
             statStr = aux.statusString(ii+1, numFiles, dur)
