@@ -1,3 +1,9 @@
+"""
+Construct and/or load a Blackhole Merger tree from the illustris blackhole merger data.
+
+
+"""
+
 
 import numpy as np
 from datetime import datetime
@@ -13,130 +19,91 @@ import pyximport
 pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 import BuildTree
 
-RUN      = 3                                                                                        # Which illustris simulation to target
-VERBOSE  = True
-_VERSION = 0.1
-LOAD     = False
 
-MYR = (1.0e6)*YEAR
-
-_TREE_SAVE_FILENAME = "ill-%d_bh-tree_v%.1f.npz"
-bhTree_filename = lambda xx : DATA_PATH + (_TREE_SAVE_FILENAME % (xx, _VERSION))
+VERSION = 0.21
 
 
 
-###  ==============================================================  ###
-###  ===========================  MAIN  ===========================  ###
-###  ==============================================================  ###
-
-
-
-def main(run=RUN, load=LOAD, verbose=VERBOSE):
-
-    print " - BHTree.py"
-
-    start_time  = datetime.now()
-
-    ### Load Repeated Mergers ###
-    tree = getTree(run, load=False, verbose=verbose)
-
-    end_time    = datetime.now()
-    durat       = end_time - start_time
-
-    print " - - Done after %s\n\n" % (str(durat))
-
-    return
-
-# main()
-
-
-
-def getTree(run, mergers=None, load=False, verbose=VERBOSE):
+def loadTree(run, mergers=None, loadsave=True, verbose=VERBOSE):
     """
     Load tree data from save file if possible, or recalculate directly.
 
     Arguments
     ---------
-    run : <int>
-        Illlustris run number {1,3}
-    mergers : <dict>, (optional=None), BHMergers.py mergers
-        Contains merger information.  If `None`, reloaded from BHMergers
-    load : <bool>, (optional=False)
-        Reload tree data directly from merger data
-    verbose : <bool>, (optional=VERBOSE)
-        Print verbose output
+    run      : <int>, Illlustris run number {1,3}
+    mergers  : <dict>, (optional=None), BHMerger data, reloaded if not provided
+    loadsave : <bool>, (optional=True), try to load tree data from previous save
+    verbose  : <bool>, (optional=VERBOSE), Print verbose output
 
     Returns
     -------
-    tree : <dict>
-        container for tree data - see BHTree doc
+    tree     : <dict>, container for tree data - see BHTree doc
 
     """
 
-    if( verbose ): print " - - BHTree.getTree()"
+    if( verbose ): print " - - BHTree.loadTree()"
 
-    fname = bhTree_filename(run)
+    fname = GET_BLACKHOLE_TREE_FILENAME(run, VERSION)
 
-    recalc_flag = False
-    if( load ):
-        recalc_flag = load
 
-    # If save file doesn't exist, must recalculate
-    if( not os.path.exists(fname) ):
-        if( verbose ): print " - - - No existing file '%s'" % ( fname )
-        recalc_flag = True
+    ### Reload existing BH Merger Tree ###
+
+    if( loadsave ):
+        if( verbose ): print " - - - Loading save file '%s'" % (fname)
+
+        if( os.path.exists(fname) ):
+            tree  = aux.npzToDict(fname)
+            loadVers = tree[TREE_VERSION]
+            if( loadVers != VERSION ):
+                loadsave = False
+                print "BHTree.loadTree() : loaded  version '%s'" % (str(loadVers))
+                print "BHTree.loadTree() : current version '%s'" % (str(VERSION ))
+            else:
+                if( verbose ): print " - - - Loaded."
+
+        else:
+            print "BHTree.loadTree() : save file does not exist!"
+            loadsave = False
+
     
 
-    ### Recalculate Tree Data from Mergers ###
-    if( recalc_flag ):
+    ### Recreate BH Merger Tree ###
 
+    if( not loadsave ):
+        if( verbose ): print " - - - Reconstructing BH Merger Tree"
+
+        # Load Mergers if needed
         if( mergers is None ):
-            print " - - - No mergers provided, loading"
+            if( verbose ): print " - - - - No mergers provided, loading"
             mergers = BHMergers.loadMergers(run)
 
-        print " - - - Finding Merger Tree from Merger Data"
 
-        start = datetime.now()
-        ### Build Tree ###
-        tree = constructBHTree(run, mergers)
+        # Construct Tree 
+        if( verbose ): print " - - - - Constructing Tree"
+        tree = _constructBHTree(run, mergers, verbose=verbose)
     
-        ### Analyze Tree Data ###
+        # Analyze Tree Data, store meta-data to tree dictionary
         timeBetween, numPast, numFuture = analyzeTree(tree, verbose=verbose)
 
         # Save Tree data
-        aux.saveDictNPZ(tree, fname, verbose=True)
-        stop = datetime.now()
-        if( verbose ): print " - - - - Done after %s" % (str(stop-start))
-
-    ### Load Tree Data from Existing Save ###
-    else:
-
-        if( verbose ) : print " - - - Loading Merger Tree from '%s'" % (fname)
-        start = datetime.now()
-        dat   = np.load(fname)
-        tree  = aux.npzToDict(dat)
-        stop  = datetime.now()
-        if( verbose ) : print " - - - - Loaded after %s" % (str(stop-start))
+        aux.dictToNPZ(tree, fname, verbose=True)
 
 
     return tree
 
+# loadTree()
 
 
 
-
-def constructBHTree(run, mergers, verbose=VERBOSE):
+def _constructBHTree(run, mergers, verbose=VERBOSE):
     """
     Use merger data to find and connect BHs which merge multiple times.
 
     Arguments
     ---------
-    run : <int>
-        Illlustris run number {1,3}
-    mergers : <dict>, BHMergers.py mergers
-        Contains merger information
-    verbose : <bool>, (optional=VERBOSE)
-        Print verbose output
+    run     : <int>, Illlustris run number {1,3}
+    mergers : <dict>, BHMergers dictionary
+    verbose : <bool>, (optional=VERBOSE), Print verbose output
 
     Returns
     -------
@@ -150,33 +117,28 @@ def constructBHTree(run, mergers, verbose=VERBOSE):
     cosmo = Cosmology()
 
     numMergers = mergers[MERGERS_NUM]
-    last     = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=long)
-    next     = -1*  np.ones([numMergers],              dtype=long)
-    lastTime = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=np.float64)
-    nextTime = -1.0*np.ones([numMergers],              dtype=np.float64)
+    last     = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=LNG)
+    next     = -1*  np.ones([numMergers],              dtype=LNG)
+    lastTime = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=DBL)
+    nextTime = -1.0*np.ones([numMergers],              dtype=DBL)
 
     # Convert merger scale factors to ages
-    if( verbose ): print " - - - Converting merger times"
-    start = datetime.now()
     scales = mergers[MERGERS_TIMES]
-    times = np.array([ cosmo.age(sc) for sc in scales ], dtype=np.float64)
-    stop = datetime.now()
-    if( verbose ): print " - - - - Done after %s" % (str(stop-start))
+    times = np.array([ cosmo.age(sc) for sc in scales ], dtype=DBL)
 
-
-    # Construct Merger Tree
+    # Construct Merger Tree from node IDs
     if( verbose ): print " - - - Builder BH Merger Tree"
     start = datetime.now()
     mids = mergers[MERGERS_IDS]
     BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
     stop = datetime.now()
-    if( verbose ): print " - - - - Retrieved after %s" % (str(stop-start))
+    if( verbose ): print " - - - - Built after %s" % (str(stop-start))
 
     inds = np.where( last < 0 )[0]
-    print "MISSING LAST = ", len(inds)
+    if( verbose ): print " - - - %d Missing 'last'" % (len(inds))
 
     inds = np.where( next < 0 )[0]
-    print "MISSING NEXT = ", len(inds)
+    if( verbose ): print " - - - %d Missing 'next'" % (len(inds))
 
 
     # Create dictionary to store data
@@ -184,11 +146,16 @@ def constructBHTree(run, mergers, verbose=VERBOSE):
              TREE_NEXT      : next,
              TREE_LAST_TIME : lastTime,
              TREE_NEXT_TIME : nextTime,
+
              TREE_CREATED   : datetime.now().ctime(),
-             TREE_RUN       : run }
+             TREE_RUN       : run,
+             TREE_VERSION   : VERSION
+             }
+
 
     return tree
 
+# _constructBHTree()
 
 
 
@@ -231,6 +198,7 @@ def analyzeTree(tree, verbose=VERBOSE):
     # Find number of unique merger BHs (i.e. no previous mergers)
     inds = np.where( (last[:,BH_IN] < 0) & (last[:,BH_OUT] < 0) & (next[:] < 0) )
     numTwoIsolated = len(inds[0])
+    # 
     inds = np.where( ((last[:,BH_IN] < 0) ^ (last[:,BH_OUT] < 0)) & (next[:] < 0) )                 # 'xor' comparison
     numOneIsolated = len(inds[0])
     
@@ -275,28 +243,31 @@ def analyzeTree(tree, verbose=VERBOSE):
     inds = np.where(next >= 0)[0]
     numRepeats = len(inds)
     fracRepeats = 1.0*numRepeats/numMergers
-    if( verbose ): 
-        print " - - - Number of repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats)
-        print " - - - Average Number of Repeated mergers  past, future  =  %.3f, %.3f" % (avePast, aveFuture)
-
 
     indsInt = np.where( timeNext >= 0.0 )[0]
+    numInts = len(indsInt)
     timeStats = aux.avestd( timeNext[indsInt] )
     inds = np.where( timeNext == 0.0 )[0]
+    numZeroInts = len(inds)
 
     if( verbose ): 
-        print " - - - Number of merger intervals    = %d" % (len(indsInt))
+        print " - - - Repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats)
+        print " - - - Average number past, future  =  %.3f, %.3f" % (avePast, aveFuture)
+        print " - - - Number of merger intervals    = %d" % (numInts)
         print " - - - - Time between = %.4e +- %.4e [Myr]" % (timeStats[0]/MYR, timeStats[1]/MYR)
-        print " - - - Number of zero time intervals = %d" % (len(inds))
+        print " - - - Number of zero time intervals = %d" % (numZeroInts)
 
 
     timeBetween = timeNext[indsInt]
 
+    # Store data to tree dictionary
     tree[TREE_NUM_PAST] = numPast
     tree[TREE_NUM_FUTURE] = numFuture
     tree[TREE_TIME_BETWEEN] = timeBetween
 
     return timeBetween, numPast, numFuture
+
+# analyzeTree()
 
 
 
@@ -308,6 +279,9 @@ def countFutureMergers( next, ind ):
         ii = next[ii]
 
     return count
+
+# countFutureMergers()
+
 
 
 def countPastMergers( last, ind, verbose=False ):
@@ -328,11 +302,7 @@ def countPastMergers( last, ind, verbose=False ):
 
     return np.max([num_in, num_out])+1
 
+# countPastMergers()
 
 
-
-
-
-
-if __name__ == "__main__": main()
 
