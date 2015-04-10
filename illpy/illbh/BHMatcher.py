@@ -5,6 +5,7 @@ Routines to match BH Mergers with BH Details entries based on times and IDs.
 """
 
 import os
+import sys
 import numpy as np
 
 from datetime import datetime
@@ -13,24 +14,20 @@ import BHDetails
 import BHMergers
 from BHConstants import *
 
-import pyximport
-pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
+#import pyximport
+#pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 from MatchDetails import getDetailIndicesForMergers
 
 from .. import Constants
 from .. import AuxFuncs as aux
 
 
+VERSION = 0.22
 
 FST = BH_FIRST
 BEF = BH_BEFORE
 AFT = BH_AFTER
 
-
-
-###  ===================================  ###
-###  =============  MAIN  ==============  ###
-###  ===================================  ###
 
 
 
@@ -62,7 +59,7 @@ def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
 
     if( verbose ): print " - - BHMatcher.loadMergerDetails()"
 
-    saveFile = GET_MERGER_DETAILS_FILENAME(run)
+    saveFile = GET_MERGER_DETAILS_FILENAME(run, VERSION)
 
     ### Try to Load Existing Merger Details ###
     if( loadsave ):
@@ -83,6 +80,7 @@ def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
                 loadsave = False
 
         else:
+            if( verbose ): print " - - - - File does not exist."
             loadsave = False
                 
 
@@ -96,10 +94,10 @@ def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
         # Get Details for Mergers
         mergerDetails = detailsForMergers(run, mergers, verbose=verbose)
         # Add meta-data
-        mergDets[DETAILS_RUN]     = run
-        mergDets[DETAILS_CREATED] = datetime.now().ctime()
-        mergDets[DETAILS_VERSION] = VERSION
-        mergDets[DETAILS_FILE]    = saveFile
+        mergerDetails[DETAILS_RUN]     = run
+        mergerDetails[DETAILS_CREATED] = datetime.now().ctime()
+        mergerDetails[DETAILS_VERSION] = VERSION
+        mergerDetails[DETAILS_FILE]    = saveFile
 
         # Save merger details
         aux.dictToNPZ(mergerDetails, saveFile, verbose=verbose)
@@ -157,22 +155,17 @@ def detailsForMergers(run, mergers, verbose=VERBOSE):
 
 
     ### Iterate over all Snapshots ###
-    startAll = datetime.now()
+    start = datetime.now()
     for ii,snum in enumerate(snapNumbers):
-        startOne = datetime.now()
 
         ## Load appropriate Details File ##
-        dets = BHDetails.loadBHDetails(run, snum)
+        dets = BHDetails.loadBHDetails(run, snum, verbose=False)
 
         # If there are no details here, continue to next iter, but save BHs
         if( dets[DETAILS_NUM] == 0 ): continue
 
         # Reset which matches are new
         matchNew  = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=LNG)
-
-        print type(mergers[MERGERS_IDS][0,0])
-        print type(dets[DETAILS_IDS][0])
-
 
         ## Load Details Information ##
         numMatches = getDetailIndicesForMergers(targets, mergers[MERGERS_IDS], 
@@ -199,9 +192,8 @@ def detailsForMergers(run, mergers, verbose=VERBOSE):
             # } FBA
 
         # } BH
-
         
-        if( progress ):
+        if( verbose ):
             now = datetime.now()
             dur = now-start
             statStr = aux.statusString(ii+1, numSnaps, dur)
@@ -345,8 +337,3 @@ def checkMatches(matches, mergers):
 
     return
 
-
-
-
-
-if __name__ == "__main__": main()
