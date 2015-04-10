@@ -41,12 +41,10 @@ import os, sys
 from glob import glob
 
 import numpy as np
+from datetime import datetime
 
 from BHConstants import *
-
 from .. import AuxFuncs as aux
-
-from datetime import datetime
 
 
 VERSION = 0.23                                                                                      # Version of BHDetails
@@ -361,28 +359,49 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=VERBOSE
         tempFiles = organizeDetails(run, loadsave=loadsave, verbose=verbose)
 
 
+    ### Try to load from existing save ###
+    if( loadsave ):
+        
+        if( os.path.exists(sav) ):
+            details = aux.npzToDict(sav)
+            loadVers = details[DETAILS_VERSION]
+            if( loadVers != VERSION ):
+                loadsave = False
+                if( verbose ): 
+                    print " - - - Loaded  v%s" % (str(loadVers))
+                    print " - - - Current v%s" % (str(VERSION ))
+
+        else:
+            if( verbose ): print " - - - File does not exist"
+            loadsave = False
+                
+
+
     ### Load Details from ASCII, Convert to Dictionary and Save to NPZ ###
+                
+    if( not loadsave ):
 
-    # Load details from ASCII File
-    ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
+        # Load details from ASCII File
+        ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
-    # Store details in dictionary
-    details = { DETAILS_NUM     : len(ids),
-                DETAILS_RUN     : run,
-                DETAILS_SNAP    : snap,
-                DETAILS_CREATED : datetime.now().ctime(),
-                DETAILS_VERSION : VERSION,
-                DETAILS_FILE    : sav,
+        # Store details in dictionary
+        details = { DETAILS_NUM     : len(ids),
+                    DETAILS_RUN     : run,
+                    DETAILS_SNAP    : snap,
+                    DETAILS_CREATED : datetime.now().ctime(),
+                    DETAILS_VERSION : VERSION,
+                    DETAILS_FILE    : sav,
 
-                DETAILS_IDS     : ids,
-                DETAILS_SCALES  : scales,
-                DETAILS_MASSES  : masses,
-                DETAILS_MDOTS   : mdots,
-                DETAILS_RHOS    : rhos,
-                DETAILS_CS      : cs }
+                    DETAILS_IDS     : ids,
+                    DETAILS_SCALES  : scales,
+                    DETAILS_MASSES  : masses,
+                    DETAILS_MDOTS   : mdots,
+                    DETAILS_RHOS    : rhos,
+                    DETAILS_CS      : cs }
 
-    # Save Dictionary
-    aux.dictToNPZ(details, sav)
+        # Save Dictionary
+        aux.dictToNPZ(details, sav)
+
 
     return sav
 
@@ -519,7 +538,7 @@ def loadBHDetails(run, snap, verbose=VERBOSE):
 
 
 
-
+'''
 def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     """
     Retrieve the details entry for a particular BH at a target snapshot.
@@ -623,10 +642,10 @@ def detailsForBH(bhid, run, snap, details=None, side=None, verbose=VERBOSE):
     bhDets = { key : details[key][retInds] for key in DETAILS_PHYSICAL_KEYS }
 
     return details, bhDets
+'''
 
 
-
-
+'''
 def detailsForMergers(mergers, run, verbose=VERBOSE):
     """
     Fix the accretor/'out' BH Mass using the blackhole details files.
@@ -793,7 +812,8 @@ def detailsForMergers(mergers, run, verbose=VERBOSE):
 
     return mergDets
 
-
+# detailsForMergers()
+'''
 
 
 def _getPrecision(args):
