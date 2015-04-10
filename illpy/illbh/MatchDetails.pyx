@@ -16,6 +16,7 @@ from BHConstants import BH_FIRST  as FST
 ctypedef unsigned long long ULNG
 
 
+
 def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[ULNG,   ndim=2] mid, 
                                np.ndarray[double, ndim=1] mtime,   np.ndarray[long,   ndim=3] lind,
                                np.ndarray[double, ndim=3] ltime,   np.ndarray[long,   ndim=3] mnew,
@@ -44,22 +45,29 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     ----------
     targets : IN, <long>[N]
         Array of indices corresponding to 'target' merger systems to be matched.
+
     mid : IN, <long>[M,2]
         Array of Merger BH IDs. Columns correspond to the 'in' and 'out' BHs (`BH_IN` / `BH_OUT`)
+
     mtime : IN, <double>[M]
         Array of times (scalefactors) of merger events.  The 'before' and 'after' events occur
         around this time
+
     lind : INOUT, <long>[M,2,3]
         Array of 'link' indices, i.e. for each BH and time ('before', 'after', 'first') store the
         index corresponding to the matching 'details' entry.
+
     ltime : INOUT, <double>[M,2,3]
         Array of 'link' times, i.e. the time of the detail entry matched for each BH and time,
         i.e. the time of the `lind` entry.
+
     mnew : INOUT, <int>[M,2,3], 
         Array of flags to mark which entries have been successfully matched.  `1` = True (matched)
         otherwise false (not matched)
+
     detid : IN, <long>[L]
         Array of BH IDs for each 'detail' entry
+
     dtime : IN, <double>[L]
         Array of times (scalefactors) for each 'detail' entry
 
@@ -69,8 +77,8 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     numMatches : OUT, <int>
         Number of successful matches (including all 'before', 'after' and 'first') for either BH
 
-
     """
+
 
     # Get the lengths of all input arrays
     cdef int numMergers = mid.shape[0]
@@ -82,8 +90,9 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     cdef np.ndarray s_det = np.lexsort( (dtime, detid) )
 
     # Declare variables
-    cdef long s_ind, t_id, s_first_match, s_before_match, s_after_match
-    cdef long d_ind_first, d_ind_before, d_ind_after
+    cdef ULNG s_ind, t_id
+    cdef ULNG s_first_match, s_before_match, s_after_match
+    cdef ULNG d_ind_first, d_ind_before, d_ind_after
     cdef double t_time, d_first_time, d_before_time, d_after_time
 
     ### Iterate over Each Target Merger Binary System ###
