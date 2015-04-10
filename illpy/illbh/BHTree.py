@@ -15,8 +15,8 @@ from .. import Cosmology
 from BHConstants import *
 import BHMergers
 
-import pyximport
-pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
+#import pyximport
+#pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 import BuildTree
 
 
@@ -75,7 +75,7 @@ def loadTree(run, mergers=None, loadsave=True, verbose=VERBOSE):
         # Load Mergers if needed
         if( mergers is None ):
             if( verbose ): print " - - - - No mergers provided, loading"
-            mergers = BHMergers.loadMergers(run)
+            mergers = BHMergers.loadFixedMergers(run)
 
 
         # Construct Tree 
@@ -123,7 +123,7 @@ def _constructBHTree(run, mergers, verbose=VERBOSE):
     nextTime = -1.0*np.ones([numMergers],              dtype=DBL)
 
     # Convert merger scale factors to ages
-    scales = mergers[MERGERS_TIMES]
+    scales = mergers[MERGERS_SCALES]
     times = np.array([ cosmo.age(sc) for sc in scales ], dtype=DBL)
 
     # Construct Merger Tree from node IDs
