@@ -4,7 +4,6 @@ Find subhalos based on target properties.
 
 """
 
-
 import sys
 import os
 from datetime import datetime
@@ -16,8 +15,9 @@ import illpy
 from illpy import Cosmology
 from illpy.Constants import *
 from illpy import AuxFuncs as aux
-from Constants import *
 
+from Constants import *
+import Subhalos
 
 import Figures
 from StellarLifetimes import StellarLifetimes
@@ -49,7 +49,7 @@ MIN_NUM_SUBHALOS   = 10
 
 def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 
-    if( verbose ): print "SubhaloFinder.py"
+    if( verbose ): print "EplusA_Finder.py"
     startMain = datetime.now()
 
     treePath = ILLUSTRIS_TREE_PATHS(run)
@@ -156,7 +156,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     if( verbose ): print " - Loading EplusA Subhalo Particle data from Snapshot %d" % (snapLast)
     if( verbose ): print " - - EplusA Catalog Indices : %s" % (str(new_epa))
     start = datetime.now()
-    epas = loadSubhaloParticles(run, snapLast, new_epa, verbose=verbose)
+    epas = Subhalos.loadSubhaloParticles(run, snapLast, new_epa, verbose=verbose)
     stop = datetime.now()
     if( verbose ): print " - - Loaded %d subhalos after %s" % (len(epas), str(stop-start))    
 
@@ -167,7 +167,7 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
     #new_null = new_oth[:COMPARE_NUM]
     if( verbose ): print " - - Selecting %d: %s" % (len(new_null), str(new_null))
     start = datetime.now()
-    nulls = loadSubhaloParticles(run, snapLast, new_null, verbose=verbose)
+    nulls = Subhalos.loadSubhaloParticles(run, snapLast, new_null, verbose=verbose)
     stop = datetime.now()
     if( verbose ): print " - - Loaded %d subhalos after %s" % (len(nulls), str(stop-start))
 
@@ -193,130 +193,11 @@ def main(run=RUN, loadsave=True, verbose=VERBOSE, plot=PLOT):
 # main()
 
 
-'''
-def saveSubhaloNumbers(run, snap, nums_epa, nums_null, verbose=VERBOSE):
-    
-    if( verbose ): print " - - SubhaloFinder.saveSubhaloNumbers()"
-
-    # Load save filename
-    saveFile   = SUBHALO_FILENAMES_NUMBERS_FILENAMES(run, snap)
-    names_epa  = np.array([])
-    names_null = np.array([])
-    nums_epa   = np.array(nums_epa )
-    nums_null  = np.array(nums_null)
-
-    if( os.path.exists(saveFile) ):
-        dat = np.load(saveFile)
-        names_epa  = dat.epas
-        names_null = dat.nulls
-        nums_epa   = np.concatenate([ dat.epas,  names_epa  ])
-        nums_null  = np.concatenate([ dat.nulls, names_null ])
-
-
-    # Convert numbers to filenames
-    temp_epa   = np.array([ SUBHALO_PARTICLES_FILENAMES(run, snap, epa ) for epa  in nums_epa  ])
-    temp_null  = np.array([ SUBHALO_PARTICLES_FILENAMES(run, snap, null) for null in nums_null ])
-    names_epa  = np.concatenate([names_epa,  temp_epa ])
-    names_null = np.concatenate([names_null, temp_null])
-
-    # Save to NPZ file
-    np.savez(saveFile, run=run, snap=snap, epas=names_epa, nulls=names_null, 
-             nums_epas=nums_epa, nums_nulls=nums_null)
-
-    if( verbose ): print " - - - Saved Subhalo filenames and numbers to '%s'" % (saveFile)
-
-    return 
-'''
-
-
-def loadSubhaloParticles(run, snapNum, subhaloInds, loadsave=True, verbose=VERBOSE):
-
-    if( verbose ): print " - - SubhaloFinder.loadSubhaloParticles()"
-
-    if( verbose ): print " - - - Loading %d subhalos" % (len(subhaloInds))
-    groupCat = None
-    
-    subhalos = []
-    for ii,shind in enumerate(subhaloInds):
-        fileName = SUBHALO_PARTICLES_FILENAMES(run, snapNum, shind)
-        if( verbose ): print " - - - - %d : Subhalo %d - '%s'" % (ii, shind, fileName)
-
-        loadsave_flag = loadsave
-        if( loadsave_flag ):
-            if( os.path.exists(fileName) ):
-                if( verbose ): print " - - - - - Loading from previous save"
-                subhaloData = aux.npzToDict(fileName)
-            else:
-                print "``loadsave`` file '%s' does not exist!" % (fileName)
-                loadsave_flag = False
-
-
-        if( not loadsave_flag ):
-            if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
-            subhaloData, groupCat = _getSubhaloParticles(run, snapNum, shind, groupCat=groupCat, verbose=verbose)
-            aux.dictToNPZ(subhaloData, fileName, verbose=True)
-
-
-        subhalos.append(subhaloData)
-
-    # } ii
-
-
-    subhalos = np.array(subhalos)
-    return subhalos
-
-# loadSubhaloParticles()
-
-
-def _getSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
-
-    if( verbose ): print " - - SubhaloFinder._getSubhaloParticles()"
-
-    # Get snapshot file path and filename
-    snapshotPath = ILLUSTRIS_OUTPUT_SNAPSHOT_FIRST_FILENAME(run, snapNum)
-
-    ### If Group Catalog is not Provided, load it ###
-    if( groupCat is None ):
-
-        # Get group catalog file path and filename
-        groupPath = ILLUSTRIS_OUTPUT_GROUP_FIRST_FILENAME(run, snapNum)
-
-        # Load subfind catalog
-        if( verbose ): print " - - - Loading subfind catalog from '%s'" % (groupPath)
-        groupCat = arepo.Subfind(groupPath, combineFiles=True)
-
-
-
-    ### Load Snapshot Data ###
-
-    # Create filter for target subhalo
-    filter = [ arepo.filter.Halo(groupCat, subhalo=subhaloInd) ]
-    # Load snapshot
-    if( verbose ): print " - - - Loading snapshot data"
-    start = datetime.now()
-    data = arepo.Snapshot(snapshotPath, filter=filter, fields=SNAPSHOT_PROPERTIES,
-                          combineFiles=True, verbose=False )
-    stop = datetime.now()
-    if( verbose ): print " - - - - Loaded after %s" % (str(stop-start))
-
-    ### Convert Snapshot Data into Dictionary ###
-
-    dataDict = {}
-    for snapKey in SNAPSHOT_PROPERTIES:
-        dataDict[snapKey] = getattr(data, snapKey)
-
-    dataDict[SUBHALO_ID]       = subhaloInd
-    dataDict[SUBHALO_RUN]      = run
-    dataDict[SUBHALO_SNAPSHOT] = snapNum
-    dataDict[SUBHALO_CREATED]  = datetime.now().ctime()
-
-    return dataDict, groupCat
-
 
 
 def selectTop(args, num=10, verbose=VERBOSE):
     
-    if( verbose ): print " - - SubhaloFinder.selectTop()"
+    if( verbose ): print " - - EplusA_Finder.selectTop()"
 
     # Make sure requested size is less than full array length
     assert num <= len(args), "``num`` must be less than length of array!"
@@ -336,7 +217,7 @@ def selectTop(args, num=10, verbose=VERBOSE):
 
 def weight_sfrChange(branches, his, los, cosmo=None, verbose=VERBOSE):
 
-    if( verbose ): print " - - SubhaloFinder.weight_sfrChange()"
+    if( verbose ): print " - - EplusA_Finder.weight_sfrChange()"
 
     if( cosmo is None ): cosmo = Cosmology()
 
@@ -370,7 +251,7 @@ def weight_sfrChange(branches, his, los, cosmo=None, verbose=VERBOSE):
 
 def loadSubhaloBranches(run, inds, tree, target, loadsave=True, verbose=VERBOSE):
 
-    if( verbose ): print " - - SubhaloFinder.loadSubhaloBranches()"
+    if( verbose ): print " - - EplusA_Finder.loadSubhaloBranches()"
 
     saveFile = SUBHALO_BRANCHES_FILENAMES(run)
 
@@ -402,7 +283,7 @@ def loadSubhaloBranches(run, inds, tree, target, loadsave=True, verbose=VERBOSE)
 def _getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PARTICLES, 
                         nbh=MIN_BH_PARTICLES, verbose=VERBOSE):
 
-    if( verbose ): print " - - SubhaloFinder.getSubhaloBranches()"
+    if( verbose ): print " - - EplusA_Finder.getSubhaloBranches()"
     numSubhalos = len(inds)
     if( numSubhalos < 100 ): interval = 1
     else:                    interval = np.int( np.floor(numSubhalos/200.0) )
@@ -571,7 +452,7 @@ def _getSubhaloBranches(run, inds, tree, target, ngas=MIN_GAS_PARTICLES, nstar=M
 
 def sfrSubhalos(cat, inds, cut=SFR_CUT, specific=False, verbose=VERBOSE):
     
-    if( verbose ): print " - - SubhaloFinder.sfrSubhalos()"
+    if( verbose ): print " - - EplusA_Finder.sfrSubhalos()"
 
     sfr = cat[SH_SFR][inds]
 
@@ -629,7 +510,7 @@ def filterSubhalos_minParticles(cat, ngas=MIN_GAS_PARTICLES, nstar=MIN_STAR_PART
     """
     
     
-    if( verbose ): print " - - SubhaloFinder.filterSubhalos_minParticles()"
+    if( verbose ): print " - - EplusA_Finder.filterSubhalos_minParticles()"
 
     lenTypes  = cat[SH_LEN_TYPE]
     massTypes = cat[SH_MASS_TYPE]
@@ -664,7 +545,7 @@ def loadSubhaloCatalog(run, target, keys=SUBFIND_PARAMETERS, verbose=VERBOSE):
     Load parameters from a particular snapshot's subfind catalog.
     """
 
-    if( verbose ): print " - - SubhaloFinder.loadSubhaloCatalog()"
+    if( verbose ): print " - - EplusA_Finder.loadSubhaloCatalog()"
 
     # Get path to catalogs
     outputPath = ILLUSTRIS_OUTPUT_PATHS(run)
@@ -691,7 +572,7 @@ def targetSnapshots(times=TARGET_LOOKBACK_TIMES, masses=None, cosmo=None, verbos
     """
 
 
-    if( verbose ): print " - SubhaloFinder.targetSnapshot()"
+    if( verbose ): print " - EplusA_Finder.targetSnapshot()"
     if( cosmo is None ): cosmo = illpy.Cosmology()
 
     # Get lookback times to all snapshots
