@@ -213,12 +213,12 @@ def GET_DETAILS_SAVE_FILENAME(run, snap, version):
 
 
 def GET_MERGER_DETAILS_FILENAME(run, version):
-    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _MERGER_DETAILS_FILENAME % (run, version)
     return fname
 
 
 def GET_BLACKHOLE_TREE_FILENAME(run, version):
-    fname = _PROCESSED_DETAILS_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _BLACKHOLE_TREE_FILENAME % (run, version)
     return fname
