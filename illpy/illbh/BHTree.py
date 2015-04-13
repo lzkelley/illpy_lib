@@ -15,8 +15,6 @@ from .. import Cosmology
 from BHConstants import *
 import BHMergers
 
-#import pyximport
-#pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 import BuildTree
 
 
@@ -127,7 +125,7 @@ def _constructBHTree(run, mergers, verbose=VERBOSE):
     times = np.array([ cosmo.age(sc) for sc in scales ], dtype=DBL)
 
     # Construct Merger Tree from node IDs
-    if( verbose ): print " - - - Builder BH Merger Tree"
+    if( verbose ): print " - - - Building BH Merger Tree"
     start = datetime.now()
     mids = mergers[MERGERS_IDS]
     BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
