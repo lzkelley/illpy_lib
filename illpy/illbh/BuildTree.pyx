@@ -6,10 +6,13 @@
 import numpy as np
 cimport numpy as np
 
-import illpy
-from illpy.illbh.BHConstants import BH_IN, BH_OUT
+from BHConstants import BH_IN, BH_OUT
 
-def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
+# A uint64 type (works with np.uint64)
+ctypedef unsigned long long ULNG
+
+
+def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
               np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,  
               np.ndarray[double, ndim=2] lastTime, np.ndarray[double, ndim=1] nextTime ):
     """
@@ -50,7 +53,8 @@ def buildTree(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
 
     """
 
-    cdef long outid, ii, jj, next_ind, last_ind
+    cdef ULNG outid
+    cdef long ii, jj, next_ind, last_ind
     cdef long numMergers = ids.shape[0]
     cdef int hunth = np.int(np.floor(0.01*numMergers))
 
