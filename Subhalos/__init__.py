@@ -8,7 +8,8 @@ __status__ = "Development"
 
 
 import Constants
-import SubhaloFinder
+import EplusA_Finder
+import Subhalos
 import Analyzer
 import Figures
 from StellarLifetimes import StellarLifetimes
