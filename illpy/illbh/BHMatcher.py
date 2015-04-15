@@ -14,8 +14,6 @@ import BHDetails
 import BHMergers
 from BHConstants import *
 
-#import pyximport
-#pyximport.install(setup_args={"include_dirs":np.get_include()}, reload_support=True)
 from MatchDetails import getDetailIndicesForMergers
 
 from .. import Constants
