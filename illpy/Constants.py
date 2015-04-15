@@ -28,14 +28,16 @@ CS_CONV               = 1.0                                                     
 BOX_LENGTH            = 75000                                                                       # [ckpc/h]
 FTPI                  = 4.0*np.pi/3.0                                                               # (4.0/3.0)*Pi
 NWTG                  = 6.673840e-08                                                                # Newton's Gravitational  Constant
-YEAR                  = 3.156e+07                                                                   # Year in seconds
+YR                    = 3.156e+07                                                                   # Year in seconds
 SPLC                  = 2.997925e+10                                                                # Speed of light [cm/s]
 H0                    = 2.268546e-18                                                                # Hubble constant at z=0.0   in [1/s]
-
+SCHW                  = 2*NWTG/(SPLC*SPLC)
+RHO_CRIT              = 3.0*H0*H0/(4.0*np.pi*NWTG)            # Cosmological Critical Density [g/cm^3
 
 # Derived Physical Constants
-MYR                   = 1.0e6*YEAR
-GYR                   = 1.0e9*YEAR
+YEAR = YR
+MYR                   = 1.0e6*YR
+GYR                   = 1.0e9*YR
 
 
 ### Numerical Constants ###
@@ -46,6 +48,8 @@ FLT  = np.float32
 DBL  = np.float64
 ULNG = np.uint64
 
+
+
 ### Illustris Constants ###
 
 NUM_SNAPS             = 136
@@ -54,9 +58,32 @@ _ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
                            2 : "L75n910FP",
                            3 : "L75n455FP" }
 
-
 _ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
-GET_ILLUSTRIS_OUTPUT_DIR = lambda run: _ILLUSTRIS_OUTPUT_DIR_BASE % (RUN_NAMES[run])
+
+def GET_ILLUSTRIS_OUTPUT_DIR(run): 
+    return _ILLUSTRIS_OUTPUT_DIR_BASE % (_ILLUSTRIS_RUN_NAMES[run])
+
+
+# GroupFind Files
+
+_ILLUSTRIS_GROUP_PATH_BASE   = '/n/ghernquist/Illustris/Runs/%s/output/groups_%03d/'
+_ILLUSTRIS_GROUP_FILENAME_BASE   = 'fof_subhalo_tab_%03d.0.hdf5'
+
+def GET_ILLUSTRIS_GROUPS_FIRST_FILENAME(run,snap): 
+ fname  = _ILLUSTRIS_GROUP_PATH_BASE % (_ILLUSTRIS_RUN_NAMES[run],snap)
+ fname += _ILLUSTRIS_GROUP_FILENAME_BASE % (snap) 
+ return fname
+
+
+# Snapshot Files
+
+_ILLUSTRIS_SNAPSHOT_PATH_BASE = '/n/ghernquist/Illustris/Runs/%s/output/snapdir_%03d/'
+_ILLUSTRIS_SNAPSHOT_FILENAME_BASE   = 'snap_%03d.0.hdf5'
+
+def GET_ILLUSTRIS_SNAPSHOT_FIRST_FILENAME(run,snap): 
+    fname  = _ILLUSTRIS_SNAPSHOT_PATH_BASE % (_ILLUSTRIS_RUN_NAMES[run],snap)
+    fname += _ILLUSTRIS_SNAPSHOT_FILENAME_BASE % (snap)
+    return fname
 
 
 # Indices for Different Types of Particles
@@ -66,6 +93,7 @@ PARTICLE_TYPE_TRAC    = 3
 PARTICLE_TYPE_STAR    = 4
 PARTICLE_TYPE_BH      = 5
 PARTICLE_NAMES        = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
+PARTICLE_TYPE_NUM     = 6
 
 # Indices for Different Photometric Bands
 PHOTO_U               = 0
