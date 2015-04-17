@@ -682,19 +682,6 @@ def countLines(files, progress=False):
     return nums
 
 
-def iterableNotString(args):
-    """
-    Check if the arguments is iterable and not a string.
-    """
-
-    # if NOT iterable, return false
-    if( not np.iterable(args) ): return False
-    # if string, return False
-    if( isinstance(args, types.StringTypes) ): return False
-
-    return True
-
-
 
 def estimateLines(files):
     """ Count the number of lines in the given file """
@@ -762,4 +749,29 @@ def npzToDict(npz):
 
     newDict = { key : npz[key] for key in npz.keys() }
     return newDict
+
+
+
+
+
+
+
+###  ====================================  ###
+###  =============  OTHER  ==============  ###
+###  ====================================  ###
+
+
+
+
+def iterableNotString(args):
+    """
+    Check if the arguments is iterable and not a string.
+    """
+
+    # if NOT iterable, return false
+    if( not np.iterable(args) ): return False
+    # if string, return False
+    if( isinstance(args, types.StringTypes) ): return False
+
+    return True
 
