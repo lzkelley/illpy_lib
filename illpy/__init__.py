@@ -13,3 +13,4 @@ import illcosmo
 from illcosmo.Cosmology import Cosmology
 import AuxFuncs
 import illbh
+import Subhalos
