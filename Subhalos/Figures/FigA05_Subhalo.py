@@ -3,7 +3,8 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 
 from .. Constants import *
-from .. Analyzer import getSubhaloRadialProfiles
+#from .. Analyzer import getSubhaloRadialProfiles
+from .. Profiler import getSubhaloRadialProfiles
 
 import PlotFuncs as pfunc
 import illpy
