@@ -236,7 +236,7 @@ def histogram(args, bins, weights=None, scale=None, ave=False):
     hist = np.array(hist)
 
     # Rescale the bin values
-    if( scale != None ):
+    if( scale is not None ):
         hist *= scale
 
     return hist
@@ -472,7 +472,7 @@ def statusString(count, total, durat=None):
     frac = 1.0*count/(total)
     stat = '%.2f%%' % (100*frac)
 
-    if( durat != None ):
+    if( durat is not None ):
         # Make sure `durat` is a datetime.timedelta object
         if( type(durat) is not datetime.timedelta ): durat = datetime.timedelta(seconds=durat)
 
