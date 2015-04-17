@@ -149,9 +149,8 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
     inds = np.argsort(scales)
     # Use indices to reorder arrays
     scales[:] = scales[inds]
-    ids[:] = ids[inds]
+    ids[:]    = ids[inds]
     masses[:] = masses[inds]
-
 
     return scales, ids, masses, combinedFilename
 
@@ -294,7 +293,7 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     fixedMergers = dict(mergers)
 
     ### Find and Remove Repeats ###
-    ids = fixedMergers[MERGERS_IDS]
+    ids    = fixedMergers[MERGERS_IDS]
     scales = fixedMergers[MERGERS_SCALES]
 
     # First sort by ``BH_IN`` then ``BH_OUT`` (reverse of given order)
@@ -346,12 +345,13 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     for key in MERGERS_PHYSICAL_KEYS:
         fixedMergers[key] = np.delete(fixedMergers[key], badInds, axis=0)
 
+
     # Recalculate maps
-    mapM2S, mapS2M, ontop = _mapToSnapshots(scales)
+    mapM2S, mapS2M, ontop = _mapToSnapshots(fixedMergers[MERGERS_SCALES])
     fixedMergers[MERGERS_MAP_MTOS ] = mapM2S
     fixedMergers[MERGERS_MAP_STOM ] = mapS2M
     fixedMergers[MERGERS_MAP_ONTOP] = ontop
-    
+
     # Change number, creation date, and version
     oldNum = len(mergers[MERGERS_SCALES])
     newNum = len(fixedMergers[MERGERS_SCALES])
