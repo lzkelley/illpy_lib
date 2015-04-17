@@ -5,7 +5,7 @@ from datetime import datetime
 
 from lib import readtreeHDF5
 from lib import readsubfHDF5
-import arepo
+#import arepo
 
 import illpy
 from illpy import Cosmology
@@ -104,6 +104,8 @@ def loadSubhaloParticles(run, snapNum, subhaloInds, noreturn=False, loadsave=Tru
 
 
 def _importSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
+
+    import arepo
 
     if( verbose ): print " - - Subhalos._importSubhaloParticles()"
 
