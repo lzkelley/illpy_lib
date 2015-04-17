@@ -9,12 +9,8 @@ import illpy
 from illpy.Constants import *
 from illpy.illbh.BHConstants import *
 
-BASE_PATH  = "/n/home00/lkelley/illustris/EplusA/Subhalos/"
-
 TYPE_ID     = np.uint64
 TYPE_SCALAR = np.float64
-
-
 
 
 ### Subhalo Properties ###
@@ -61,29 +57,6 @@ def GET_SUBHALO_PARTICLES_FILENAMES(run, snap, subhalo):
     return fileName
 
 
-
-### General Illustris ###
-
-NUM_SNAPS = 136
-
-ILLUSTRIS_RUN_NAMES           = { 1: 'L75n1820FP',
-                                  2: 'L75n910FP' ,
-                                  3: 'L75n455FP'  }
-
-
-
-
-### SubLink Merger Trees ###
-
-ILLUSTRIS_TREE_PATH_BASE      = '/n/ghernquist/Illustris/Runs/%s/trees/SubLink_gal'
-ILLUSTRIS_TREE_PATHS          = lambda run: ILLUSTRIS_TREE_PATH_BASE % (ILLUSTRIS_RUN_NAMES[run])
-
-SL_SNAP_NUM                   = "SnapNum"
-SL_SUBFIND_ID                 = "SubfindID"
-
-SUBLINK_PARAMETERS            = [ SL_SNAP_NUM, SL_SUBFIND_ID ]
-SUBLINK_PARAMETER_TYPES       = [ TYPE_ID,     TYPE_ID       ]
-
 ### Subfind Catalog Parameters ###
 
 SH_BH_MASS                    = "SubhaloBHMass"
@@ -108,17 +81,6 @@ SUBFIND_PARAMETER_TYPES       = [ TYPE_SCALAR, TYPE_SCALAR, TYPE_SCALAR,  TYPE_S
 
 SH_SNAPSHOT_NUM               = "snapshot"
 
-### Additional Data for Branches ###
-BRANCH_RUN                    = "run"
-BRANCH_INDS                   = "indices"
-BRANCH_CREATED                = "created"
-BRANCH_SNAPS                  = "snapshots"
-
-
-
-### EplusA Snapshot Particle Data ###
-
-
 
 ### Subhalo Profiles ###
 
@@ -135,17 +97,9 @@ PROFILE_VERSION   = 'version'
 
 ### Intermediate Save Files ###
 
-_SUBHALO_BRANCHES_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_branches.npz"
-
 _SUBHALO_FILENAMES_NUMBERS_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-names-numbers.npz"
 
 _SUBHALO_RADIAL_PROFILES_FILENAME_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-profiles.npz"
-
-
-
-def SUBHALO_BRANCHES_FILENAMES(run):
-    fileName = _SUBHALO_BRANCHES_SAVE_BASE % (ILLUSTRIS_RUN_NAMES[run], run)
-    return fileName
 
 
 def SUBHALO_FILENAMES_NUMBERS_FILENAMES(run, snap):
