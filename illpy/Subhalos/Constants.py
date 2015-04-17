@@ -93,20 +93,3 @@ PROFILE_COLS      = 'cols'
 PROFILE_CREATED   = 'created'
 PROFILE_VERSION   = 'version'
 
-
-
-### Intermediate Save Files ###
-
-_SUBHALO_FILENAMES_NUMBERS_SAVE_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-names-numbers.npz"
-
-_SUBHALO_RADIAL_PROFILES_FILENAME_BASE = BASE_PATH + "data/%s/ill-%d_snap-%d_subhalos-profiles.npz"
-
-
-def SUBHALO_FILENAMES_NUMBERS_FILENAMES(run, snap):
-    fileName = _SUBHALO_FILENAMES_NUMBERS_SAVE_BASE % (ILLUSTRIS_RUN_NAMES[run], run, snap)
-    return fileName
-
-
-def GET_SUBHALO_RADIAL_PROFILES_FILENAMES(run, snap):
-    fileName = _SUBHALO_RADIAL_PROFILES_FILENAME_BASE % (ILLUSTRIS_RUN_NAMES[run], run, snap)
-    return fileName
