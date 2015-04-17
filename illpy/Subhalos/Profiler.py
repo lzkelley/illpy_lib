@@ -14,7 +14,6 @@ from illpy.Constants import *
 from illpy import AuxFuncs as aux
 
 from Constants import *
-import Figures
 
 VERBOSE = True
 _VERSION = 0.1
