@@ -3,8 +3,8 @@ import sys
 import os
 from datetime import datetime
 
-import readtreeHDF5
-import readsubfHDF5
+from lib import readtreeHDF5
+from lib import readsubfHDF5
 import arepo
 
 import illpy
