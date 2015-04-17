@@ -28,84 +28,6 @@ densConv = DENS_CONV
 
 
 
-def loadProfiles(run, snap, nums, bins=None, loadsave=True, verbose=VERBOSE):
-
-    if( verbose ): print " - - Analzyer.loadProfiles()"
-
-    # Create Radial Bins if needed
-    if( bins is None ): bins = np.logspace( *np.log10(RAD_EXTREMA), num=NUM_RAD_BINS+1 )
-
-    fileName = GET_SUBHALO_RADIAL_PROFILES_FILENAMES(run, snap)
-
-    ### Try To Load Existing Save File ###
-
-    if( loadsave ):
-        if( verbose ): print " - - - Loading from save '%s'" % (fileName)
-        if( os.path.exists(fileName) ):
-            profiles = aux.npzToDict(fileName)
-            # Make sure 'version' matches
-            profVers = profiles[PROFILE_VERSION]
-            if( profVers != _VERSION ):
-                print "Loaded '%s' version %s, current %s" % (profVers, _VERSION)
-                loadsave = False
-
-        else:
-            print "``fileName`` '%s' does not exist!" % (fileName)
-            loadsave = False
-
-
-    if( not loadsave ):
-        if( verbose ): print " - - - Creating profiles"
-        profiles = constructProfiles(run, snap, nums, bins, verbose=verbose)
-        aux.dictToNPZ(profiles, fileName)
-
-
-    return profiles
-
-# loadProfiles()
-
-
-
-
-def constructProfiles(run, snap, nums, bins, verbose=VERBOSE):
-
-    if( verbose ): print " - - Analyzer.constructProfiles()"
-
-    numSubhalos = len(nums)
-    numBins     = len(bins)-1
-    names = [ SUBHALO_PARTICLES_FILENAMES(run, snap, nn) for nn in nums ]
-
-    if( verbose ): print " - - - Loading %s Subhalos with %d bins" % (numSubhalos, numBins)
-
-    gas   = np.zeros([numSubhalos, numBins], dtype=np.float32)
-    stars = np.zeros([numSubhalos, numBins], dtype=np.float32)
-    dm    = np.zeros([numSubhalos, numBins], dtype=np.float32)
-    cols  = np.zeros([numSubhalos, numBins], dtype=np.float32)
-    
-    for ii,nam in enumerate(names):
-        print " - - - %d : '%s'" % (ii, nam)
-        # Load Data from NPZ
-        data = aux.npzToDict(nam)
-        tb, aves, gas[ii], stars[ii], dm[ii], cols[ii] = \
-            getSubhaloRadialProfiles(data, bins=bins, verbose=verbose)
-
-    profiles = {
-        PROFILE_BIN_EDGES : bins,
-        PROFILE_BIN_AVES  : aves,
-        PROFILE_GAS       : gas,
-        PROFILE_STARS     : stars,
-        PROFILE_DM        : dm,
-        PROFILE_COLS      : cols,
-        PROFILE_CREATED   : datetime.now().ctime(),
-        PROFILE_VERSION   : _VERSION
-        }
-    
-    return profiles
-
-# constructProfiles()
-
-
-
 def getSubhaloRadialProfiles(data, bins=None, verbose=VERBOSE):
 
     numParts = data[SNAPSHOT_NPART]
@@ -157,7 +79,7 @@ def getSubhaloRadialProfiles(data, bins=None, verbose=VERBOSE):
     gmr       = np.array([ cols[PHOTO_g] - cols[PHOTO_r] for cols in colsStars])
 
 
-    ### Create density profiles ###
+    ### Create Radial profiles ###
 
     # Average gas densities in each bin
     hg = aux.histogram(radsGas,   bins, weights=rhoGas,    ave=True )
@@ -169,6 +91,8 @@ def getSubhaloRadialProfiles(data, bins=None, verbose=VERBOSE):
     hd = hd*massDM/binVols
     # Average colors in each bin
     hc = aux.histogram(radsStars, bins, weights=gmr, ave=True )
+
+
 
     return bins, binAves, hg, hs, hd, hc
 
