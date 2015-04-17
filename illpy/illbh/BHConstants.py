@@ -11,7 +11,6 @@ from glob import glob
 from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
 
 VERBOSE = True
-#VERSION = 0.22
 
 
 ### Illustris Parameters ###
@@ -40,7 +39,6 @@ _ILLUSTRIS_DETAILS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/
 
 
 ### Post-Processing Parameters ###
-#_PROCESSED_DIR                  = "/n/home00/lkelley/illustris/data/%s/output/postprocessing/"
 _PROCESSED_DIR                  = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
