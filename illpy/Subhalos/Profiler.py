@@ -163,30 +163,29 @@ def reflectPos(pos, center=None):
 
 
 
-
-
-def powerLaw_ll(lr,ly0,lr0,alpha):
-    """ log-log transform of ``n(r) = y0*(r/r0)^alpha`` """
-    return alpha*(lr + ly0 - lr0)
-
 def powerLaw(rr,y0,r0,alpha):
     """ Single power law ``n(r) = y0*(r/r0)^alpha`` """
     return y0*np.power(rr/r0, alpha)
 
-def brokenPowerLaw_ll(rr,y0,r0,alpha,beta):
-    """ Log-log transform of a broken (piece-wise defined) power-law """
-    y1 = (powerLaw_ll(rr,y0,r0,alpha))[rr<=r0]
-    y2 = (powerLaw_ll(rr,y0,r0,beta ))[rr> r0]
-    yy = np.concatenate((y1,y2))
-    return yy
+def powerLaw_ll(lr,ly0,lr0,alpha):
+    """ log-log transform of ``n(r) = y0*(r/r0)^alpha`` """
+    return ly0 + alpha*(lr - lr0)
 
-def brokenPowerLaw(rr,y0,r0,alpha,beta):
+
+
+def powerLaw_broken(rr,y0,r0,alpha,beta):
     """ Two power-laws linked together piece-wise at the scale radius ``r0`` """
     y1 = (powerLaw(rr,y0,r0,alpha))[rr<=r0]
     y2 = (powerLaw(rr,y0,r0,beta ))[rr> r0]
     yy = np.concatenate((y1,y2))
     return yy
 
+def powerLaw_broken_ll(rr,y0,r0,alpha,beta):
+    """ Log-log transform of a broken (piece-wise defined) power-law """
+    y1 = (powerLaw_ll(rr,y0,r0,alpha))[rr<=r0]
+    y2 = (powerLaw_ll(rr,y0,r0,beta ))[rr> r0]
+    yy = np.concatenate((y1,y2))
+    return yy
 
 
 
@@ -207,64 +206,72 @@ def fit_powerLaw(xx, yy, pars=None):
     Returns
     -------
     func  : <callable>, fitting function with the fit parameters already plugged-in
+    y0    : <float>   , normalization to the fitting function
     pars1 : <float>[2], fit parameters defining the power-law function.
     """
     
     # Transform to log-log space and scale towards unity
-    scx = np.max(xx)
-    scy = np.max(yy)
+    y0 = np.max(yy)                                                                                
+    x0 = np.max(xx)
     
-    lx = np.log10(xx/scx)
-    ly = np.log10(yy/scy)
+    lx = np.log10(xx/x0)
+    ly = np.log10(yy/y0)
     
-    # Guess Power Law Parameters
+    # Guess Power Law Parameters if they are not provided
     if( pars is None ): 
         pars0 = [1.0, -3.0]
+    # Convert to log-space if they are provided
     else:                
         pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0]/scx)
+        pars0[0] = np.log10(pars0[0]/x0)
 
 
-    pars1, covar = sp.optimize.curve_fit(powerLaw_ll, lx, ly, p0=pars0)
+    # Do not fit for normalization parameter ``y0``
+    func = lambda rr,p0,p1: powerLaw_ll(rr, y0, p0, p1)
+    pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
     
     # Transform fit parameters from log-log space, back to normal
-    pars1[0] = scx*np.power(10.0, pars1[0])
+    pars1[0] = x0*np.power(10.0, pars1[0])
 
-    # Create fitting function
-    func = lambda rr: scy*powerLaw(rr, *pars1)
+    # Create fitting function using the determined parameters
+    func = lambda rr: powerLaw(rr, y0, *pars1)
     
     # Return function and fitting parameters
-    return func, pars1
+    return func, y0, pars1
+
+# fit_powerLaw()
 
 
 
 def fit_powerLaw_broken(xx, yy, pars=None):
     # Transform to log-log space and scale towards unity
-    scx = 1.0 #np.max(xx)
-    scy = 1.0 #np.max(yy)
-    
-    lx = np.log10(xx/scx)
-    ly = np.log10(yy/scy)
-    
+    y0 = np.max(yy)
+
+    lx = np.log10(xx)
+    ly = np.log10(yy/y0)
     
     # Guess Power Law Parameters
     if( pars is None ): 
         pars0 = [1.0, -1.0, -4.0]
     else:
         pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0]/scx)
+        pars0[0] = np.log10(pars0[0])
     
 
-    pars1, covar = sp.optimize.curve_fit(brokenPowerLaw_ll, lx, ly, p0=pars0)
+    # Don't fit for the normalization parameter ``y0``
+    func = lambda rr,p0,p1,p2: powerLaw_broken_ll(rr, y0, p0, p1, p2)
+    pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
     
     # Transform fit parameters from log-log space, back to normal
-    pars1[0] = scx*np.power(10.0, pars1[0])
+    pars1[0] = np.power(10.0, pars1[0])
 
     # Create fitting function
-    func = lambda rr: scy*brokenPowerLaw(rr, *pars1)
+    func = lambda rr: powerLaw_broken(rr, y0, *pars1)
     
     # Return function and fitting parameters
-    return func, pars1
+    return func, y0, pars1
+
+# fit_powerLaw_broken()
 
 
 
