@@ -212,9 +212,8 @@ def fit_powerLaw(xx, yy, pars=None):
     
     # Transform to log-log space and scale towards unity
     y0 = np.max(yy)                                                                                
-    x0 = np.max(xx)
     
-    lx = np.log10(xx/x0)
+    lx = np.log10(xx)
     ly = np.log10(yy/y0)
     
     # Guess Power Law Parameters if they are not provided
@@ -223,7 +222,7 @@ def fit_powerLaw(xx, yy, pars=None):
     # Convert to log-space if they are provided
     else:                
         pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0]/x0)
+        pars0[0] = np.log10(pars0[0])
 
 
     # Do not fit for normalization parameter ``y0``
@@ -231,83 +230,64 @@ def fit_powerLaw(xx, yy, pars=None):
     pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
     
     # Transform fit parameters from log-log space, back to normal
-    pars1[0] = x0*np.power(10.0, pars1[0])
+    pars1[0] = np.power(10.0, pars1[0])
+
+    # Add global normalization ``y0`` back in
+    pars1 = np.insert(pars1, 0, y0)
 
     # Create fitting function using the determined parameters
-    func = lambda rr: powerLaw(rr, y0, *pars1)
+    func = lambda rr: powerLaw(rr, *pars1)
     
     # Return function and fitting parameters
-    return func, y0, pars1
+    return func, pars1
 
 # fit_powerLaw()
 
 
 
-def fit_powerLaw_broken(xx, yy, pars=None):
+def fit_powerLaw_broken(xx, yy, inner=None):
+    """
+    Fit a broken power law function to the given data, the inner slope can be fixed.
+    """
+
     # Transform to log-log space and scale towards unity
     y0 = np.max(yy)
-
     lx = np.log10(xx)
     ly = np.log10(yy/y0)
-    
-    # Guess Power Law Parameters
-    if( pars is None ): 
-        pars0 = [1.0, -1.0, -4.0]
-    else:
-        pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0])
-    
 
-    # Don't fit for the normalization parameter ``y0``
-    func = lambda rr,p0,p1,p2: powerLaw_broken_ll(rr, y0, p0, p1, p2)
-    pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-    
-    # Transform fit parameters from log-log space, back to normal
+        
+    # Guess Power Law Parameters
+    pars0 = [1.0*PC, -1.0, -4.0]
+    pars0 = np.array(pars0)
+    # Convert to log-space
+    pars0[0] = np.log10(pars0[0])
+
+
+    # If ``inner`` is not specified, fit all parameters  (``r0``, ``alpha`` and ``beta``)
+    if( inner is None ):
+        func = lambda rr,r0,alp,bet: powerLaw_broken_ll(rr, y0, r0, alp, bet)
+        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
+    # If ``inner`` is specified, only fit the other parameters (``r0`` and ``beta``)
+    else:
+        func = lambda rr,r0,bet: powerLaw_broken_ll(rr, y0, r0, inner, bet)
+        pars0 = np.delete(pars0, 1)
+        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
+        pars1 = np.insert(pars1, 1, inner)
+
+
+    # Transform fit parameter ``r0`` from log-log space, back to normal space
     pars1[0] = np.power(10.0, pars1[0])
 
+    # Add global normalization back into parameters
+    pars1 = np.insert(pars1, 0, y0)
+
     # Create fitting function
-    func = lambda rr: powerLaw_broken(rr, y0, *pars1)
+    func = lambda rr: powerLaw_broken(rr, *pars1)
     
     # Return function and fitting parameters
-    return func, y0, pars1
+    return func, pars1
 
 # fit_powerLaw_broken()
 
 
 
-def fit_powerLaw_innerFixed(xx, yy, fix, pars=None):
-    # Transform to log-log space and scale towards unity
-    scx = np.max(xx)
-    scy = 1.0 #np.max(yy)
-    
-    lx = np.log10(xx/scx)
-    ly = np.log10(yy/scy)
-    
-    
-    # Guess Power Law Parameters
-    if( pars is None ): 
-        pars0 = [1.0, -1.0, -4.0]
-    else:
-        pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0]/scx)
-
-
-    inFix = lambda rr,r0,beta: brokenPowerLaw_ll(rr, r0, fix, beta)
-    pars1, covar = sp.optimize.curve_fit(inFix, lx, ly, p0=[pars0[0],pars0[2]])
-    
-    # Transform fit parameters from log-log space, back to normal
-    pars1[0] = scx*np.power(10.0, pars1[0])
-
-    # Create fitting function
-    func = lambda rr: scy*brokenPowerLaw(rr, pars1[0], fix, pars1[1])
-
-
-    #pars1[0] /= np.power(scy, 1.0/pars1[1])
-    #func = lambda rr: brokenPowerLaw(rr, pars1[0], fix, pars1[1])
-
-    
-    # Return function and fitting parameters
-    return func, np.insert(pars1, 1, fix)
-
-
-    
