@@ -6,8 +6,7 @@ Provide common constants and hard-settings.
 import numpy as np
 
 import illpy
-#from illpy.Constants import *
-#from illpy.illbh.BHConstants import *
+from illpy.illbh.BHConstants import GET_PROCESSED_DIR
 
 TYPE_ID     = np.uint64
 TYPE_SCALAR = np.float64
