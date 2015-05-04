@@ -10,6 +10,7 @@ from datetime import datetime
 
 import numpy as np
 import scipy as sp
+from scipy import optimize
 
 import illpy
 from illpy import Cosmology
@@ -245,7 +246,7 @@ def fit_powerLaw(xx, yy, pars=None):
 
 
 
-def fit_powerLaw_broken(xx, yy, inner=None):
+def fit_powerLaw_broken(xx, yy, inner=None, outer=None):
     """
     Fit a broken power law function to the given data, the inner slope can be fixed.
     """
@@ -257,22 +258,43 @@ def fit_powerLaw_broken(xx, yy, inner=None):
 
         
     # Guess Power Law Parameters
-    pars0 = [1.0*PC, -1.0, -4.0]
+    pars0 = [100.0*PC, -1.0, -4.0]
     pars0 = np.array(pars0)
     # Convert to log-space
     pars0[0] = np.log10(pars0[0])
 
 
-    # If ``inner`` is not specified, fit all parameters  (``r0``, ``alpha`` and ``beta``)
-    if( inner is None ):
+    ## Fit all parameters  (``r0``, ``alpha`` and ``beta``)
+    if( inner is None and outer is None ):
         func = lambda rr,r0,alp,bet: powerLaw_broken_ll(rr, y0, r0, alp, bet)
         pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-    # If ``inner`` is specified, only fit the other parameters (``r0`` and ``beta``)
-    else:
+    ## Fir outer profile If ``inner`` is specified
+    elif( outer is None ):
         func = lambda rr,r0,bet: powerLaw_broken_ll(rr, y0, r0, inner, bet)
+        # Remove inner-guess parameter
         pars0 = np.delete(pars0, 1)
         pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
+        # Replace inner parameter with given value
         pars1 = np.insert(pars1, 1, inner)
+    ## Fit inner profile If ``outer`` is specified
+    elif( inner is None ):
+        func = lambda rr,r0,alp: powerLaw_broken_ll(rr, y0, r0, alp, outer)
+        # Remove outer-guess parameter
+        pars0 = np.delete(pars0, 2)
+        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
+        # Replace inner parameter with given value
+        pars1 = np.insert(pars1, 2, outer)
+    # Only fit break radius
+    else:
+        func = lambda rr,r0: powerLaw_broken_ll(rr, y0, r0, inner, outer)
+        # Remove guess parameters for slopes
+        pars0 = np.delete(pars0, 2)
+        pars0 = np.delete(pars0, 1)
+        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
+        # Replace parameters with given values
+        pars1 = np.insert(pars1, 1, inner)
+        pars1 = np.insert(pars1, 2, outer)
+
 
 
     # Transform fit parameter ``r0`` from log-log space, back to normal space
