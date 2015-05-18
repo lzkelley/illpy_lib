@@ -246,10 +246,26 @@ def fit_powerLaw(xx, yy, pars=None):
 
 
 
-def fit_powerLaw_broken(xx, yy, inner=None, outer=None):
+def fit_powerLaw_broken(xx0, yy0, inner=None, outer=None, xlo=None, xhi=None):
     """
     Fit a broken power law function to the given data, the inner slope can be fixed.
     """
+
+    xx = np.array(xx0)
+    yy = np.array(yy0)
+
+    ## Select subsample of input arrays
+
+    if( xlo is not None ):
+        inds = np.where( xx >= xlo )
+        xx = xx[inds]
+        yy = yy[inds]
+
+    if( xhi is not None ):
+        inds = np.where( xx <= xhi )
+        xx = xx[inds]
+        yy = yy[inds]
+
 
     # Transform to log-log space and scale towards unity
     y0 = np.max(yy)
@@ -258,7 +274,13 @@ def fit_powerLaw_broken(xx, yy, inner=None, outer=None):
 
         
     # Guess Power Law Parameters
-    pars0 = [100.0*PC, -1.0, -4.0]
+    
+    guess_x0 = np.average(lx)
+    guess_x0 = np.power(10.0, guess_x0)
+    print guess_x0/PC
+
+    # pars0 = [100.0*PC, -1.0, -4.0]
+    pars0 = [guess_x0, -1.0, -4.0]
     pars0 = np.array(pars0)
     # Convert to log-space
     pars0[0] = np.log10(pars0[0])
