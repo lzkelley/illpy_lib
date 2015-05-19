@@ -277,7 +277,6 @@ def fit_powerLaw_broken(xx0, yy0, inner=None, outer=None, xlo=None, xhi=None):
     
     guess_x0 = np.average(lx)
     guess_x0 = np.power(10.0, guess_x0)
-    print guess_x0/PC
 
     # pars0 = [100.0*PC, -1.0, -4.0]
     pars0 = [guess_x0, -1.0, -4.0]
