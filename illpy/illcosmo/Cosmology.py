@@ -156,6 +156,14 @@ class Cosmology(object):
         return (1.0/sf) - 1.0
 
 
+    @staticmethod
+    def zToA(redz): return 1.0/(1.0+redz)
+
+    @staticmethod
+    def aToZ(sf): return (1.0/sf) - 1.0
+
+
+
     def __parameter(self, sf, key):
         '''
         Retrieve a target parameter at a certain snapshot or scalefactor
