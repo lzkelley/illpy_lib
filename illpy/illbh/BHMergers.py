@@ -229,7 +229,7 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
 
     fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run, VERSION)
 
-    ### Try to Load Existing Mapped Mergers ###
+    ## Try to Load Existing Mapped Mergers
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (fixedFilename)
         if( os.path.exists(fixedFilename) ):
@@ -248,10 +248,8 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
             loadsave = False
 
 
-
-    ### Recreate Fixed Mergers ###
+    ## Recreate Fixed Mergers
     if( not loadsave ):
-
         # Load Mapped Mergers
         mergersMapped = loadMappedMergers(run, verbose=verbose)
         # Fix Mergers
