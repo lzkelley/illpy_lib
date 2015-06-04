@@ -8,6 +8,8 @@ import scipy as sp
 from datetime import datetime
 from enum import Enum
 import os
+from cStringIO import StringIO
+import sys
 
 import illpy
 from illpy.Constants import NUM_SNAPS, DTYPE_ID, DTYPE_SCALAR, GET_ILLUSTRIS_OUTPUT_DIR
@@ -24,13 +26,14 @@ import zcode.InOut as zio
 
 
 RUN_NUM = 3
-
+VERSION = 0.2
 
 
 _SAVE_FILE_NAME = "ill-%d_bh_snapshot_data_v-%.1f.npz"
 def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
 
-def SNAP(Enum):
+#class SNAP(Enum):
+class SNAP():
     VERSION = 'version'
     CREATED = 'created'
     RUN     = 'run'
@@ -39,9 +42,21 @@ def SNAP(Enum):
 
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 
-VERSION = 0.1
 
 
+class Capturing(list):
+
+    def __enter__(self):
+        self._stdout = sys.stdout
+        self._stderr = sys.stderr
+        sys.stdout = self._stringio = StringIO()
+        sys.stderr = self._stringio = StringIO()
+        return self
+
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        sys.stdout = self._stdout
+        sys.stderr = self._stderr
     
 
 
@@ -124,7 +139,7 @@ def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
                          number of mergers
 
     """
-    
+
     if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
     
     saveFileName = GET_SAVE_FILE_NAME(run, VERSION)
@@ -147,7 +162,7 @@ def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
     ## Import data directly from Illustris
     if( not loadsave ):
         # Import data
-        snapData = importBHSnapshotData(run, verbose=verbose, debug=debug)
+        snapData = _importBHSnapshotData(run, verbose=verbose, debug=debug)
         # Save data to NPZ file
         zio.dictToNPZ(snapData, saveFileName, verbose=verbose)
 
@@ -157,12 +172,26 @@ def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
 # loadBHSnapshotData()
 
 
-def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
+def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
     """
+    Import BH particle data directly from illustris snapshots.
+
+    Arguments
+    ---------
+       run     <int>  : illustris simulation number {1,3}
+       verbose <bool> : optional, print verbose output
+       debug   <bool> : optional, print extremely verbose output for diagnostics
+
+    Returns
+    -------
+       data    <dict> : BH snapshot particle data for each merger
+       
+                        Each entry in the dictionary is shapes [N,2] for ``N`` mergers,
+                        and each of ``BH_IN`` and ``BH_OUT``.
 
     """
 
-    if( verbose ): print " - - BHSnapshotData.importBHSnapshotData()"
+    if( verbose ): print " - - BHSnapshotData._importBHSnapshotData()"
 
     dir_illustris = GET_ILLUSTRIS_OUTPUT_DIR(run)
     if( verbose ): print " - - - Using illustirs data dir '%s'" % (dir_illustris)
@@ -182,12 +211,16 @@ def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
     #  ========================================
     first = True
     if( verbose ): print " - - - Iterating over snapshots"
-    for snap in xrange(NUM_SNAPS):
+    beg = datetime.now()
+    if( not debug ): print "\t\t|%s|\n\t\t|" % (" "*(NUM_SNAPS-2)),
+    for snap in xrange(NUM_SNAPS-1):
+
+        # if( num_pos > 100 ): break
 
         if( debug ): print "Snapshot %d/%d" % (snap, NUM_SNAPS)
         
-        # Get Mergers for this Snapshot
-        mrgs = mergers[MERGERS_MAP_STOM][snap]
+        # Get Mergers occuring just after this Snapshot
+        mrgs = mergers[MERGERS_MAP_STOM][snap+1]
         nums = len(mrgs)
         targetIDs = mergers[MERGERS_IDS][mrgs]
         if( debug ): print "Targeting %d mergers" % (nums)
@@ -198,7 +231,10 @@ def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
         # If there are any mergers, load snapshot
         if( nums > 0 ):
 
-            snap = ill.snapshot.loadSubset(dir_illustris, snap, 'bh', fields=SNAPSHOT_FIELDS)
+            # catch non-fatal output
+            with Capturing() as output:
+                snap = ill.snapshot.loadSubset(dir_illustris, snap, 'bh', fields=SNAPSHOT_FIELDS)
+
             snap_keys = snap.keys()
             if( 'count' in snap_keys ): snap_keys.remove('count')
             if( debug ): print "Loaded %d particles" % (snap['count'])
@@ -207,7 +243,7 @@ def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
             if( first ):
                 if( debug ): print "Initializing output dictionary"
                 for key in snap_keys: 
-                    data[key] = -1*np.ones([numMergers, 2], dtype=np.dtype(snap[key][0]))
+                    data[key] = np.zeros([numMergers, 2], dtype=np.dtype(snap[key][0]))
                     
                 first = False
 
@@ -233,18 +269,24 @@ def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
         # } if nums
 
+        sys.stdout.write('.')
+        sys.stdout.flush()
+
     # } for snap
 
-    if( verbose ): print " - - - - %d Matched, %d Missing" % (num_pos, num_neg)
+    if( not debug ): print "|"
+    end = datetime.now()
+
+    if( verbose ): print " - - - - %d Good, %d Bad - after %s" % (num_pos, num_neg, str(end-beg))
 
     # Add Meta-Data
     data[SNAP.VERSION] = VERSION
-    data[SNAP.VERSION] = run
-    data[SNAP.VERSION] = str(datetime.now())
-    data[SNAP.VERSION] = dir_illustris
+    data[SNAP.RUN]     = run
+    data[SNAP.CREATED] = str(datetime.now())
+    data[SNAP.DIR_SRC] = dir_illustris
 
     return data
     
-# importBHSnapshotData()
+# _importBHSnapshotData()
 
 
