@@ -10,7 +10,7 @@ from datetime import datetime
 import illpy
 from illpy.Constants import NUM_SNAPS, DTYPE_ID, DTYPE_SCALAR, GET_ILLUSTRIS_OUTPUT_DIR
 from illpy.illbh import BHMergers
-from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_IDS
+from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_IDS, BH_IN, BH_OUT
 
 from Settings import *
 
@@ -18,13 +18,13 @@ import plotting as gwplot
 
 import illustris_python as ill
 
-
 RUN_NUM = 3
-
-PARTICLE_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 
 #SAVE_FILE = "ill-3_bh-mergers_snapshots_smoothing-lengths.npz"
 
+SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
+
+VERSION = 0.1
 
 
 ###  ==============================================================  ###
@@ -35,7 +35,7 @@ PARTICLE_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 
 def main(run=RUN_NUM, verbose=VERBOSE):
 
-    print " - SmoothingLengths.py"
+    print " - BHSnapshotData.py"
 
     start_time  = datetime.now()
 
@@ -49,9 +49,9 @@ def main(run=RUN_NUM, verbose=VERBOSE):
 
     ### Load Smoothing Lengths ###
 
-    print " - Loading smoothing lengths"
+    print " - Loading Blackhole Snapshot Particle Data"
 
-    bhHsml, sfHsml, bhMass = getSmoothingLengths(run, base)
+    bhHsml, sfHsml, bhMass = importBHSnapshotData(run, base)
 
     # Plot
     gwplot.plotFig5_SmoothingLengths(bhHsml, sfHsml, bhMass)
@@ -96,11 +96,12 @@ def main(run=RUN_NUM, verbose=VERBOSE):
 ###  ==============================================================  ###
 
 
-def importSmoothingLengths(run, verbose=VERBOSE):
+def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
-    if( verbose ): print " - - SmoothingLengths.importSmoothingLengths()"
+    if( verbose ): print " - - BHSnapshotData.importBHSnapshotData()"
 
     dir_illustris = GET_ILLUSTRIS_OUTPUT_DIR(run)
+    if( verbose ): print " - - - Using illustirs data dir '%s'" % (dir_illustris)
 
     ## Load BH Mergers
     #  ===============
@@ -109,40 +110,72 @@ def importSmoothingLengths(run, verbose=VERBOSE):
     numMergers = mergers[MERGERS_NUM]
     if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
 
-    bhHsml = -1*np.ones([numMergers, 2], dtype=DTYPE_SCALAR)
-    sfHsml = -1*np.ones([numMergers, 2], dtype=DTYPE_SCALAR)
-    bhMass = -1*np.ones([numMergers, 2], dtype=DTYPE_SCALAR)
-    bhID   = -1*np.ones([numMergers, 2], dtype=DTYPE_ID)
+    data = {}
+    num_pos = 0
+    num_neg = 0
 
-    count = 0
-
+    ## Iterate Over Each Snapshot, Loading Data
+    #  ========================================
+    first = True
+    if( verbose ): print " - - - Iterating over snapshots"
     for snap in xrange(NUM_SNAPS):
+
+        if( debug ): print "Snapshot %d/%d" % (snap, NUM_SNAPS)
         
-        # Get number of mergers in this snapshot
-        nmerg = len(base.s2m[snap])
+        # Get Mergers for this Snapshot
+        mrgs = mergers[MERGERS_MAP_STOM][snap]
+        nums = len(mrgs)
+        targetIDs = mergers[MERGERS_IDS][mrgs]
+        if( debug ): print "Targeting %d mergers" % (nums)
+        
+        pos = 0
+        neg = 0
 
         # If there are any mergers, load snapshot
-        if( nmerg > 0 ):
+        if( nums > 0 ):
 
-            snap = ill.snapshot.loadSubset(dir_illustris, snap, 'bh', fields=PARTICLE_FIELDS)
+            snap = ill.snapshot.loadSubset(dir_illustris, snap, 'bh', fields=SNAPSHOT_FIELDS)
+            snap_keys = snap.keys()
+            if( 'count' in snap_keys ): snap_keys.remove('count')
+            if( debug ): print "Loaded %d particles" % (snap['count'])
 
-            dat = np.load(fname)
-
-            # Get the merger numbers for these BHs
-            minds = dat['mergers']
-        
-            count += len(minds)
-
-            bhHsml[minds,:] = dat['BH_Hsml']
-            sfHsml[minds,:] = dat['SubfindHsml']
-            bhMass[minds,:] = dat['BH_Mass']
+            # First time through, initialize dictionary of results
+            if( first ):
+                if( debug ): print "Initializing output dictionary"
+                for key in snap_keys: 
+                    data[key] = -1*np.ones([numMergers, 2], dtype=np.dtype(snap[key][0]))
+                    
+                first = False
 
 
-    print " - - Retrieved %d/%d mergers" % (count, numMergers)
+            # Match target BHs
+            if( debug ): print "Matching BHs"
+            for index,tid in zip(mrgs,targetIDs):
+                for BH in [BH_IN, BH_OUT]:
+                    ind = np.where( snap['ParticleIDs'] == tid[BH] )[0]
+                    if( len(ind) == 1 ):
+                        pos += 1
+                        for key in snap_keys: data[key][index,BH] = snap[key][ind[0]]
+                    else:
+                        neg += 1
 
-    return bhHsml, sfHsml, bhMass
+                # } for BH
+
+            # } for index,tid
+                
+            if( debug ): print "%d Matching, %d Missing" % (pos, neg)
+            num_pos += pos
+            num_neg += neg
+
+        # } if nums
+
+    # } for snap
+
+    if( verbose ): print " - - - - %d Matched, %d Missing" % (num_pos, num_neg)
+
+    return data
     
-# importSmoothingLengths()
+# importBHSnapshotData()
 
 
 def analyzeSmoothingLengths(bhHsml, sfHsml, bhMass):
