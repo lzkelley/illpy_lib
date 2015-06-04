@@ -6,6 +6,8 @@
 import numpy as np
 import scipy as sp
 from datetime import datetime
+from enum import Enum
+import os
 
 import illpy
 from illpy.Constants import NUM_SNAPS, DTYPE_ID, DTYPE_SCALAR, GET_ILLUSTRIS_OUTPUT_DIR
@@ -13,26 +15,37 @@ from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_IDS, BH_IN, BH_OUT
 
 from Settings import *
-
 import plotting as gwplot
 
 import illustris_python as ill
 
+import zcode
+import zcode.InOut as zio
+
+
 RUN_NUM = 3
 
-#SAVE_FILE = "ill-3_bh-mergers_snapshots_smoothing-lengths.npz"
+
+
+_SAVE_FILE_NAME = "ill-%d_bh_snapshot_data_v-%.1f.npz"
+def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
+
+def SNAP(Enum):
+    VERSION = 'version'
+    CREATED = 'created'
+    RUN     = 'run'
+    DIR_SRC = 'directory'
+
 
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 
 VERSION = 0.1
 
 
-###  ==============================================================  ###
-###  ===========================  MAIN  ===========================  ###
-###  ==============================================================  ###
+    
 
 
-
+'''
 def main(run=RUN_NUM, verbose=VERBOSE):
 
     print " - BHSnapshotData.py"
@@ -85,18 +98,69 @@ def main(run=RUN_NUM, verbose=VERBOSE):
     return
 
 # main()
+'''
 
 
 
+def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
+    """
+    Load Blackhole snapshot particle data.
+
+    If ``loadsave``, first data is attempted to be loaded from existing savefile.  If this fails,
+    of if ``loadsave`` is `False`, then the data is reimported directly from illustris snapshots.
+
+    Arguments
+    ---------
+       run      <int>  : illustris simulation number {1,3}
+       loadsave <bool> : optional, attempt to load previous save
+       verbose  <bool> : optional, print verbose output
+       debug    <bool> : optional, print extremely verbose diagnostic output
+
+    Returns
+    -------
+       snapData <dict> : dictionary of snapshot particle data for all merger BHs
+
+                         Each entry in the dictionary is shaped as [N,2] where ``N`` is the 
+                         number of mergers
+
+    """
+    
+    if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
+    
+    saveFileName = GET_SAVE_FILE_NAME(run, VERSION)
+
+    ## Load Existing Data
+    if( loadsave ):
+        # If save file exists, load it
+        if( os.path.exists(saveFileName) ):
+            snapData = zio.npzToDict(saveFileName)
+            # Make sure version matches
+            if( snapData[SNAP.VERSION] != VERSION ):
+                print " - - - Snapshot Data save file '%s' is out of date!" % (saveFileName)
+                loadsave = False
+
+        else:
+            print " - - - Snapshot Data save file '%s' does not exist!" % (saveFileName)
+            loadsave = False
 
 
+    ## Import data directly from Illustris
+    if( not loadsave ):
+        # Import data
+        snapData = importBHSnapshotData(run, verbose=verbose, debug=debug)
+        # Save data to NPZ file
+        zio.dictToNPZ(snapData, saveFileName, verbose=verbose)
 
-###  ==============================================================  ###
-###  =====================  PRIMARY FUNCTIONS  ====================  ###
-###  ==============================================================  ###
+
+    return snapData
+
+# loadBHSnapshotData()
 
 
 def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
+    """
+
+    """
 
     if( verbose ): print " - - BHSnapshotData.importBHSnapshotData()"
 
@@ -173,20 +237,14 @@ def importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
     if( verbose ): print " - - - - %d Matched, %d Missing" % (num_pos, num_neg)
 
+    # Add Meta-Data
+    data[SNAP.VERSION] = VERSION
+    data[SNAP.VERSION] = run
+    data[SNAP.VERSION] = str(datetime.now())
+    data[SNAP.VERSION] = dir_illustris
+
     return data
     
 # importBHSnapshotData()
 
-
-def analyzeSmoothingLengths(bhHsml, sfHsml, bhMass):
-    
-    print " - analyzeSmoothingLengths()"
-
-
-    return
-
-
-
-
-if __name__ == "__main__": main()
 
