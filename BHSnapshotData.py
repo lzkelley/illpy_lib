@@ -17,7 +17,6 @@ from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_IDS, BH_IN, BH_OUT
 
 from Settings import *
-import plotting as gwplot
 
 import illustris_python as ill
 
@@ -32,17 +31,13 @@ VERSION = 0.2
 _SAVE_FILE_NAME = "ill-%d_bh_snapshot_data_v-%.1f.npz"
 def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
 
-#class SNAP(Enum):
 class SNAP():
     VERSION = 'version'
     CREATED = 'created'
     RUN     = 'run'
     DIR_SRC = 'directory'
 
-
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
-
-
 
 class Capturing(list):
 
@@ -58,62 +53,6 @@ class Capturing(list):
         sys.stdout = self._stdout
         sys.stderr = self._stderr
     
-
-
-'''
-def main(run=RUN_NUM, verbose=VERBOSE):
-
-    print " - BHSnapshotData.py"
-
-    start_time  = datetime.now()
-
-    ### Load Basic Simulation and Merger Variables ###
-    print " - Loading Basics"
-    start = datetime.now()
-    base = Basics.Basics(run)
-    stop = datetime.now()
-    print " - - Loaded after %s" % (str(stop-start))
-
-
-    ### Load Smoothing Lengths ###
-
-    print " - Loading Blackhole Snapshot Particle Data"
-
-    bhHsml, sfHsml, bhMass = importBHSnapshotData(run, base)
-
-    # Plot
-    gwplot.plotFig5_SmoothingLengths(bhHsml, sfHsml, bhMass)
-
-
-    ### Get Effective Smoothing Length for each Merger ###
-
-    Hsml = -1.0*np.ones(len(bhHsml), dtype=DBL)
-
-    # Find mergers where both BHs have smoothing lengths
-    inds = np.where( (bhHsml[:,0] >= 0.0) & (bhHsml[:,1] >= 0.0) )[0]
-
-    # Get max of each pair of smoothing lengths
-    Hsml[inds] = np.max( bhHsml[inds], axis=1 )
-
-    # Save
-    fname = PP_MERGERS_SNAPSOT_SMOOTHING_LENGTHS(run)
-    hdict = { 'run':run,
-              'bh_Hsml':bhHsml,
-              'sf_Hsml':sfHsml,
-              'Hsml':Hsml }
-
-    np.savez(fname, **hdict)
-    print " - - Saved to '%s'" % (fname)
-
-    end_time    = datetime.now()
-    durat       = end_time - start_time
-    
-    print "\nDone after %s\n\n" % (str(durat))
-
-    return
-
-# main()
-'''
 
 
 
@@ -148,9 +87,12 @@ def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
     if( loadsave ):
         # If save file exists, load it
         if( os.path.exists(saveFileName) ):
+            if( verbose ): print " - - - Snapshot Data save file '%s' Exists" % (saveFileName)
             snapData = zio.npzToDict(saveFileName)
             # Make sure version matches
-            if( snapData[SNAP.VERSION] != VERSION ):
+            if( snapData[SNAP.VERSION] == VERSION ):
+                if( verbose ): print " - - - Snapshot Particle Data loaded"
+            else:
                 print " - - - Snapshot Data save file '%s' is out of date!" % (saveFileName)
                 loadsave = False
 
@@ -288,5 +230,8 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
     return data
     
 # _importBHSnapshotData()
+
+
+
 
 
