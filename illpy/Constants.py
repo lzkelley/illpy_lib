@@ -48,11 +48,13 @@ FLT  = np.float32
 DBL  = np.float64
 ULNG = np.uint64
 
-
+DTYPE_ID     = np.uint64
+DTYPE_SCALAR = np.float64
+DTYPE_INDEX  = np.int64
 
 ### Illustris Constants ###
 
-NUM_SNAPS             = 136
+NUM_SNAPS              = 136
 
 _ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
                            2 : "L75n910FP",
