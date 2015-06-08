@@ -28,7 +28,7 @@ RUN_NUM = 3
 VERSION = 0.2
 
 
-_SAVE_FILE_NAME = "ill-%d_bh_snapshot_data_v-%.1f.npz"
+_SAVE_FILE_NAME = "./data/ill-%d_bh_snapshot_data_v-%.1f.npz"
 def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
 
 class SNAP():
