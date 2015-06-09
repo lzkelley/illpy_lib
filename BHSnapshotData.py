@@ -12,7 +12,7 @@ from cStringIO import StringIO
 import sys
 
 import illpy
-from illpy.Constants import NUM_SNAPS, DTYPE_ID, DTYPE_SCALAR, GET_ILLUSTRIS_OUTPUT_DIR
+from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR
 from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_IDS, BH_IN, BH_OUT
 
