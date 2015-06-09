@@ -48,9 +48,18 @@ FLT  = np.float32
 DBL  = np.float64
 ULNG = np.uint64
 
+"""
 DTYPE_ID     = np.uint64
 DTYPE_SCALAR = np.float64
 DTYPE_INDEX  = np.int64
+"""
+
+class DTYPE():
+    ID     = np.uint64
+    SCALAR = np.float64
+    INDEX  = np.int64
+
+
 
 ### Illustris Constants ###
 
