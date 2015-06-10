@@ -8,5 +8,5 @@ __status__ = "Development"
 
 
 import Constants
-import Subhalos
+import Subhalo
 import Profiler
