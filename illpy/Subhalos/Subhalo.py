@@ -1,153 +1,90 @@
 
-import sys
-import os
 from datetime import datetime
-
-from lib import readtreeHDF5
-from lib import readsubfHDF5
-#import arepo
+import numpy as np
 
 import illpy
-from illpy import Cosmology
-from illpy.Constants import *
-from illpy import AuxFuncs as aux
-from illpy.illbh.BHConstants import *
+from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
 
-import Constants
-from Constants import *
+import illustris_python as ill
 
-
-VERSION = 0.2
 VERBOSE = True
 
+LOAD_PARTICLES = [PARTICLE.GAS, PARTICLE.DM, PARTICLE.STAR, PARTICLE.BH]
 
-def loadSubhaloParticles(run, snapNum, subhaloInds, noreturn=False, loadsave=True, verbose=VERBOSE):
+
+
+def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOSE):
     """
-    Load the particle data from an Illustris snapshot corresponding to the target subhalo(s).
+    Import particle data for a given Subhalo from the illustris snapshot files.
+
+    The target particle types are the standard, e.g. 0-gas, 1-dm, etc described by the constants in
+    ``illpy.Constants.PARTICLE``.  Each particle type has a different set of parameters returned in
+    the resulting dictionaries in the ``data`` output.
 
     Arguments
     ---------
-    run         : <int>, illustris simulation number {1,3}
-    snapNum     : <int>, illustris snapshot number {0,135}
-    subhaloInds : array_like<int>[N], single or multiple subhalo indices to retrieve
-    loadsave    : <bool>, optional=True, load previous save if possible
-    verbose     : <bool>, optional=VERBOSE, verbose output
+       run       <int>      : Illustris simulation number {1,3}
+       snapNum   <int>      : Illustris snapshot number {1,135}
+       subhalo   <int>      : Subhalo index for this snapshot
+       partTypes <int>([N]) : optional, Target particle types; if `None`, all are loaded
+       verbose   <bool>     : optional, print verbose output
 
     Returns
     -------
-    subhalos    : <dict>[N], list of 'Subhalo' dictionaries of particle data
+       data      <dict>([N]) : dictionary of target particle data
+                               If a single ``partType`` is given, a single dictionary is returned.
+                               Otherwise a list of dictionaries, one for each ``partType`` is
+                               returned in the same order as provided.
+
+    Additional Parameters
+    ---------------------
+       LOAD_PARTICLES <int>[N] : Default list of particle types to load if ``partType == None``.
 
     """
 
-    yesReturn = not noreturn
-
-    # Make sure input indices are iterable
-    if( not np.iterable(subhaloInds) ): subhInds = np.array([subhaloInds])
-    else:                               subhInds = np.array( subhaloInds )
-
-    if( verbose ): print " - - Subhalos.loadSubhaloParticles()"
-
-    if( verbose ): print " - - - Loading %d subhalos" % (len(subhInds))
-    groupCat = None
-
-    if( yesReturn ): subhalos = []
-
-    ### Iterate over Target Subhalo Indices ###
-    for ii,shind in enumerate(subhInds):
-        fileName = Constants.GET_SUBHALO_PARTICLES_FILENAMES(run, snapNum, shind)
-        if( verbose ): print " - - - - %d : Subhalo %d - '%s'" % (ii, shind, fileName)
-
-        loadsave_flag = loadsave
-        # Try to load Existing Save
-        if( loadsave_flag ):
-            # Make sure file exists
-            if( os.path.exists(fileName) ):
-                if( verbose ): print " - - - - - Loading from previous save"
-                subhaloData = aux.npzToDict(fileName)
-                # Really old version didn't have ``version`` information... catch that
-                try:             loadVers = subhaloData[SUBHALO_VERSION]
-                except KeyError: loadVers = -1.0
-
-                # Make sure version is up to date
-                if( loadVers != VERSION ):
-                    print "Subhalos.loadSubhaloParticles() : Loaded version %s" % (str(loadVers))
-                    print "Subhalos.loadSubhaloParticles() : VERSION %s" % (str(VERSION))
-                    print "Subhalos.loadSubhaloParticles() : re-importing particle data!!"
-                    loadsave_flag = False
-
-            else:
-                print "``loadsave`` file '%s' does not exist!" % (fileName)
-                loadsave_flag = False
-
-        # Re-import data directly from illustris snapshots
-        if( not loadsave_flag ):
-            if( verbose ): print " - - - - - Reloading EplusA Particles from snapshot"
-            # Import data 
-            subhaloData, groupCat = _importSubhaloParticles(run, snapNum, shind, 
-                                                            groupCat=groupCat, verbose=verbose)
-            # Save data
-            aux.dictToNPZ(subhaloData, fileName, verbose=True)
-
-
-        if( yesReturn ): subhalos.append(subhaloData)
-
-    # } ii
-
-    if( yesReturn ):
-        subhalos = np.array(subhalos)
-        return subhalos
-
-    return
-
-# loadSubhaloParticles()
-
-
-
-def _importSubhaloParticles(run, snapNum, subhaloInd, groupCat=None, verbose=VERBOSE):
-
-    import arepo
-
     if( verbose ): print " - - Subhalos._importSubhaloParticles()"
 
+    ## Prepare Particle Types to Import
+    #  --------------------------------
+
+    # Set particle types to Default
+    if( partTypes is None ): partTypes = LOAD_PARTICLES
+
+    # Make sure ``partTypes`` is iterable
+    if( not np.iterable(partTypes) ): partTypes = [ partTypes ]
+
+    # Get names of particle types
+    partNames = [ PARTICLE.NAMES(ptype) for ptype in partTypes ]
+
     # Get snapshot file path and filename
-    snapshotPath = GET_ILLUSTRIS_SNAPSHOT_FIRST_FILENAME(run, snapNum)
-
-    ### If Group Catalog is not Provided, load it ###
-    if( groupCat is None ):
-
-        # Get group catalog file path and filename
-        groupPath = GET_ILLUSTRIS_GROUPS_FIRST_FILENAME(run, snapNum)
-
-        # Load subfind catalog
-        if( verbose ): print " - - - Loading subfind catalog from '%s'" % (groupPath)
-        groupCat = arepo.Subfind(groupPath, combineFiles=True)
+    outputPath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
 
+    ## Load Snapshot data for target Particles
+    #  ---------------------------------------
 
-    ### Load Snapshot Data ###
-
-    # Create filter for target subhalo
-    filter = [ arepo.filter.Halo(groupCat, subhalo=subhaloInd) ]
-    # Load snapshot
     if( verbose ): print " - - - Loading snapshot data"
-    start = datetime.now()
-    data = arepo.Snapshot(snapshotPath, filter=filter, fields=SNAPSHOT_PROPERTIES,
-                          combineFiles=True, verbose=False )
-    stop = datetime.now()
-    if( verbose ): print " - - - - Loaded after %s" % (str(stop-start))
+    data = []
+    if( verbose ): start_all = datetime.now()
+    # Iterate over particle types
+    for ptype,pname in zip(partTypes,partNames):
+        if( verbose ): start = datetime.now()
+        partData = ill.snapshot.loadSubhalo(outputPath, snapNum, subhalo, ptype )
+        data.append(partData)
+        if( verbose ): stop = datetime.now()
+        numParts = partData['count']
+        numParams = len(partData.keys())-1
+        if( verbose ): 
+            print "         %8d %6s, %2d pars, after %s" % \
+                (numParts, pname, numParams, str(stop-start))
 
-    ### Convert Snapshot Data into Dictionary ###
 
-    dataDict = {}
-    for snapKey in SNAPSHOT_PROPERTIES:
-        dataDict[snapKey] = getattr(data, snapKey)
+    if( verbose ): stop_all = datetime.now()
+    if( verbose ): print " - - - - All After %s" % (str(stop_all-start_all))
 
-    dataDict[SUBHALO_ID]       = subhaloInd
-    dataDict[SUBHALO_RUN]      = run
-    dataDict[SUBHALO_SNAPSHOT] = snapNum
-    dataDict[SUBHALO_CREATED]  = datetime.now().ctime()
-    dataDict[SUBHALO_VERSION]  = VERSION
+    # If single particle, don't both with list
+    if( len(data) == 1 ): data = data[0]
 
-    return dataDict, groupCat
+    return data
 
-# _importSubhaloParticles()
+# importSubhaloParticles()
