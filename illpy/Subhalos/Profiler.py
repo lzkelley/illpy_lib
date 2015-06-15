@@ -3,125 +3,329 @@
 
 """
 
-
-import sys
-import os
 from datetime import datetime
-
 import numpy as np
-import scipy as sp
-from scipy import optimize
+import matplotlib.pyplot as plt
 
 import illpy
-from illpy import Cosmology
-from illpy.Constants import *
-from illpy import AuxFuncs as aux
+from illpy.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
 
-from Constants import *
+import Subhalo
+import Constants
+from Constants import SNAPSHOT
+
+import zcode
+import zcode.Math as zmath
+import zcode.Plotting as zplot
 
 VERBOSE = True
-_VERSION = 0.1
-
 
 NUM_RAD_BINS = 40
 RAD_EXTREMA = [ 1.0, 1.0e6 ]                      # [parsecs]
 
 
-def getSubhaloRadialProfiles(data, bins=None, nbins=NUM_RAD_BINS, verbose=VERBOSE):
 
-    if( verbose ): print " - - Profiler.getSubhaloRadialProfiles()"
-
-    numParts = data[SNAPSHOT_NPART]
-    cumNumParts = np.concatenate([[0],np.cumsum(numParts)])
-    slices = [ slice( cumNumParts[ii], cumNumParts[ii+1] ) for ii in range(len(numParts)) ]
-
-    # Get Number of Particles
-    ngas      = data[SNAPSHOT_NPART][PARTICLE_TYPE_GAS]
-    nstars    = data[SNAPSHOT_NPART][PARTICLE_TYPE_STAR]
-    ndm       = data[SNAPSHOT_NPART][PARTICLE_TYPE_DM]
-
-    if( verbose ): print " - - - Number of DM %d, Stars %d, Gas %d" % (ndm, nstars, ngas)
-
-
-    ### Load Masses, Densities and Create Profiles ###
-    rhoGas    = data[SNAPSHOT_DENS]*DENS_CONV      # Only gas has 'density'/'rho'
-    massGas   = data[SNAPSHOT_MASS][:ngas]*MASS_CONV
-    massStars = data[SNAPSHOT_MASS][ngas:(ngas+nstars)]*MASS_CONV
-    massDM    = data[SNAPSHOT_MASSES][PARTICLE_TYPE_DM]*MASS_CONV
-
-
-    posAll = data[SNAPSHOT_POS]
-    posAll = reflectPos(posAll)
-
-
-    ### Get Positions and Radii of Each Particle ###
-    bhmass = data[SNAPSHOT_BH_MASS]
-    posBH = posAll[slices[PARTICLE_TYPE_BH  ]]
-    # If there are multiple BHs, use the most-massive as the CoM
-    if( len(bhmass) > 1 ):
-        bhind = np.argmax(bhmass)
-        posBH = posBH[bhind]
-
-
-    posGas    = posAll[slices[PARTICLE_TYPE_GAS ]]
-    posDM     = posAll[slices[PARTICLE_TYPE_DM  ]]
-    posStars  = posAll[slices[PARTICLE_TYPE_STAR]]
+### Subhalo Profiles ###
+'''
+PROFILE_BIN_EDGES = 'bin_edges'
+PROFILE_BIN_AVES  = 'bin_aves'
+PROFILE_GAS       = 'gas'
+PROFILE_STARS     = 'stars'
+PROFILE_DM        = 'dm'
+PROFILE_COLS      = 'cols'
+PROFILE_CREATED   = 'created'
+PROFILE_VERSION   = 'version'
+'''
 
 
 
-    # Select a center position
-    # posCenter = posBH
-    # posCenter = posAve
-    posCenter = np.median(posStars, axis=0)
 
-    # Subtract off BH position
-    posGas   -= posCenter
-    posDM    -= posCenter
-    posStars -= posCenter
+def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS, 
+                          refid=None, verbose=VERBOSE, debug=False):
 
-    radsGas   = np.array([ aux.getMagnitude(vec) for vec in posGas   ])*DIST_CONV
-    radsDM    = np.array([ aux.getMagnitude(vec) for vec in posDM    ])*DIST_CONV
-    radsStars = np.array([ aux.getMagnitude(vec) for vec in posStars ])*DIST_CONV
+    if( verbose ): print " - - Profiler.subhaloRadialProfiles()"
 
-    # Create Radial Bins if they are not provided
-    if( bins is None ):
-        radsExtr  = np.concatenate([radsGas, radsDM, radsStars])
-        radsExtr  = aux.extrema(radsExtr, nonzero=True)
-        bins      = np.logspace( *np.log10(radsExtr), num=nbins+1 )
+    if( verbose ): print " - - - Loading subhalo partile data"
+    partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
+    partNums = [ pd['count'] for pd in partData ]
+    partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
+    numPartTypes = len(partNums)
+    if( verbose ):
+        print " - - - - Run %d, Snap %d, Subhalo %d : Loaded %s particles" % \
+            (run, snapNum, subhalo, str(partNums))
 
+
+    # Get the mass of each DM particle for this run (hard-coded in illpy.Constants)
+    massPerDM = GET_ILLUSTRIS_DM_MASS(run)
+
+    pos_com = np.zeros([numPartTypes, 3], dtype=DTYPE.SCALAR)
+    
+    pos = []; pot = []; vdisp = []; mass = []
+    # Iterate over all particle types and their data
+    if( debug ): print " - - - Extracting particle properties"
+    for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
+        # ids_p = data[SNAPSHOT.IDS]
+        pos_p   = reflectPos(data[SNAPSHOT.POS])
+        pot_p   = data[SNAPSHOT.POT]
+        vdisp_p = data[SNAPSHOT.SUBF_VDISP]
+        # DarkMatter Particles
+        if( ptype == PARTICLE.DM ): 
+            mass_p = massPerDM
+            for jj in range(3): pos_com[ii, jj] = np.average( pos_p[:,jj] )
+        # Other Particles
+        else:
+            mass_p = data[SNAPSHOT.MASS]
+            for jj in range(3): pos_com[ii, jj] = np.average( pos_p[:,jj], weights=mass_p )
+
+        pos.append(pos_p)
+        pot.append(pot_p)
+        vdisp.append(vdisp_p)
+        mass.append(mass_p)
+        
+    # } for data, ptype
+
+
+    refCOM = None
+    if( refid is not None ):
+        for pdat,pname in zip(partData, partNames):
+            inds = np.where( pdat[SNAPSHOT.IDS] == refid )[0]
+            if( len(inds) == 1 ): 
+                if( verbose ): print " - - - Found Most Bound Particle in '%s'" % (pname)
+                refCOM = pdat[SNAPSHOT.POS][inds]
+                break
+    
+        # } pdat,pname
+
+    '''
+    if( refCOM is not None ):
+        print zmath.dist( pos_com, refCOM )
+
+    return
+    '''
+
+
+    rads  = np.zeros([numPartTypes, numPartTypes], dtype=object)
+    radExtrema = None
+
+    potsAll = []
+    radsAll = []
+    dispAll = []
+
+    # Iterate over COM of particles ``ii``
+    if( debug ): print " - - - Finding Radii for each COM"
+    for ii, pt1 in enumerate(partTypes):
+
+        # Iterate over particles ``jj`` to find postitions relative to COM
+        for jj, pt2 in enumerate(partTypes):
+
+            # Calculate distances of particles ``jj`` from COM ``ii``
+            # rads_p = np.sqrt( np.sum( np.square(pos[jj] - pos_com[ii]), axis=1) )
+            rads_p = zmath.dist(pos[jj], pos_com[ii])
+            rads[jj,ii] = rads_p
+
+            # Find extrema for all combinations
+            radExtrema = zmath.minmax(rads_p, prev=radExtrema, nonzero=True)
+
+            if( jj == 0 ): 
+                pot_all = np.array(pot[jj])
+                rads_all = np.array(rads_p)
+                vdisp_all = np.array(vdisp[jj])
+            else:
+                pot_all = np.concatenate([pot_all, pot[jj]])
+                rads_all = np.concatenate([rads_all, rads_p])
+                vdisp_all = np.concatenate([vdisp_all, vdisp[jj]])
+
+        # } for jj, pt2
+
+        potsAll.append(pot_all)
+        radsAll.append(rads_all)
+        dispAll.append(vdisp_all)
+
+    # } for ii, pt1
+
+    refRads = None
+    refPots = None
+    refDisp = None
+    if( refCOM is not None ):
+        # Iterate over particles ``jj`` to find postitions relative to COM
+        for jj, pt2 in enumerate(partTypes):
+
+            rads_p = zmath.dist(pos[jj], refCOM)
+
+            if( jj == 0 ): 
+                refPots = np.array(pot[jj])
+                refRads = np.array(rads_p)
+                refDisp = np.array(vdisp[jj])
+            else:
+                refPots = np.concatenate([refPots, pot[jj]])
+                refRads = np.concatenate([refRads, rads_p])
+                refDisp = np.concatenate([refDisp, vdisp[jj]])
+
+        # } for jj, pt2
+
+
+    # Create radial bin spacings, these will be the upper-bound radii
+    radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
 
     # Find average bin positions, and radial bin (shell) volumes
-    binAves = np.zeros(nbins)
     binVols = np.zeros(nbins)
-    for ii in range(len(bins)-1):
-        binAves[ii] = np.average([bins[ii], bins[ii+1]])
-        binVols[ii] = np.power(bins[ii+1],3.0) - np.power(bins[ii],3.0)
+    for ii in range(len(radBins)):
+        if( ii == 0 ): binVols[ii] = np.power(radBins[ii],3.0)
+        else:          binVols[ii] = np.power(radBins[ii],3.0) - np.power(radBins[ii-1],3.0)
+    # } ii
+
+    densBins = np.zeros([numPartTypes, nbins, numPartTypes], dtype=DTYPE.SCALAR)
+    massBins = np.zeros([numPartTypes, nbins, numPartTypes], dtype=DTYPE.SCALAR)
+
+    # Iterate over COM of particles ``ii``
+    if( debug ): print " - - - Binning properties by radii"
+    for ii, pt1 in enumerate(partTypes):
+        # Iterate over properties for particles ``jj``
+        for jj, pt2 in enumerate(partTypes):
+
+            # Get the total mass in each bin
+            counts, massBins[jj,:,ii] = zmath.histogram(rads[jj,ii], radBins, weights=mass[jj],
+                                                        edges='right', func='sum', stdev=False)
+            
+            # Divide by volume to get density
+            densBins[jj,:,ii] = massBins[jj,:,ii]/binVols
+
+        # } for jj, pt2
+    # } for ii, pt1
+
+    return radBins, massBins, densBins, radsAll, potsAll, dispAll, refRads, refPots, refDisp, partTypes
+
+# subhaloRadialProfiles()
 
 
-    colsStars = data[SNAPSHOT_STELLAR_PHOTOS]     # Only stars have photometric entries
-    gmr       = np.array([ cols[PHOTO_g] - cols[PHOTO_r] for cols in colsStars])
+
+def plotSubhaloRadialProfiles(run, snapNum, subhalo, refid=None, verbose=VERBOSE):
+
+    plot1 = False
+    plot2 = True
+
+    if( verbose ): print " - - Profiler.plotSubhaloRadialProfiles()"
+
+    if( verbose ): print " - - - Loading Profiles"
+    radBins, massBins, densBins, radsAll, potsAll, dispAll, refRads, refPots, refDisp, partTypes = \
+        subhaloRadialProfiles(run, snapNum, subhalo, refid=refid)
+
+    partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
+    numParts = len(partNames)
 
 
-    ### Create Radial profiles ###
-
-    # Average gas densities in each bin
-    hg = aux.histogram(radsGas,   bins, weights=rhoGas,    ave=True )
-    # Sum Stellar masses in each bin, divide by shell volumes
-    hs = aux.histogram(radsStars, bins, weights=massStars, scale=1.0/binVols)
-    # Sum DM Masses in each bin
-    hd = aux.histogram(radsDM,    bins) 
-    # Weight DM profile by masses and volumes
-    hd = hd*massDM/binVols
-    # Average colors in each bin
-    hc = aux.histogram(radsStars, bins, weights=gmr, ave=True )
+    ## Figure 1
+    #  --------
+    if( plot1 ):
+        fname = '1_%05d.png' % (subhalo)
+        fig1 = plot_1(numParts, partNames, radBins, densBins)
+        fig1.savefig(fname)
+        plt.close(fig1)
+        print fname
 
 
+    ## Figure 2
+    #  --------
+    if( plot2 ):
+        fname = '2_%05d.png' % (subhalo)
+        fig2 = plot_2(numParts, partNames, radsAll, potsAll, dispAll, refRads, refPots, refDisp)
+        fig2.savefig(fname)
+        plt.close(fig2)
+        print fname
 
-    return bins, binAves, hg, hs, hd, hc
-
-# getSubhaloRadialProfiles()
 
 
+    return
+
+# plotSubhaloRadialProfiles()
+
+def plot_1(numParts, partNames, radBins, densBins):
+
+    fig, axes = zplot.subplots(figsize=[10,14], nrows=4)
+    
+    cols = zplot.setColorCycle(numParts)
+    # stys = zplot.setLineStyleCycle(numParts)
+    
+    for ii in range(numParts):
+
+        axes[ii].set_title('COM %s' % partNames[ii])
+
+        for jj in range(numParts):
+
+            ll, = axes[ii].plot(radBins, densBins[jj,:,ii], ls='-', c=cols[jj], lw=2.0, alpha=0.5, 
+                                label=partNames[jj])
+
+    axes[0].legend(loc='lower left', ncol=1, prop={'size':'small'}, 
+                   bbox_transform=fig.transFigure, bbox_to_anchor=(0.01,0.01) )
+
+
+    return fig
+
+# plot_1()
+
+
+def plot_2(numParts, partNames, radsAll, potsAll, dispAll, refRads, refPots, refDisp):
+
+    ALPHA = 0.05
+    PS    = 5
+
+    radsExtr = zmath.minmax(radsAll, nonzero=True)
+    potsExtr = zmath.minmax(potsAll, nonzero=True)
+    dispExtr = zmath.minmax(dispAll, nonzero=True)
+    radsBins = zmath.spacing(radsExtr, num=NUM_RAD_BINS+1)[1:]
+    plotBins = np.concatenate([[radsExtr[0]],radsBins])
+    
+    fig, axes = zplot.subplots(figsize=[10,14], nrows=numParts+1, top=0.95, bot=0.05, left=0.05, right=0.90,
+                               xlim=radsExtr, ylim=dispExtr, twinylim=potsExtr)
+    for ii,ax in enumerate(axes):
+
+        if( ii < numParts ):
+            plotRads = radsAll[ii]
+            plotDisp = dispAll[ii]
+            plotPots = potsAll[ii]
+            plotName = partNames[ii]
+        else:
+            plotRads = refRads
+            plotDisp = refDisp
+            plotPots = refPots
+            plotName = "Most Bound"
+
+        ax.set_title(plotName)
+        tw = ax.twinx()
+        tw.set_yscale('linear')
+
+        ax.scatter(plotRads, plotDisp, marker='o', s=PS, alpha=ALPHA, c='red',  label='VelDisp')
+        tw.scatter(plotRads, plotPots, marker='o', s=PS, alpha=ALPHA, c='blue', label='Potential')
+
+        count, dispHist, dispStd = zmath.histogram(plotRads, radsBins, weights=plotDisp, 
+                                                   func='ave', stdev=True, edges='right')
+
+        inds = np.where( dispStd > 0.0 )
+        dispStd_ave = np.average( dispStd[inds], weights=count[inds] )
+        dispStd_med = np.median( dispStd[inds] )
+
+        zplot.plotHistLine(ax, plotBins, dispHist, yerr=dispStd, c='red', nonzero=True)
+
+        count, potsHist, potsStd = zmath.histogram(plotRads, radsBins, weights=plotPots, 
+                                                   func='ave', stdev=True, edges='right')
+
+        inds = np.where( potsStd > 0.0 )
+        potsStd_ave = np.average( potsStd[inds], weights=count[inds] )
+        potsStd_med = np.median( potsStd[inds] )
+
+        zplot.plotHistLine(tw, plotBins, potsHist, yerr=potsStd, c='blue', nonzero=True)
+
+        print "%10s : %e %e   %e %e" % (plotName, dispStd_ave, dispStd_med, potsStd_ave, potsStd_med)
+
+    # } ii, ax
+
+
+    axes[0].legend(loc='lower left', ncol=1, prop={'size':'small'}, 
+                   bbox_transform=fig.transFigure, bbox_to_anchor=(0.01,0.01) )
+
+    return fig
+
+# plot_2()
 
 
 def reflectPos(pos, center=None):
@@ -161,6 +365,7 @@ def reflectPos(pos, center=None):
 
     return fix
 
+# reflectPos()
 
 
 
