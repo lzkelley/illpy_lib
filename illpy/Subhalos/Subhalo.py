@@ -1,9 +1,19 @@
+"""
+Submodule to import particle data from illustris snapshots.  Wrappers for `illustris_python`.
+
+Functions
+---------
+   importSubhaloParticles() : 
+
+
+
+"""
 
 from datetime import datetime
 import numpy as np
 
 import illpy
-from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
+from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, GET_ILLUSTRIS_GROUPS_DIR, PARTICLE, SUBHALO
 
 import illustris_python as ill
 
@@ -35,6 +45,9 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
                                If a single ``partType`` is given, a single dictionary is returned.
                                Otherwise a list of dictionaries, one for each ``partType`` is
                                returned in the same order as provided.
+
+       partTypes <int>([N])  : Particle number for returned data, same ordering as ``data``.
+
 
     Additional Parameters
     ---------------------
@@ -85,6 +98,54 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
     # If single particle, don't both with list
     if( len(data) == 1 ): data = data[0]
 
-    return data
+    return data, partTypes
 
 # importSubhaloParticles()
+
+
+
+
+def importGroupCatalogData(run, snapNum, subhalos=None, verbose=VERBOSE):
+    """
+    Load group catalog data for all or some subhalos.
+
+    Arguments
+    ---------
+       run      <int>      : illustris simulation run number {1,3}
+       snapNum  <int>      : illustris snapshot number {1,135}
+       subhalos <int>([N]) : optional, target subhalo numbers
+       verbose  <bool>     : optional, print verbose output
+
+    Returns
+    -------
+       subcat   <dict>     : dictionary of catalog properties (see ``illpy.Constants.SUBHALO``)
+
+    """
+
+
+    if( verbose ): print " - - Subhalo.importGroupCatalogData()"
+
+    ## Load Group Catalog
+    #  ------------------
+    path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
+    if( verbose ): print " - - - Loading group catalog from '%s'" % (path_output)
+    gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=SUBHALO.PROPERTIES())
+    numSubhalos = gcat['count']
+    if( verbose ): print " - - - - Loaded %d subhalos" % (numSubhalos)
+
+    # If no subhalos selected, return full catalog
+    if( subhalos is None ): 
+        subcat = dict(gcat)
+        return subcat
+    
+
+    ## Extract Target Subhalos
+    #  -----------------------
+    subcat = {}
+    for key in gcat.keys():
+        if( key is not 'count' ): subcat[key] = gcat[key][subhalos]
+    
+
+    return subcat
+
+# importGroupCatalogData()
