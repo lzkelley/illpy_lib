@@ -105,7 +105,7 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
 
 
 
-def importGroupCatalogData(run, snapNum, subhalos=None, verbose=VERBOSE):
+def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VERBOSE):
     """
     Load group catalog data for all or some subhalos.
 
@@ -125,11 +125,14 @@ def importGroupCatalogData(run, snapNum, subhalos=None, verbose=VERBOSE):
 
     if( verbose ): print " - - Subhalo.importGroupCatalogData()"
 
+    # If no group-catalog fields given, use all of them (available)
+    if( fields is None ): fields = SUBHALO.PROPERTIES()
+
     ## Load Group Catalog
     #  ------------------
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
     if( verbose ): print " - - - Loading group catalog from '%s'" % (path_output)
-    gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=SUBHALO.PROPERTIES())
+    gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
     numSubhalos = gcat['count']
     if( verbose ): print " - - - - Loaded %d subhalos" % (numSubhalos)
 
