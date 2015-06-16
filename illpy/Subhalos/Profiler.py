@@ -41,8 +41,35 @@ PROFILE_VERSION   = 'version'
 
 
 
-def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS, 
-                          mostBound=None, verbose=VERBOSE, debug=False):
+def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS, 
+                          mostBound=None, verbose=VERBOSE):
+    """
+    Construct binned, radial profiles of density for each particle species.
+
+    Profiles for the velocity dispersion and gravitational potential are also constructed for 
+    all particle types together.
+
+    Arguments
+    ---------
+       run       <int>    : illustris simulation run number {1,3}
+       snapNum   <int>    : illustris simulation snapshot number {1,135}
+       subhalo   <int>    : subhalo index number for target snapshot
+       radBins   <flt>[N] : optional, right-edges of radial bins in simulation units
+       nbins     <int>    : optional, numbers of bins to create if ``radBins`` is `None`
+       mostBound <int>    : optional, ID number of the most-bound particle for this subhalo
+       verbose   <bool>   : optional, print verbose output
+
+    Returns
+    -------
+       radBins   <flt>[N]   : coordinates of right-edges of ``N`` radial bins
+       partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy.Constants.PARTICLE``)
+       massBins  <flt>[M,N] : binned radial mass profile for ``M`` particle types, ``N`` bins each
+       densBins  <flt>[M,N] : binned mass density profile
+       potsBins  <flt>[N]   : binned gravitational potential energy profile for all particles
+       dispBins  <flt>[N]   : binned velocity dispersion profile for all particles
+
+    """
+
 
     if( verbose ): print " - - Profiler.subhaloRadialProfiles()"
 
@@ -68,6 +95,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
         # Get most-bound ID number
         mostBound = mostBound[SUBHALO.MOST_BOUND]
 
+    if( mostBound is None ): raise RuntimeError("Could not find mostBound particle ID number!")
+
     # Find the most-bound particle, store its position
     for pdat,pname in zip(partData, partNames):
         inds = np.where( pdat[SNAPSHOT.IDS] == mostBound )[0]
@@ -77,6 +106,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
             break
 
     # } pdat,pname
+
+    if( posRef is None ): raise RuntimeError("Could not find most bound particle in snapshot!")
 
 
     mass = []
@@ -115,7 +146,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
     #  ------------------
 
     # Create radial bin spacings, these are the upper-bound radii
-    radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
+    if( radBins is None ): radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
 
     # Find average bin positions, and radial bin (shell) volumes
     binVols = np.zeros(nbins)
@@ -136,10 +167,9 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
     potsBins = np.zeros([nbins, 2], dtype=DTYPE.SCALAR)
     dispBins = np.zeros([nbins, 2], dtype=DTYPE.SCALAR)
 
+    # Iterate over particle types
     if( verbose ): print " - - - Binning properties by radii"
     for ii, pt1 in enumerate(partTypes):
-
-        print pt1, " : ", np.shape(rads[ii]), np.shape(mass[ii])
 
         # Get the total mass in each bin
         counts, massBins[ii,:] = zmath.histogram(rads[ii], radBins, weights=mass[ii],
@@ -149,6 +179,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
         densBins[ii,:] = massBins[ii,:]/binVols
 
     # } for ii, pt1
+
 
     # Convert list of arrays into 1D arrays of all elements
     rads = np.concatenate(rads)
@@ -168,21 +199,23 @@ def subhaloRadialProfiles(run, snapNum, subhalo, bins=None, nbins=NUM_RAD_BINS,
     dispBins[:,1] = stds
 
 
-    return radBins, massBins, densBins, potsBins, dispBins, partTypes
+    return radBins, partTypes, massBins, densBins, potsBins, dispBins
 
 # subhaloRadialProfiles()
+
 
 
 
 def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VERBOSE):
 
     plot1 = False
+    # plot1 = True
     plot2 = True
 
     if( verbose ): print " - - Profiler.plotSubhaloRadialProfiles()"
 
     if( verbose ): print " - - - Loading Profiles"
-    radBins, massBins, densBins, radsAll, potsAll, dispAll, refRads, refPots, refDisp, partTypes = \
+    radBins, partTypes, massBins, densBins, potsBins, dispBins = \
         subhaloRadialProfiles(run, snapNum, subhalo, mostBound=mostBound)
 
     partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
@@ -193,7 +226,7 @@ def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VER
     #  --------
     if( plot1 ):
         fname = '1_%05d.png' % (subhalo)
-        fig1 = plot_1(numParts, partNames, radBins, densBins)
+        fig1 = plot_1(partNames, radBins, densBins, massBins)
         fig1.savefig(fname)
         plt.close(fig1)
         print fname
@@ -203,7 +236,7 @@ def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VER
     #  --------
     if( plot2 ):
         fname = '2_%05d.png' % (subhalo)
-        fig2 = plot_2(numParts, partNames, radsAll, potsAll, dispAll, refRads, refPots, refDisp)
+        fig2 = plot_2(radBins, potsBins, dispBins)
         fig2.savefig(fname)
         plt.close(fig2)
         print fname
@@ -214,93 +247,56 @@ def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VER
 
 # plotSubhaloRadialProfiles()
 
-def plot_1(numParts, partNames, radBins, densBins):
+def plot_1(partNames, radBins, densBins, massBins):
 
-    fig, axes = zplot.subplots(figsize=[10,14], nrows=4)
-    
+    numParts = len(partNames)
+    fig, axes = zplot.subplots(figsize=[10,6])
     cols = zplot.setColorCycle(numParts)
-    # stys = zplot.setLineStyleCycle(numParts)
+
+    LW = 2.0
+    ALPHA = 0.5
+
+    plotBins = np.concatenate([ [zmath.extend(radBins)[0]], radBins] )
     
     for ii in range(numParts):
+        zplot.plotHistLine(axes, plotBins, densBins[ii], ls='-',
+                           c=cols[ii], lw=LW, alpha=ALPHA, nonzero=True, label=partNames[ii])
 
-        axes[ii].set_title('COM %s' % partNames[ii])
 
-        for jj in range(numParts):
-
-            ll, = axes[ii].plot(radBins, densBins[jj,:,ii], ls='-', c=cols[jj], lw=2.0, alpha=0.5, 
-                                label=partNames[jj])
-
-    axes[0].legend(loc='lower left', ncol=1, prop={'size':'small'}, 
-                   bbox_transform=fig.transFigure, bbox_to_anchor=(0.01,0.01) )
-
+    axes.legend(loc='upper right', ncol=1, prop={'size':'small'}, 
+                   bbox_transform=axes.transAxes, bbox_to_anchor=(0.99,0.99) )
 
     return fig
 
 # plot_1()
 
 
-def plot_2(numParts, partNames, radsAll, potsAll, dispAll, refRads, refPots, refDisp):
 
-    ALPHA = 0.05
-    PS    = 5
+def plot_2(radBins, potsBins, dispBins):
 
-    radsExtr = zmath.minmax(radsAll, nonzero=True)
-    potsExtr = zmath.minmax(potsAll, nonzero=True)
-    dispExtr = zmath.minmax(dispAll, nonzero=True)
-    radsBins = zmath.spacing(radsExtr, num=NUM_RAD_BINS+1)[1:]
-    plotBins = np.concatenate([[radsExtr[0]],radsBins])
+    FS = 12
+    LW = 2.0
+    ALPHA = 0.8
+
+
+    fig, ax = plt.subplots(figsize=[10,6])
+    zplot.setAxis(ax, axis='x', label='Distance', fs=FS, scale='log')
+    zplot.setAxis(ax, axis='y', label='Dispersion', c='red', fs=FS)
+    tw = zplot.twinAxis(ax, axis='x', label='Potential', c='blue', fs=FS)
+    tw.set_yscale('linear')
+
+    plotBins = np.concatenate([ [zmath.extend(radBins)[0]], radBins] )
     
-    fig, axes = zplot.subplots(figsize=[10,14], nrows=numParts+1, top=0.95, bot=0.05, left=0.05, right=0.90,
-                               xlim=radsExtr, ylim=dispExtr, twinylim=potsExtr)
-    for ii,ax in enumerate(axes):
+    zplot.plotHistLine(ax, plotBins, dispBins[:,0], yerr=dispBins[:,1], ls='-',
+                       c='red', lw=LW, alpha=ALPHA, nonzero=True)
 
-        if( ii < numParts ):
-            plotRads = radsAll[ii]
-            plotDisp = dispAll[ii]
-            plotPots = potsAll[ii]
-            plotName = partNames[ii]
-        else:
-            plotRads = refRads
-            plotDisp = refDisp
-            plotPots = refPots
-            plotName = "Most Bound"
-
-        ax.set_title(plotName)
-        tw = ax.twinx()
-        tw.set_yscale('linear')
-
-        ax.scatter(plotRads, plotDisp, marker='o', s=PS, alpha=ALPHA, c='red',  label='VelDisp')
-        tw.scatter(plotRads, plotPots, marker='o', s=PS, alpha=ALPHA, c='blue', label='Potential')
-
-        count, dispHist, dispStd = zmath.histogram(plotRads, radsBins, weights=plotDisp, 
-                                                   func='ave', stdev=True, edges='right')
-
-        inds = np.where( dispStd > 0.0 )
-        dispStd_ave = np.average( dispStd[inds], weights=count[inds] )
-        dispStd_med = np.median( dispStd[inds] )
-
-        zplot.plotHistLine(ax, plotBins, dispHist, yerr=dispStd, c='red', nonzero=True)
-
-        count, potsHist, potsStd = zmath.histogram(plotRads, radsBins, weights=plotPots, 
-                                                   func='ave', stdev=True, edges='right')
-
-        inds = np.where( potsStd > 0.0 )
-        potsStd_ave = np.average( potsStd[inds], weights=count[inds] )
-        potsStd_med = np.median( potsStd[inds] )
-
-        zplot.plotHistLine(tw, plotBins, potsHist, yerr=potsStd, c='blue', nonzero=True)
-
-        print "%10s : %e %e   %e %e" % (plotName, dispStd_ave, dispStd_med, potsStd_ave, potsStd_med)
-
-    # } ii, ax
-
-
-    axes[0].legend(loc='lower left', ncol=1, prop={'size':'small'}, 
-                   bbox_transform=fig.transFigure, bbox_to_anchor=(0.01,0.01) )
+    zplot.plotHistLine(tw, plotBins, potsBins[:,0], yerr=potsBins[:,1], ls='-',
+                       c='blue', lw=LW, alpha=ALPHA, nonzero=True)
 
     return fig
 
 # plot_2()
+
 
 
 def reflectPos(pos, center=None):
