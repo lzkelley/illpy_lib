@@ -1,4 +1,9 @@
 """
+Process radial profiles of Illustris subhalos.
+
+Functions
+---------
+ - subhaloRadialProfiles() : construct binned, radial density profiles for all particle types
 
 
 """
@@ -21,23 +26,7 @@ import zcode.InOut    as zio
 
 VERBOSE = True
 
-NUM_RAD_BINS = 40
-RAD_EXTREMA = [ 1.0, 1.0e6 ]                      # [parsecs]
-
-
-
-### Subhalo Profiles ###
-'''
-PROFILE_BIN_EDGES = 'bin_edges'
-PROFILE_BIN_AVES  = 'bin_aves'
-PROFILE_GAS       = 'gas'
-PROFILE_STARS     = 'stars'
-PROFILE_DM        = 'dm'
-PROFILE_COLS      = 'cols'
-PROFILE_CREATED   = 'created'
-PROFILE_VERSION   = 'version'
-'''
-
+NUM_RAD_BINS = 100
 
 
 
@@ -208,8 +197,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
 def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VERBOSE):
 
-    plot1 = False
-    # plot1 = True
+    #plot1 = False
+    plot1 = True
     plot2 = True
 
     if( verbose ): print " - - Profiler.plotSubhaloRadialProfiles()"
