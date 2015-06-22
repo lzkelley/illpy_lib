@@ -13,7 +13,8 @@ from datetime import datetime
 import numpy as np
 
 import illpy
-from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, GET_ILLUSTRIS_GROUPS_DIR, PARTICLE, SUBHALO
+from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
+from Constants import SUBHALO
 
 import illustris_python as ill
 
@@ -133,21 +134,24 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
     if( verbose ): print " - - - Loading group catalog from '%s'" % (path_output)
     gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
-    numSubhalos = gcat['count']
+    
+    if( isinstance(gcat, dict) ): numSubhalos = gcat['count']
+    else:                         numSubhalos = len(gcat)
     if( verbose ): print " - - - - Loaded %d subhalos" % (numSubhalos)
 
     # If no subhalos selected, return full catalog
-    if( subhalos is None ): 
-        subcat = dict(gcat)
-        return subcat
+    if( subhalos is None ): return gcat
     
 
     ## Extract Target Subhalos
     #  -----------------------
-    subcat = {}
-    for key in gcat.keys():
-        if( key is not 'count' ): subcat[key] = gcat[key][subhalos]
-    
+
+    if( isinstance(gcat, dict) ): 
+        subcat = {}
+        for key in gcat.keys():
+            if( key is not 'count' ): subcat[key] = gcat[key][subhalos]
+    else:
+        subcat = gcat[subhalos]
 
     return subcat
 
