@@ -12,14 +12,12 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
-import illpy
 from illpy.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
 
 import Subhalo
 import Constants
-from Constants import SNAPSHOT
+from Constants import SNAPSHOT, SUBHALO
 
-import zcode
 import zcode.Math     as zmath
 import zcode.Plotting as zplot
 import zcode.InOut    as zio
@@ -51,7 +49,10 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     Returns
     -------
        radBins   <flt>[N]   : coordinates of right-edges of ``N`` radial bins
+       posRef    <flt>[3]   : coordinates in simulation box of most-bound particle (used as C.O.M.)
        partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy.Constants.PARTICLE``)
+       partNames <str>[M]   : particle type strings for each type
+       partNums  <int>[M]   : number of particles in subhalo for each particle type
        massBins  <flt>[M,N] : binned radial mass profile for ``M`` particle types, ``N`` bins each
        densBins  <flt>[M,N] : binned mass density profile
        potsBins  <flt>[N]   : binned gravitational potential energy profile for all particles
@@ -63,7 +64,10 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( verbose ): print " - - Profiler.subhaloRadialProfiles()"
 
     if( verbose ): print " - - - Loading subhalo partile data"
-    partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
+    # Redirect output during this call
+    with zio.StreamCapture() as strCap:
+        partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
+
     partNums = [ pd['count'] for pd in partData ]
     partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
     numPartTypes = len(partNums)
@@ -80,18 +84,19 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # If no particle ID is given, find it
     if( mostBound is None ): 
         # Get group catalog
-        mostBound = Subhalo.importGroupCatalogData(3, 135, subhalos=subhalo, fields=[SUBHALO.MOST_BOUND])
-        # Get most-bound ID number
-        mostBound = mostBound[SUBHALO.MOST_BOUND]
+        mostBound = Subhalo.importGroupCatalogData(3, 135, subhalos=subhalo, \
+                                                   fields=[SUBHALO.MOST_BOUND])
 
     if( mostBound is None ): raise RuntimeError("Could not find mostBound particle ID number!")
 
     # Find the most-bound particle, store its position
     for pdat,pname in zip(partData, partNames):
+        # Skip, if no particles of this type
+        if( pdat['count'] == 0 ): continue
         inds = np.where( pdat[SNAPSHOT.IDS] == mostBound )[0]
         if( len(inds) == 1 ): 
             if( verbose ): print " - - - Found Most Bound Particle in '%s'" % (pname)
-            posRef = pdat[SNAPSHOT.POS][inds]
+            posRef = pdat[SNAPSHOT.POS][inds[0]]
             break
 
     # } pdat,pname
@@ -99,7 +104,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( posRef is None ): raise RuntimeError("Could not find most bound particle in snapshot!")
 
 
-    mass = []
+    mass = np.zeros(numPartTypes, dtype=object)
     rads = np.zeros(numPartTypes, dtype=object)
     pots = np.zeros(numPartTypes, dtype=object)
     disp = np.zeros(numPartTypes, dtype=object)
@@ -112,20 +117,27 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( verbose ): print " - - - Extracting and processing particle properties"
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
+        # Skip if this particle type has no elements
+        #    use empty lists so that call to ``np.concatenate`` below works (ignored)
+        if( data['count'] == 0 ): 
+            mass[ii] = []
+            rads[ii] = []
+            pots[ii] = []
+            disp[ii] = []
+            continue
+
         # Extract relevant data from dictionary
         posn   = reflectPos(data[SNAPSHOT.POS])
 
         # DarkMatter Particles all have the same mass, store that single value
-        if( ptype == PARTICLE.DM ): mass_p = [ GET_ILLUSTRIS_DM_MASS(run) ]
-        else:                       mass_p = data[SNAPSHOT.MASS]
-        mass.append(mass_p)
+        if( ptype == PARTICLE.DM ): mass[ii] = [ GET_ILLUSTRIS_DM_MASS(run) ]
+        else:                       mass[ii] = data[SNAPSHOT.MASS]
 
         # Convert positions to radii from ``posRef`` (most-bound particle), and find radial extrema
-        rads_p = zmath.dist(posn, posRef)
-        radExtrema = zmath.minmax(rads_p, prev=radExtrema, nonzero=True)
-        rads[ii] = rads_p
+        rads[ii] = zmath.dist(posn, posRef)
         pots[ii] = data[SNAPSHOT.POT]
         disp[ii] = data[SNAPSHOT.SUBF_VDISP]
+        radExtrema = zmath.minmax(rads[ii], prev=radExtrema, nonzero=True)
 
     # } for data, ptype
 
@@ -158,7 +170,11 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # Iterate over particle types
     if( verbose ): print " - - - Binning properties by radii"
-    for ii, pt1 in enumerate(partTypes):
+    # for ii, pt1 in enumerate(partTypes):
+    for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
+
+        # Skip if this particle type has no elements
+        if( data['count'] == 0 ): continue
 
         # Get the total mass in each bin
         counts, massBins[ii,:] = zmath.histogram(rads[ii], radBins, weights=mass[ii],
@@ -188,7 +204,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     dispBins[:,1] = stds
 
 
-    return radBins, partTypes, massBins, densBins, potsBins, dispBins
+    return radBins, posRef, partTypes, partNames, partNums, massBins, densBins, potsBins, dispBins
 
 # subhaloRadialProfiles()
 
