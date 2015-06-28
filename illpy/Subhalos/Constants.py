@@ -38,19 +38,22 @@ class SUBHALO():
     # SubhaloWindMass
     # SubhaloGasMetallicityMaxRad
     VDISP                = "SubhaloVelDisp"
+    VMAX                 = "SubhaloVmax"
     SFR                  = "SubhaloSFR"
     # SubhaloStarMetallicityMaxRad
     NUM_PARTS            = "SubhaloLen"
     SFR_HALF_RAD         = "SubhaloSFRinHalfRad"
     PHOTOS               = "SubhaloStellarPhotometrics"
-    METZ                 = "SubhaloGasMetallicity"
+    METZ_GAS             = "SubhaloGasMetallicity"
+    METZ_STAR            = "SubhaloStarMetallicity"
     BH_MASS              = "SubhaloBHMass"
+    BH_MDOT              = "SubhaloBHMdot"
     MOST_BOUND           = "SubhaloIDMostbound"
     MASS_TYPE            = "SubhaloMassType"
     # SubhaloStellarPhotometricsMassInRad
     RAD_HALF_MASS        = "SubhaloHalfmassRad"
     # SubhaloParent
-    # SubhaloSpin
+    SubhaloSpin          = "SubhaloSpin"
     # SubhaloStarMetallicityHalfRad
     VEL                  = "SubhaloVel"
     NUM_PARTS_TYPE       = "SubhaloLenType"
@@ -58,7 +61,7 @@ class SUBHALO():
     # SubhaloGasMetallicityHalfRad
     # SubhaloMassInRad
     NUM_GROUP            = "SubhaloGrNr"
-    # SubhaloMassInHalfRad
+    MASS_HALF_RAD        = "SubhaloMassInHalfRad"
     # SubhaloSFRinRad
     # SubhaloMassInMaxRad
     # SubhaloHalfmassRadType
