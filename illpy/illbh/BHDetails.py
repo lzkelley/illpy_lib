@@ -8,8 +8,25 @@ details can then be accessed by snapshot and blackhole ID number.
 
 Functions
 ---------
-main() : returns None, assures that intermediate files exist -- creating them if necessary.
-detailsForBH() : returns dict, dict; retrieves the details entries for a given BH ID number.
+   main() : returns None, assures that intermediate files exist -- creating them if necessary.
+   detailsForBH() : returns dict, dict; retrieves the details entries for a given BH ID number.
+
+
+Details Dictionary
+------------------
+   { DETAILS_RUN       : <int>, illustris simulation number in {1,3}
+     DETAILS_NUM       : <int>, total number of mergers `N`
+     DETAILS_FILE      : <str>, name of save file from which mergers were loaded/saved
+     DETAILS_CREATED   : <str>, date and time this file was created
+     DETAILS_VERSION   : <flt>, version of BHDetails used to create file
+   
+     DETAILS_IDS       : <uint64>[N], BH particle ID numbers for each entry
+     DETAILS_SCALES    : <flt64> [N], scale factor at which each entry was written
+     DETAILS_MASSES    : <flt64> [N], BH mass
+     DETAILS_MDOTS     : <flt64> [N], BH Mdot
+     DETAILS_RHOS      : <flt64> [N], ambient mass-density
+     DETAILS_CS        : <flt64> [N], ambient sound-speed
+   }
 
 
 Notes
@@ -47,9 +64,9 @@ from BHConstants import *
 from .. import AuxFuncs as aux
 
 
-VERSION = 0.23                                                                                      # Version of BHDetails
+VERSION = 0.23                                    # Version of BHDetails
 
-_DEF_PRECISION = -8                                                                                 # Default precision
+_DEF_PRECISION = -8                               # Default precision
 
 
 
@@ -129,13 +146,15 @@ def formatDetails(run, loadsave=True, verbose=VERBOSE):
             dets = loadBHDetails(run, 0)
             loadVers = dets[DETAILS_VERSION]
             if( loadVers != VERSION ):
-                print "BHDetails.formatDetails() : loaded version %s from '%s'" % (str(loadVers), dets[DETAILS_FILE])
+                print "BHDetails.formatDetails() : loaded version %s from '%s'" % \
+                    (str(loadVers), dets[DETAILS_FILE])
                 print "BHDetails.formatDetails() : current version %s" % (str(VERSION))
                 print "BHDetails.formatDetails() : re-converting Details files !!!"
                 loadsave = False
 
         else:
-            print "BHDetails.formatDetails() : Save files do not exist e.g. '%s'" % (saveFilenames[0])
+            print "BHDetails.formatDetails() : Save files do not exist e.g. '%s'" % \
+                (saveFilenames[0])
             print "BHDetails.formatDetails() : converting raw Details files !!!"
             loadsave = False
 
@@ -380,12 +399,12 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=VERBOSE
         ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
         # Store details in dictionary
-        details = { DETAILS_NUM     : len(ids),
-                    DETAILS_RUN     : run,
+        details = { DETAILS_RUN     : run,
                     DETAILS_SNAP    : snap,
+                    DETAILS_NUM     : len(ids),
+                    DETAILS_FILE    : sav,
                     DETAILS_CREATED : datetime.now().ctime(),
                     DETAILS_VERSION : VERSION,
-                    DETAILS_FILE    : sav,
 
                     DETAILS_IDS     : ids,
                     DETAILS_SCALES  : scales,
@@ -404,9 +423,9 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=VERBOSE
 
 def _loadBHDetails_ASCII(asciiFile, verbose=VERBOSE):
 
-    ### Files have some blank lines in them... Clean ###
-    lines = open(asciiFile).readlines()                                                             # Read all lines at once
-    nums = len(lines)
+    ## Files have some blank lines in them... Clean
+    lines  = open(asciiFile).readlines()
+    nums   = len(lines)
 
     # Allocate storage
     ids    = np.zeros(nums, dtype=TYPE_ID)
@@ -546,5 +565,4 @@ def _getPrecision(args):
     return order
 
 # _getPrecision()
-
 

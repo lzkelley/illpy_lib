@@ -14,8 +14,8 @@ variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mergers.
 
 Internal Parameters
 -------------------
-RUN : int, the illustris run number {1,3} to load by default
-VERBOSE : bool, whether or not to print verbose output by default
+VERSION_MAP <flt> : version number for 'mapped' mergers, and associated save files
+VERSION_FIX <flt> : version number for 'fixed'  mergers, and associated save files
 
 
 Functions
@@ -27,25 +27,27 @@ loadRawMergers                : load all merger entries, sorted by scalefactor, 
 loadMappedMergers             : load dictionary of merger events with associated mappings to and
                                 from snapshots.
 loadFixedMergers              : load dictionary of merger events with mappings, which have been
-                                processed and filtered.
+                                processed and filtered.  These mergers also have the 'out' mass
+                                entry corrected (based on inference from ``BHDetails`` entries).
                                 
 
 Mergers Dictionary
 ------------------
-{ MERGERS_RUN       : <int>, illustris simulation number in {1,3}
-  MERGERS_NUM       : <int>, total number of mergers `N`
-  MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
-  MERGERS_CREATED   : <str>, 
-  MERGERS_VERSION   : <float>,
+   { MERGERS_RUN       : <int>, illustris simulation number in {1,3}
+     MERGERS_NUM       : <int>, total number of mergers `N`
+     MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
+     MERGERS_CREATED   : <str>, 
+     MERGERS_VERSION   : <float>,
+   
+     MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
+     MERGERS_IDS       : <ulong>[N,2],
+     MERGERS_MASSES    : <double>[N,2], 
 
-  MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
-  MERGERS_IDS       : <ulong>[N,2],
-  MERGERS_MASSES    : <double>[N,2], 
+     MERGERS_MAP_MTOS  : <int>[N], 
+     MERGERS_MAP_STOM  : <int>[136,list], 
+     MERGERS_MAP_ONTOP : <int>[136,list], 
+   }
 
-  MERGERS_MAP_MTOS  : <int>[N], 
-  MERGERS_MAP_STOM  : <int>[136,list], 
-  MERGERS_MAP_ONTOP : <int>[136,list], 
-}
 
 Examples
 --------
@@ -68,6 +70,7 @@ Notes
                    filtering of any kind.
 
 
+
    The underlying data is in the illustris bh merger files, 'blackhole_mergers_<#>.txt', which are
    processed by `_loadMergersFromIllustris()`.  Each line of the input files is processed by
    `_parseMergerLine()` which returns the redshift ('time') of the merger, and the IDs and masses
@@ -88,13 +91,16 @@ import numpy as np
 import BHDetails
 import BHConstants
 from BHConstants import *
+import BHMatcher
 
 from .. import Cosmology
 from .. import AuxFuncs as aux
 
 
-VERSION = 0.21
+# VERSION = 0.21
 
+VERSION_MAP = 0.21
+VERSION_FIX = 0.31
 
 
 def processMergers(run, verbose=VERBOSE):
@@ -165,7 +171,7 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
     if( verbose ): print " - - BHMergers.loadMappedMergers()"
 
-    mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION)
+    mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
 
     ### Try to Load Existing Mapped Mergers ###
     if( loadsave ):
@@ -177,10 +183,10 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
             if( verbose ): print " - - - Dictionary Loaded"
             loadVers = mergersMapped[MERGERS_VERSION]
             # Make sure version matches, otherwise re-create mappings
-            if( loadVers != VERSION ):
+            if( loadVers != VERSION_MAP ):
                 loadTime = mergersMapped[MERGERS_CREATED]
                 print "BHMergers.loadMappedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-                print "BHMergers.loadMappedMergers() : VERSION %f, recreating new version!" % (VERSION)
+                print "BHMergers.loadMappedMergers() : VERSION %f, recreating new version!" % (VERSION_MAP)
                 loadsave = False
 
         else:
@@ -203,7 +209,7 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
                           MERGERS_RUN       : run,
                           MERGERS_NUM       : len(scales),
                           MERGERS_CREATED   : datetime.now().ctime(),
-                          MERGERS_VERSION   : VERSION,
+                          MERGERS_VERSION   : VERSION_MAP,
 
                           MERGERS_SCALES    : scales,
                           MERGERS_IDS       : ids,
@@ -224,10 +230,25 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
 
 def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
+    """
+    Load BH Merger data with duplicats removes, and masses corrected.
+
+    Arguments
+    ---------
+       run      <int>  : illustris simulation run number {1,3}
+       verbose  <bool> : optional, print verbose output
+       loadsave <bool> : optional, load existing save file (recreate if `False`)
+
+    Returns
+    -------
+       mergersFixed <dict> : dictionary of 'fixed' mergers, most entries shaped [N,2] for `N`
+                             mergers, and an entry for each {``BH_IN``, ``BH_OUT``}
+
+    """
     
     if( verbose ): print " - - BHMergers.loadFixedMergers()"
 
-    fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run, VERSION)
+    fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
 
     ## Try to Load Existing Mapped Mergers
     if( loadsave ):
@@ -237,10 +258,10 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
             if( verbose ): print " - - - Loaded from '%s'" % (fixedFilename)
             loadVers = mergersFixed[MERGERS_VERSION]
             # Make sure version matches, otherwise re-create mappings
-            if( loadVers != VERSION ):
+            if( loadVers != VERSION_FIX ):
                 loadTime = mergersFixed[MERGERS_CREATED]
                 print "BHMergers.loadFixedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-                print "BHMergers.loadFixedMergers() : VERSION %f, recreating!" % (VERSION)
+                print "BHMergers.loadFixedMergers() : VERSION %f, recreating!" % (VERSION_FIX)
                 loadsave = False
                 
         else:
@@ -269,18 +290,25 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     Filter and 'fix' input merger catalog.
 
     This includes:
-     - Remove duplicate entries
-     - [TO-DO: FIX MERGER MASSES]
+     - Remove duplicate entries (Note-1)
+     - Load 'fixed' out-BH masses from ``BHMatcher`` (which uses ``BHDetails`` entries)
 
     Arguments
     ---------
-    run : <int>, illustris simulation number {1,3}
-    mergers : <dict>, input dictionary of unfiltered merger events
-    verbose : <bool>, optional=VERBOSE, print verbose output
+       run     <int>  : illustris simulation number {1,3}
+       mergers <dict> : input dictionary of unfiltered merger events
+       verbose <bool> : optional, print verbose output
 
     Returns
     -------
-    fixedMergers : <dict>, filtered merger dictionary
+       fixedMergers <dict> : filtered merger dictionary
+
+    Notes
+    -----
+       1 : There are 'duplicate' entries which have different occurence times (scale-factors)
+           suggesting that there is a problem with the actual merger, not just the logging.
+           This is not confirmed.  Currently, whether the times match or not, the *later*
+           merger entry is the only one that is preserved in ``fixedMergers``
 
     """
 
@@ -290,7 +318,11 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     # Make copy to modify
     fixedMergers = dict(mergers)
 
-    ### Find and Remove Repeats ###
+
+    ##  Remove Repeated Entries
+    #   =======================
+    #      Remove entries where IDs match a second time (IS THIS ENOUGH?!)
+
     ids    = fixedMergers[MERGERS_IDS]
     scales = fixedMergers[MERGERS_SCALES]
 
@@ -302,7 +334,7 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
 
     if( verbose ): print " - - - Examining %d merger entries" % (len(sort))
 
-    ### Iterate over all entries ###
+    ## Iterate over all entries
 
     for ii in xrange(len(sort)-1):
         
@@ -311,21 +343,11 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
 
         # Look through all examples of same BH_IN
         while( ids[sort[jj],BH_IN] == this[BH_IN] ):
-            # If BH_OUT also matches, this is a duplicate -- store first entry as bad
+            # If BH_OUT also matches, this is a duplicate -- store first entry as bad |NOTE-1|
             if( ids[sort[jj],BH_OUT] == this[BH_OUT] ):
 
                 # Double check that time also matches
-                if( scales[sort[ii]] != scales[sort[jj]] ):
-                    '''
-                    print 'sort[%d] = %d  matches  sort[%d] = %d' % (ii, sort[ii], jj, sort[jj])
-                    print ids[sort[ii]]
-                    print ids[sort[jj]]
-                    print scales[sort[ii]]
-                    print scales[sort[jj]]
-                    print "\n"
-                    '''
-                    numMismatch += 1
-
+                if( scales[sort[ii]] != scales[sort[jj]] ): numMismatch += 1
                 badInds.append(sort[ii])
                 break
 
@@ -339,7 +361,7 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     if( verbose ): print " - - - Total number of duplicates = %d" % (len(badInds))
     if( verbose ): print " - - - Number with mismatched times = %d" % (numMismatch)
 
-    ### Remove Duplicate Entries ###
+    ## Remove Duplicate Entries
     for key in MERGERS_PHYSICAL_KEYS:
         fixedMergers[key] = np.delete(fixedMergers[key], badInds, axis=0)
 
@@ -355,12 +377,24 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     newNum = len(fixedMergers[MERGERS_SCALES])
     fixedMergers[MERGERS_NUM] = newNum
     fixedMergers[MERGERS_CREATED] = datetime.now().ctime()
-    fixedMergers[MERGERS_VERSION] = VERSION
+    fixedMergers[MERGERS_VERSION] = VERSION_FIX
 
     if( verbose ): print " - - - Number of Mergers %d ==> %d" % (oldNum, newNum)
 
+
+    ### Fix Merger 'Out' Masses
+    #   =======================
+    if( verbose ): print " - - - Loading reconstructed 'out' BH masses"
+    masses = fixedMergers[MERGERS_MASSES]
+    aveBef = np.average( masses[:,BH_OUT] )
+    massOut = BHMatcher.inferMergerOutMasses(run, mergers=fixedMergers, verbose=verbose)
+    masses[:,BH_OUT] = massOut
+    aveAft = np.average( masses[:,BH_OUT] )
+    if( verbose ): print " - - - - Ave mass:  %.4e ===> %.4e" % (aveBef, aveAft)
+
     return fixedMergers
 
+# _fixMergers()
 
 
 def _importRawMergers(files, verbose=VERBOSE):
