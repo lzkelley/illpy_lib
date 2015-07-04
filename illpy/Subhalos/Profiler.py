@@ -179,7 +179,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # Iterate over particle types
     if( verbose ): print " - - - Binning properties by radii"
-    # for ii, pt1 in enumerate(partTypes):
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
         # Skip if this particle type has no elements
