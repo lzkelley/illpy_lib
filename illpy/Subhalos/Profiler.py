@@ -117,6 +117,14 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( verbose ): print " - - - Extracting and processing particle properties"
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
+        # Make sure the expected number of particles are found
+        if( data['count'] != partNums[ii] ):
+            errstr  = "Type '%s' count mismatch after loading!!\n" % (partNames[ii])
+            errstr += "\tExpecting = %d" % (partNums[ii])
+            errstr += "\tRetrieved = %d" % (data['count'])
+            raise RuntimeError(errstr)
+
+
         # Skip if this particle type has no elements
         #    use empty lists so that call to ``np.concatenate`` below works (ignored)
         if( data['count'] == 0 ): 
@@ -186,10 +194,21 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # } for ii, pt1
 
+
     # Consistency check on numbers of particles
     for ii in xrange(numPartTypes):
-        assert partNums[ii] == np.sum(numsBins[ii]), \
-            "Particle '%s' counts dont match!" % (partNames[ii])
+
+        numExp = partNums[ii]
+        numAct = np.sum(numsBins[ii])
+
+        # Make sure the total number of particles are in bins
+        if( numExp != numAct ):
+            errstr  = "Type '%s' count mismatch after binning!!\n" % (partNames[ii])
+            errstr += "\tExpecting = %d" % (numExp)
+            errstr += "\tRetrieved = %d" % (numAct)
+            raise RuntimeError(errstr)
+
+    # } for ii
 
     # Convert list of arrays into 1D arrays of all elements
     rads = np.concatenate(rads)
