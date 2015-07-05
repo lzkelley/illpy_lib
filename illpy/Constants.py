@@ -1,12 +1,7 @@
-# ==================================================================================================
-# Constants.py
-# ------------
-#
-#
-# ------------------
-# Luke Zoltan Kelley
-# LKelley@cfa.harvard.edu
-# ==================================================================================================
+"""
+Numerical constants pertaining to the Illustris Simulations and their data.
+
+"""
 
 import numpy as np
 
@@ -42,17 +37,6 @@ GYR              = 1.0e9*YR
 
 ### Numerical Constants ###
 
-INT  = np.int32
-LNG  = np.int64
-FLT  = np.float32
-DBL  = np.float64
-ULNG = np.uint64
-
-"""
-DTYPE_ID     = np.uint64
-DTYPE_SCALAR = np.float64
-DTYPE_INDEX  = np.int64
-"""
 
 class DTYPE():
     ID     = np.uint64
@@ -83,17 +67,6 @@ def GET_ILLUSTRIS_OUTPUT_DIR(run):
     return _ILLUSTRIS_OUTPUT_DIR_BASE % (_ILLUSTRIS_RUN_NAMES[run])
 
 
-'''
-# Snapshot Files
-
-_ILLUSTRIS_SNAPSHOT_PATH_BASE = '/n/ghernquist/Illustris/Runs/%s/output/snapdir_%03d/'
-_ILLUSTRIS_SNAPSHOT_FILENAME_BASE   = 'snap_%03d.0.hdf5'
-
-def GET_ILLUSTRIS_SNAPSHOT_FIRST_FILENAME(run,snap): 
-    fname  = _ILLUSTRIS_SNAPSHOT_PATH_BASE % (_ILLUSTRIS_RUN_NAMES[run],snap)
-    fname += _ILLUSTRIS_SNAPSHOT_FILENAME_BASE % (snap)
-    return fname
-'''
 
 
 # Indices for Different Types of Particles
@@ -126,7 +99,6 @@ class PARTICLE():
         return cls._PARTICLE_NAMES[it]
 
 # } class PARTICLE
-
 
 
 
