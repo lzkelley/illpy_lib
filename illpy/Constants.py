@@ -61,6 +61,10 @@ _ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
                            2 : "L75n910FP",
                            3 : "L75n455FP" }
 
+def GET_ILLUSTRIS_RUN_NAMES(run): 
+    return _ILLUSTRIS_RUN_NAMES[run]
+
+
 _ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
 
 def GET_ILLUSTRIS_OUTPUT_DIR(run): 
@@ -111,4 +115,11 @@ PHOTO_g               = 4
 PHOTO_r               = 5
 PHOTO_i               = 6
 PHOTO_z               = 7
+
+
+
+_PROCESSED_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
+
+def GET_PROCESSED_DIR(run):
+    return _PROCESSED_DIR % (_ILLUSTRIS_RUN_NAMES[run])
 

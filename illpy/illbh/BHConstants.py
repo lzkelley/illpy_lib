@@ -8,9 +8,8 @@ Constants for Blackhole related functions and submodules.
 import numpy as np
 from glob import glob
 
-from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
-
-VERBOSE = True
+from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, \
+    GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR
 
 
 ### Illustris Parameters ###
@@ -39,7 +38,6 @@ _ILLUSTRIS_DETAILS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/
 
 
 ### Post-Processing Parameters ###
-_PROCESSED_DIR                  = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
@@ -135,13 +133,7 @@ TREE_VERSION      = 'version'
 
 
 
-
-def GET_ILLUSTRIS_RUN_NAMES(run):
-    """ Get canonical name of illustris simulation runs, e.g. 'L75n1820FP' """
-    return _ILLUSTRIS_RUN_NAMES[run]
-
-
-def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
+def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
 
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
 
@@ -160,7 +152,7 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
     return files
 
 
-def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
+def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
 
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
 
@@ -178,9 +170,6 @@ def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
 
     return files
 
-
-def GET_PROCESSED_DIR(run):
-    return _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
 
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
