@@ -61,70 +61,67 @@ Finally, any Particle1's with index 988 or after belong to no subhalo, and no ha
 """
 
 import os
-import sys
 import numpy as np
 from datetime import datetime
 
-import illpy
-from illpy.Constants import *
-from illpy.illbh.BHConstants import *
-from illpy import AuxFuncs as aux
+from illpy.Constants import DTYPE, GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE_NUM
+#from illpy.illbh.BHConstants import *
 
-import arepo
+import zcode.InOut as zio
 
-# Max number of particles is 1820^3 which is larger than max of uint32,
-#     but smaller than max int64... so might as well used signed int
-#     and be able to use negative numbers for flags
-TYPE_INDEX = np.int64
+import illustris_python as ill
 
-# ID numbers must be unsigned 64 to accamadate Illustirs-1
-TYPE_IDNUM = np.uint64
+_VERSION = 0.2
 
 
-VERSION = 0.2
-VERBOSE = True
+class OFFSET():
+    """ Keys for offset table dictionary. """
 
+    RUN        = 'run'
+    SNAP       = 'snapshot'
+    VERSION    = 'version'
+    CREATED    = 'created'
+    FILENAME   = 'filename'
 
-OFFSET_RUN        = 'run'
-OFFSET_SNAP       = 'snapshot'
-OFFSET_VERSION    = 'version'
-OFFSET_CREATED    = 'created'
-OFFSET_FILENAME   = 'filename'
+    HALOS      = 'halo_numbers'
+    SUBHALOS   = 'subhalo_numbers'
+    PARTICLES  = 'particle_numbers'
 
-OFFSET_HALOS      = 'halo_numbers'
-OFFSET_SUBHALOS   = 'subhalo_numbers'
-OFFSET_PARTICLES  = 'particle_numbers'
+    BH_IDS     = 'bh_ids'
+    BH_INDICES = 'bh_indices'
 
-OFFSET_BH_IDS     = 'bh_ids'
-OFFSET_BH_INDICES = 'bh_indices'
 
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill-%d_snap-%d_offset-table.npz"
 
+def GET_OFFSET_TABLE_SAVE_FILENAME(run, snap, version=_VERSION):
+    fname  = GET_PROCESSED_DIR(run)
+    fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap)
+    return fname
 
 
 
 
-def loadOffsetTable(run, snap, loadsave=True, verbose=VERBOSE):
+def loadOffsetTable(run, snap, loadsave=True, verbose=True):
     """
 
     """
 
     if( verbose ): print " - - HaloOffsetTable.loadOffsetTable()"
 
-    saveFile = _GET_OFFSET_TABLE_SAVE_FILENAME(run, snap)
+    saveFile = GET_OFFSET_TABLE_SAVE_FILENAME(run, snap)
 
     ### Load Existing Save ###
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
         # Make sure path exists
         if( os.path.exists(saveFile) ):
-            offsetTable = aux.npzToDict(saveFile)
-            loadVers = offsetTable[OFFSET_VERSION]
+            offsetTable = zio.npzToDict(saveFile)
+            loadVers = offsetTable[OFFSET.VERSION]
             # Make sure version matches
-            if( loadVers != VERSION ):
+            if( loadVers != _VERSION ):
                 print "HaloOffsetTable.loadOffsetTable() : Loaded  version %s" % (str(loadVers))
-                print "HaloOffsetTable.loadOffsetTable() : Current version %s" % (str(VERSION ))
+                print "HaloOffsetTable.loadOffsetTable() : Current version %s" % (str(_VERSION ))
                 print "HaloOffsetTable.loadOffsetTable() : Reconstructing offsets !!"
                 loadsave = False
             else:
@@ -151,21 +148,21 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=VERBOSE):
         offsetTable = {}
 
         # Store data
-        offsetTable[OFFSET_HALOS]      = haloNums
-        offsetTable[OFFSET_SUBHALOS]   = subhNums
-        offsetTable[OFFSET_PARTICLES]  = offsets
-        offsetTable[OFFSET_BH_INDICES] = bhInds
-        offsetTable[OFFSET_BH_IDS]     = bhIDs
+        offsetTable[OFFSET.HALOS]      = haloNums
+        offsetTable[OFFSET.SUBHALOS]   = subhNums
+        offsetTable[OFFSET.PARTICLES]  = offsets
+        offsetTable[OFFSET.BH_INDICES] = bhInds
+        offsetTable[OFFSET.BH_IDS]     = bhIDs
 
         # Add Metadata
-        offsetTable[OFFSET_RUN]        = run
-        offsetTable[OFFSET_SNAP]       = snap
-        offsetTable[OFFSET_VERSION]    = VERSION
-        offsetTable[OFFSET_CREATED]    = datetime.now().ctime()
-        offsetTable[OFFSET_FILENAME]   = saveFile
+        offsetTable[OFFSET.RUN]        = run
+        offsetTable[OFFSET.SNAP]       = snap
+        offsetTable[OFFSET.VERSION]    = _VERSION
+        offsetTable[OFFSET.CREATED]    = datetime.now().ctime()
+        offsetTable[OFFSET.FILENAME]   = saveFile
 
         # Save
-        aux.dictToNPZ(offsetTable, saveFile)
+        zio.dictToNPZ(offsetTable, saveFile)
 
         stop = datetime.now()
         if( verbose ): print " - - - - Done after %s" % (str(stop-start))
@@ -177,7 +174,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=VERBOSE):
 
 
 
-def getBHSubhaloIndices(run, snap, bhIDs, verbose=VERBOSE):
+def getBHSubhaloIndices(run, snap, bhIDs, verbose=True):
     """
     Retrieve the subhalo indices which host the given Blackhole ID numbers.
 
@@ -220,7 +217,7 @@ def getBHSubhaloIndices(run, snap, bhIDs, verbose=VERBOSE):
 
 
 
-def _getHostsFromParticleIndex(run, snap, pind, verbose=VERBOSE):
+def _getHostsFromParticleIndex(run, snap, pind, verbose=True):
     '''
     Given the index of a particle, find the indices of the halo and subhalo it belongs to.
 
@@ -243,9 +240,9 @@ def _getHostsFromParticleIndex(run, snap, pind, verbose=VERBOSE):
     # Load offset table
     if( verbose ): print " - - - Loading offset table"
     offsetTable = loadOffsetTable(run, snap, verbose=verbose)
-    haloNums = offsetTable[OFFSET_HALOS]
-    subhNums = offsetTable[OFFSET_SUBHALOS]
-    partNums = offsetTable[OFFSET_PARTICLES][:,PTYPE]
+    haloNums = offsetTable[OFFSET.HALOS]
+    subhNums = offsetTable[OFFSET.SUBHALOS]
+    partNums = offsetTable[OFFSET.PARTICLES][:,PTYPE]
     if( verbose ): print " - - - - Loaded %d entries" % (len(haloNums))
 
 
@@ -253,7 +250,7 @@ def _getHostsFromParticleIndex(run, snap, pind, verbose=VERBOSE):
 
     if( verbose ): print " - - - Finding halo bins"
     # Find the entry for each index, np.digitize assigns values to right bin, shift left with '-1'
-    binInds = np.digitize(bhInds, partNums).astype(TYPE_INDEX)-1
+    binInds = np.digitize(bhInds, partNums).astype(DTYPE.INDEX)-1
 
     hostHalos = haloNums[binInds]
     hostSubhs = subhNums[binInds]
@@ -273,7 +270,7 @@ def _getHostsFromParticleIndex(run, snap, pind, verbose=VERBOSE):
 
 
 
-def _bhIDsToIndices(inIDs, table, verbose=VERBOSE):
+def _bhIDsToIndices(inIDs, table, verbose=True):
     """
     Convert from blackhole ID numbers to indexes using an offset table dictionary.
     
@@ -285,8 +282,8 @@ def _bhIDsToIndices(inIDs, table, verbose=VERBOSE):
 
     if( verbose ): print " - - HaloOffsetTable._idsToIndices()"
 
-    outIDs  = table[OFFSET_BH_IDS]
-    outInds = table[OFFSET_BH_INDICES]
+    outIDs  = table[OFFSET.BH_IDS]
+    outInds = table[OFFSET.BH_INDICES]
 
     ### Find Indices of Matches ###
 
@@ -321,117 +318,123 @@ def _bhIDsToIndices(inIDs, table, verbose=VERBOSE):
 # _bhIDsToIndices()
 
 
-def _constructOffsetTable(run, snap, verbose=VERBOSE):
+def _constructOffsetTable(run, snap, verbose=True):
     """
-    Construct offset table from a group catalog
+    Construct offset table from halo and subhalo catalogs.
+
+    Each 'entry' is the first particle index number for a group of particles.  Particles are
+    grouped by the halos and subhalos they belong to.  The first entry is particles in the first
+    subhalo of the first halo.  The last entry for the first halo is particles that dont belong to
+    any subhalo (but still belong to the first halo).  The very last entry is for particles that
+    dont belong to any halo or subhalo.
     
     Arguments
     ---------
-    run     : <int>, illustris simulation number {1,3}
-    snap    : <int>, illustris snapshot number {0,135}
-    verbose : <bool>, optional=VERBOSE, print verbose output
+       run     <int>  : illustris simulation number {1,3}
+       snap    <int>  : illustris snapshot number {0,135}
+       verbose <bool> : optional, print verbose output
 
     Returns
     -------
-    haloNum : <long>[N],   halo      number for each offset entry
-    subhNum : <long>[N],   subhalo   number for each offset entry
-    offsets : <long>[N,6], particle offsets for each offset entry
+       haloNum <int>[N]   : halo      number for each offset entry
+       subhNum <int>[N]   : subhalo   number for each offset entry
+       offsets <int>[N,6] : particle offsets for each offset entry
 
     """
 
     if( verbose ): print " - - HaloOffsetTable._constructOffsetTable()"
 
-    ### Load Group Catalog ###
-    groupCatFilename = GET_ILLUSTRIS_GROUPS_FIRST_FILENAME(run, snap)
-    if( verbose ): print " - - - Loading group catalog '%s'" % (groupCatFilename)
-    start = datetime.now()
-    groupCat = arepo.Subfind(groupCatFilename, combineFiles=True)
-    stop  = datetime.now()
-    if( verbose ): print " - - - - Done after %s" % (str(stop-start))
+    ## Load (Sub)Halo Catalogs
+    #  -----------------------
 
-    numHalos    = groupCat.npart_loaded[0]
-    numSubhalos = groupCat.npart_loaded[1]
-    tableSize   = numHalos + numSubhalos + 1
-    if( verbose ):
-        print " - - - - %d Halos, %d Subhalos" % (numHalos, numSubhalos)
-        print " - - - - %d Offset entries" % (tableSize)
-
-
-    if( numHalos < 200 ): interval = 1
-    else:                 interval = np.int(np.floor( numHalos/200.0 ))
+    # Illustris Data Directory where catalogs are stored
+    illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
+    
+    if( verbose ): print " - - - Loading Catalogs from '%s'" % (illpath)
+    haloCat = ill.groupcat.loadHalos(illpath, snap, fields=None)
+    numHalos    = haloCat['count']
+    if( verbose ): print " - - - - Halos    Loaded (%7d)" % (numHalos)
+    subhCat = ill.groupcat.loadSubhalos(illpath, snap, fields=None)
+    numSubhs = subhCat['count']
+    if( verbose ): print " - - - - Subhalos Loaded (%7d)" % (numSubhs)
 
 
-    ### Initialize ###
+    ## Initialize Storage
+    #  ------------------
+
+    tableSize = numHalos + numSubhs + 1
 
     # See object description; recall entries are [HALO, SUBHALO, PART0, ... PART5]
-    #    offsetTable = -1*np.ones( [numHalos+numSubhalos+1, 8], dtype=TYPE_INDEX)
-    haloNum = -1*np.ones(tableSize, dtype=TYPE_INDEX)
-    subhNum = -1*np.ones(tableSize, dtype=TYPE_INDEX)
-    offsets = -1*np.ones([tableSize,PARTICLE_TYPE_NUM], dtype=TYPE_INDEX)
+    #    (Sub)halo numbers are smaller, use signed-integers for `-1` to be no (Sub)halo
+    haloNum = np.zeros( tableSize,               dtype=DTYPE.INDEX)
+    subhNum = np.zeros( tableSize,               dtype=DTYPE.INDEX)
+    # Offsets approach total number of particles, must be uint64
+    offsets = np.zeros([tableSize,PARTICLE_NUM], dtype=DTYPE.ID)
 
     subh = 0
     offs = 0
-    cumHaloParts = np.zeros(6, dtype=TYPE_INDEX)
-    cumSubhParts = np.zeros(6, dtype=TYPE_INDEX)
+    cumHaloParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
+    cumSubhParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
 
-    # Iterate over each Halo
-    start = datetime.now()
+
+    ## Iterate Over Each Halo
+    #  ----------------------
     for ii in xrange(numHalos):
 
         # Add the number of particles in this halo
-        cumHaloParts += groupCat.group.GroupLenType[ii,:]
+        cumHaloParts[:] += haloCat['GroupLenType'][ii,:]
 
-        # Iterate over each Subhalo in halo 'ii'
-        for jj in range(groupCat.group.GroupNsubs[ii]):
+        
+        ## Iterate over each Subhalo, in halo ``ii``
+        #  -----------------------------------------
+        for jj in xrange(haloCat['GroupNsubs'][ii]):
+
+            # Consistency check: make sure subhalo number is as expected
+            if( jj == 0 and subh != haloCat['GroupFirstSub'][ii] ):
+                print "ii = %d, jj = %d, subh = %d" % (ii, jj, subh)
+                raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
+
             # Add entry for each subhalo
-            #     offsetTable[offs] = np.append([ ii, subh ], cumSubhParts)
             haloNum[offs] = ii
             subhNum[offs] = subh
             offsets[offs,:] = cumSubhParts
 
-            # Increment
-            #   Add particles in this subhalo
-            cumSubhParts += groupCat.subhalo.SubhaloLenType[subh]
+            # Add particles in this subhalo to offset counts
+            cumSubhParts[:] += subhCat['SubhaloLenType'][subh,:]
+
+            # Increment subhalo and entry number
             subh += 1
             offs += 1
 
+        # } for jj
+
 
         # Add Entry for particles with NO subhalo
-        #      offsetTable[offs] = np.append([ii,-1], cumSubhParts)
-        haloNum[offs] = ii
-        subhNum[offs] = -1
+        haloNum[offs] = ii                        # Still part of halo ``ii``
+        subhNum[offs] = -1                        # `-1` means no (sub)halo
         offsets[offs,:] = cumSubhParts
 
         # Increment particle numbers to include this halo
         cumSubhParts = np.copy(cumHaloParts)
+
+        # Increment entry number
         offs += 1
 
-        if( verbose and ii%interval == 0 ):
-            # Find out current duration
-            now = datetime.now()
-            dur = now-start
-
-            # Print status and time to completion
-            statStr = aux.statusString(ii+1, numHalos, dur)
-            sys.stdout.write('\r - - - - %s' % (statStr))
-            sys.stdout.flush()
+    # } for ii
 
 
-
-    # Add entry for end of all halo particles / start of particles with NO halo
-    #    offsetTable[offs] = np.append([-1,-1], cumSubhParts)
+    # Add entry for particles with NO halo and NO subhalo
     haloNum[offs] = -1
     subhNum[offs] = -1
     offsets[offs,:] = cumSubhParts
-
-    if( verbose ): sys.stdout.write('\n')
 
     return haloNum, subhNum, offsets
 
 # _constructOffsetTable()
 
 
-def _constructIndexTable(run, snap, verbose=VERBOSE):
+
+def _constructIndexTable(run, snap, verbose=True):
     
     if( verbose ): print " - - HaloOffsetTable._constructIndexTable()"
 
@@ -455,9 +458,5 @@ def _constructIndexTable(run, snap, verbose=VERBOSE):
 
 
 
-def _GET_OFFSET_TABLE_SAVE_FILENAME(run, snap):
-    fname  = GET_PROCESSED_DIR(run)
-    fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap)
-    return fname
 
 
