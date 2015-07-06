@@ -76,8 +76,6 @@ import illustris_python as ill
 
 _VERSION = 0.5
 
-_FULL_TABLE = False
-
 
 
 class OFFTAB():
@@ -105,6 +103,14 @@ _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%3d_offset-table_v%.2f.npz"
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=_VERSION):
     fname  = GET_PROCESSED_DIR(run)
     fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap, version)
+    return fname
+
+
+_BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%3d_bh-hosts_v%.2f.npz"
+
+def _GET_BH_HOSTS_TABLE_FILENAME(run, snap, version=_VERSION):
+    fname  = GET_PROCESSED_DIR(run)
+    fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, snap, version)
     return fname
 
 
@@ -172,11 +178,10 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         offsetTable[OFFTAB.CREATED]     = datetime.now().ctime()
         offsetTable[OFFTAB.FILENAME]    = saveFile
 
-        if( _FULL_TABLE ):
-            # Offsets table data
-            offsetTable[OFFTAB.HALOS]       = haloNums
-            offsetTable[OFFTAB.SUBHALOS]    = subhNums
-            offsetTable[OFFTAB.OFFSETS]     = offsets
+        # Offsets table data
+        offsetTable[OFFTAB.HALOS]       = haloNums
+        offsetTable[OFFTAB.SUBHALOS]    = subhNums
+        offsetTable[OFFTAB.OFFSETS]     = offsets
 
         # BH Specific data
         offsetTable[OFFTAB.BH_INDICES]  = bhInds
@@ -194,6 +199,114 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
     return offsetTable
 
 # loadOffsetTable()
+
+
+
+def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
+    """
+    Load pre-existing, or manage the creation of the particle offset table.
+
+    Arguments
+    ---------
+       run      <int>  : illustris simulation number {1,3}
+       snap     <int>  : illustris snapshot number {1,135}
+       loadsave <bool> : optional, load existing table
+       verbose  <bool> : optional, print verbose output
+
+    Returns
+    -------
+       offsetTable <dict> : particle offset table, see ``HaloOffsetTable`` docs for more info.
+
+    """
+
+    if( verbose ): print " - - HaloOffsetTable.loadBHHosts()"
+
+    saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, snap)
+
+    ## Load Existing Save
+    #  ==================
+    if( loadsave ):
+        if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
+        # Make sure path exists
+        if( os.path.exists(saveFile) ):
+            offsetTable = zio.npzToDict(saveFile)
+            if( verbose ): print " - - - - Table loaded"
+        else:
+            if( verbose ): print " - - - - File does not Exist, reconstructing BH Hosts"
+            loadsave = False
+
+
+    ## Reconstruct Hosts Table
+    #  =======================
+    if( not loadsave ):
+        if( verbose ): print " - - - Constructing Offset Table"
+        start = datetime.now()
+
+        offsetFile = ''
+        if( convert is not None ): 
+            offsetFile = _GET_OFFSET_TABLE_FILENAME(run, snap, version=convert)
+            if( verbose ): print " - - - Trying to convert from existing '%s'" % (offsetFile)
+
+        ## Convert an Existing (Full) Offset Table into BH Hosts
+        #  -----------------------------------------------------
+        if( os.path.exists(offsetFile) ):
+            offsetTable = zio.npzToDict(offsetFile)
+
+            bhInds  = offsetTable[OFFTAB.BH_INDICES]
+            bhIDs   = offsetTable[OFFTAB.BH_IDS]    
+            bhHalos = offsetTable[OFFTAB.BH_HALOS]
+            bhSubhs = offsetTable[OFFTAB.BH_SUBHALOS]
+
+        else:
+            if( verbose ): print " - - - Reconstructing offset table"
+
+            # Construct Offset Data
+            haloNums, subhNums, offsets = _constructOffsetTable(run, snap, verbose=verbose)
+
+            # Construct BH index Data
+            bhInds, bhIDs = _constructBHIndexTable(run, snap, verbose=verbose)
+
+            # Find BH Subhalos
+            binInds = np.digitize(bhInds, offsets[:,PARTICLE.BH]).astype(DTYPE.INDEX)-1
+            if( any(binInds < 0) ): raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
+            bhHalos = haloNums[binInds]
+            bhSubhs = subhNums[binInds]
+
+
+        ## Save To Dict
+        #  ------------
+
+        hostTable = {}
+
+        # Metadata
+        hostTable[OFFTAB.RUN]         = run
+        hostTable[OFFTAB.SNAP]        = snap
+        hostTable[OFFTAB.VERSION]     = _VERSION
+        hostTable[OFFTAB.CREATED]     = datetime.now().ctime()
+        hostTable[OFFTAB.FILENAME]    = saveFile
+
+        # BH Data
+        hostTable[OFFTAB.BH_INDICES]  = bhInds
+        hostTable[OFFTAB.BH_IDS]      = bhIDs
+        hostTable[OFFTAB.BH_HALOS]    = bhHalos
+        hostTable[OFFTAB.BH_SUBHALOS] = bhSubhs
+
+        # Save to file
+        zio.dictToNPZ(hostTable, saveFile, verbose=verbose)
+
+        stop = datetime.now()
+        if( verbose ): print " - - - - Done after %s" % (str(stop-start))
+    
+    # } if loadsave
+
+
+    return hostTable
+
+# loadBHHosts()
+
+
+
+
 
 
 
