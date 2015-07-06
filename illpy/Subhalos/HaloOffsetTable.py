@@ -177,7 +177,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         offsetTable[OFFTAB.BH_INDICES]  = bhInds
         offsetTable[OFFTAB.BH_IDS]      = bhIDs
         offsetTable[OFFTAB.BH_HALOS]    = bhHalos
-        offsetTable[OFFTAB.BH_SUBHALOS] = bhSubhalos
+        offsetTable[OFFTAB.BH_SUBHALOS] = bhSubhs
 
         # Save to file
         zio.dictToNPZ(offsetTable, saveFile, verbose=verbose)
