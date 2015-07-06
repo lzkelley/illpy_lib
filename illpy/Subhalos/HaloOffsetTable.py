@@ -72,7 +72,12 @@ import zcode.InOut as zio
 
 import illustris_python as ill
 
-_VERSION = 0.4
+
+
+_VERSION = 0.5
+
+_FULL_TABLE = False
+
 
 
 class OFFTAB():
@@ -95,7 +100,7 @@ class OFFTAB():
 
 
 
-_OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
+_OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%3d_offset-table_v%.2f.npz"
 
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=_VERSION):
     fname  = GET_PROCESSED_DIR(run)
@@ -135,8 +140,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
             offsetTable = zio.npzToDict(saveFile)
             if( verbose ): print " - - - - Table loaded"
         else:
-            print "HaloOffsetTable.loadOffsetTable() : File does not Exist!"
-            print "HaloOffsetTable.loadOffsetTable() : Reconstructing offsets !!"
+            if( verbose ): print " - - - - File does not Exist, reconstructing offsets"
             loadsave = False
 
 
@@ -168,10 +172,11 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         offsetTable[OFFTAB.CREATED]     = datetime.now().ctime()
         offsetTable[OFFTAB.FILENAME]    = saveFile
 
-        # Offsets table data
-        offsetTable[OFFTAB.HALOS]       = haloNums
-        offsetTable[OFFTAB.SUBHALOS]    = subhNums
-        offsetTable[OFFTAB.OFFSETS]     = offsets
+        if( _FULL_TABLE ):
+            # Offsets table data
+            offsetTable[OFFTAB.HALOS]       = haloNums
+            offsetTable[OFFTAB.SUBHALOS]    = subhNums
+            offsetTable[OFFTAB.OFFSETS]     = offsets
 
         # BH Specific data
         offsetTable[OFFTAB.BH_INDICES]  = bhInds
@@ -289,7 +294,7 @@ def _constructOffsetTable(run, snap, verbose=True):
                 # Increment subhalo and entry number
                 subh += 1
                 offs += 1
-                pbar.update(offs)
+                if( verbose ): pbar.update(offs)
 
             # } for jj
 
@@ -304,7 +309,7 @@ def _constructOffsetTable(run, snap, verbose=True):
 
             # Increment entry number
             offs += 1
-            pbar.update(offs)
+            if( verbose ): pbar.update(offs)
 
         # } for ii
 
@@ -358,3 +363,49 @@ def _constructBHIndexTable(run, snap, verbose=True):
 # _constructBHIndexTable()
 
 
+
+
+
+def main():
+    titleStr = "illpy.Subhalos.HaloOffsetTable.main()"
+    print "\n%s\n%s\n" % (titleStr, "="*len(titleStr))
+
+    import sys
+
+    try:
+        run   = np.int(sys.argv[1])
+        start = np.int(sys.argv[2])
+        stop  = np.int(sys.argv[3])
+        skip  = np.int(sys.argv[4])
+
+    except:
+        # Print Usage
+        print "usage:  HaloOffsetTable RUN SNAP_START SNAP_STOP SNAP_SKIP"
+        print "arguments:"
+        print "    RUN        <int> : illustris simulation number {1,3}"
+        print "    SNAP_START <int> : illustris snapshot   number {0,135} to start on"
+        print "    SNAP_STOP  <int> :                                     to stop  before"
+        print "    SNAP_SKIP  <int> : spacing of snapshots to work on"
+        print ""
+        # Raise Exception
+        raise
+
+    else:
+        snaps = np.arange(start, stop, skip)
+        print snaps
+
+        for sn in snaps:
+            sys.stdout.write('\t%3d ... ' % (sn))
+            sys.stdout.flush()
+
+            beg = datetime.now()
+            table = loadOffsetTable(run, sn, verbose=False)
+            end = datetime.now()
+
+            sys.stdout.write(' After %s\n' % (str(end-beg)) )
+            sys.stdout.flush()
+
+    return
+
+
+if( __name__ == "__main__" ): main()
