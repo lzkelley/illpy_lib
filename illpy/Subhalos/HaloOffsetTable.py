@@ -5,19 +5,21 @@ The table is in the form of a dictionary with keys given by the constants ``OFFS
 ``loadOffsetTable()`` is the only necessary API - it deals with constructing, saving, and loading
 the offset tables.
 
-
-Methods
+Classes
 -------
-  API
-  - loadOffsetTable()                 : load offset table for target run and snapshot
-  - getBHSubhaloIndices()             : get the subhalo indices for given blackhole IDs
+   OFFSET : enumerator-like class for dictionary key-words
 
-  Internal
-  - _GET_OFFSET_TABLE_SAVE_FILENAME() : filename which the offset table is saved/loaded to/from
-  - _getHostsFromParticleIndex()      : Given a BH index, find its host halo and subhalo
-  - _bhIDsToIndices()                 : convert from BH ID number to Index in snapshot files
-  - _constructOffsetTable()           : construct the offset table from the group catalog
-  - _constructIndexTable()            : construct mapping from BH IDs to indices in snapshot files
+
+Functions
+---------
+   loadOffsetTable                 : load offset table for target run and snapshot
+   getBHSubhaloIndices             : get the subhalo indices for given blackhole IDs
+
+   _GET_OFFSET_TABLE_SAVE_FILENAME : filename which the offset table is saved/loaded to/from
+   _getHostsFromParticleIndex      : Given a BH index, find its host halo and subhalo
+   _bhIDsToIndices                 : convert from BH ID number to Index in snapshot files
+   _constructOffsetTable           : construct the offset table from the group catalog
+   _constructBHIndexTable          : construct mapping from BH IDs to indices in snapshot files
 
 
 Notes
@@ -63,15 +65,16 @@ Finally, any Particle1's with index 988 or after belong to no subhalo, and no ha
 import os
 import numpy as np
 from datetime import datetime
+import progressbar
 
-from illpy.Constants import DTYPE, GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE_NUM
-#from illpy.illbh.BHConstants import *
+from .. Constants import DTYPE, GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE_NUM, GET_PROCESSED_DIR, PARTICLE
+from Constants import SNAPSHOT
 
 import zcode.InOut as zio
 
 import illustris_python as ill
 
-_VERSION = 0.2
+_VERSION = 0.3
 
 
 class OFFSET():
@@ -92,11 +95,11 @@ class OFFSET():
 
 
 
-_OFFSET_TABLE_FILENAME_BASE = "offsets/ill-%d_snap-%d_offset-table.npz"
+_OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
 
-def GET_OFFSET_TABLE_SAVE_FILENAME(run, snap, version=_VERSION):
+def GET_OFFSET_TABLE_FILENAME(run, snap, version=_VERSION):
     fname  = GET_PROCESSED_DIR(run)
-    fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap)
+    fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap, version)
     return fname
 
 
@@ -104,36 +107,41 @@ def GET_OFFSET_TABLE_SAVE_FILENAME(run, snap, version=_VERSION):
 
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
     """
+    Load pre-existing, or manage the creation of the particle offset table.
+
+    Arguments
+    ---------
+       run      <int>  : illustris simulation number {1,3}
+       snap     <int>  : illustris snapshot number {1,135}
+       loadsave <bool> : optional, load existing table
+       verbose  <bool> : optional, print verbose output
+
+    Returns
+    -------
+       offsetTable <dict> : particle offset table, see ``HaloOffsetTable`` docs for more info.
 
     """
 
     if( verbose ): print " - - HaloOffsetTable.loadOffsetTable()"
 
-    saveFile = GET_OFFSET_TABLE_SAVE_FILENAME(run, snap)
+    saveFile = GET_OFFSET_TABLE_FILENAME(run, snap)
 
-    ### Load Existing Save ###
+    ## Load Existing Save
+    #  ------------------
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
         # Make sure path exists
         if( os.path.exists(saveFile) ):
             offsetTable = zio.npzToDict(saveFile)
-            loadVers = offsetTable[OFFSET.VERSION]
-            # Make sure version matches
-            if( loadVers != _VERSION ):
-                print "HaloOffsetTable.loadOffsetTable() : Loaded  version %s" % (str(loadVers))
-                print "HaloOffsetTable.loadOffsetTable() : Current version %s" % (str(_VERSION ))
-                print "HaloOffsetTable.loadOffsetTable() : Reconstructing offsets !!"
-                loadsave = False
-            else:
-                if( verbose ): print " - - - - Loaded"
-
+            if( verbose ): print " - - - - Table loaded"
         else:
             print "HaloOffsetTable.loadOffsetTable() : File does not Exist!"
             print "HaloOffsetTable.loadOffsetTable() : Reconstructing offsets !!"
             loadsave = False
 
 
-    ### Reconstruct Offset Table ###
+    ## Reconstruct Offset Table
+    #  ------------------------
     if( not loadsave ):
         if( verbose ): print " - - - Constructing Offset Table"
         start = datetime.now()
@@ -142,7 +150,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         haloNums, subhNums, offsets = _constructOffsetTable(run, snap, verbose=verbose)
 
         # Construct index Data
-        bhInds, bhIDs = _constructIndexTable(run, snap, verbose=verbose)
+        bhInds, bhIDs = _constructBHIndexTable(run, snap, verbose=verbose)
 
 
         offsetTable = {}
@@ -196,7 +204,7 @@ def getBHSubhaloIndices(run, snap, bhIDs, verbose=True):
 
     """
 
-    
+
     if( verbose ): print " - - HaloOffsetTable.getBHSubhaloIndices()"
 
     # Load Offset Table
@@ -273,7 +281,7 @@ def _getHostsFromParticleIndex(run, snap, pind, verbose=True):
 def _bhIDsToIndices(inIDs, table, verbose=True):
     """
     Convert from blackhole ID numbers to indexes using an offset table dictionary.
-    
+
     Notes
     -----
     Not all BH IDs will be found.  Incorrect/missing matches return '-1' elements
@@ -295,14 +303,13 @@ def _bhIDsToIndices(inIDs, table, verbose=True):
     found = sortIDs[foundSorted]
 
 
-
     foundIDs  = outIDs[found]
     foundInds = outInds[found]
 
-    
+
     ### Check Matches ###
 
-    # Find incorrect matches 
+    # Find incorrect matches
     inds = np.where( inIDs != foundIDs )[0]
     numBad = len(inds)
     numGood = len(inIDs)-numBad
@@ -312,7 +319,7 @@ def _bhIDsToIndices(inIDs, table, verbose=True):
         foundIDs[inds]  = -1
         foundInds[inds] = -1
 
-    
+
     return foundInds
 
 # _bhIDsToIndices()
@@ -327,7 +334,7 @@ def _constructOffsetTable(run, snap, verbose=True):
     subhalo of the first halo.  The last entry for the first halo is particles that dont belong to
     any subhalo (but still belong to the first halo).  The very last entry is for particles that
     dont belong to any halo or subhalo.
-    
+
     Arguments
     ---------
        run     <int>  : illustris simulation number {1,3}
@@ -349,7 +356,7 @@ def _constructOffsetTable(run, snap, verbose=True):
 
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
-    
+
     if( verbose ): print " - - - Loading Catalogs from '%s'" % (illpath)
     haloCat = ill.groupcat.loadHalos(illpath, snap, fields=None)
     numHalos    = haloCat['count']
@@ -376,57 +383,71 @@ def _constructOffsetTable(run, snap, verbose=True):
     cumHaloParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
     cumSubhParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
 
+    # Set Progress Bar Parameters
+    widgets = [
+        progressbar.Percentage(),
+        ' ', progressbar.Bar(),
+        ' ', progressbar.AdaptiveETA(),
+        ]
 
-    ## Iterate Over Each Halo
-    #  ----------------------
-    for ii in xrange(numHalos):
+    # Start Progress Bar
+    with progressbar.ProgressBar(widgets=widgets, maxval=tableSize, term_width=100) as pbar:
 
-        # Add the number of particles in this halo
-        cumHaloParts[:] += haloCat['GroupLenType'][ii,:]
 
-        
-        ## Iterate over each Subhalo, in halo ``ii``
-        #  -----------------------------------------
-        for jj in xrange(haloCat['GroupNsubs'][ii]):
+        ## Iterate Over Each Halo
+        #  ----------------------
+        for ii in xrange(numHalos):
 
-            # Consistency check: make sure subhalo number is as expected
-            if( jj == 0 and subh != haloCat['GroupFirstSub'][ii] ):
-                print "ii = %d, jj = %d, subh = %d" % (ii, jj, subh)
-                raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
+            # Add the number of particles in this halo
+            cumHaloParts[:] += haloCat['GroupLenType'][ii,:]
 
-            # Add entry for each subhalo
-            haloNum[offs] = ii
-            subhNum[offs] = subh
+
+            ## Iterate over each Subhalo, in halo ``ii``
+            #  -----------------------------------------
+            for jj in xrange(haloCat['GroupNsubs'][ii]):
+
+                # Consistency check: make sure subhalo number is as expected
+                if( jj == 0 and subh != haloCat['GroupFirstSub'][ii] ):
+                    print "ii = %d, jj = %d, subh = %d" % (ii, jj, subh)
+                    raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
+
+                # Add entry for each subhalo
+                haloNum[offs] = ii
+                subhNum[offs] = subh
+                offsets[offs,:] = cumSubhParts
+
+                # Add particles in this subhalo to offset counts
+                cumSubhParts[:] += subhCat['SubhaloLenType'][subh,:]
+
+                # Increment subhalo and entry number
+                subh += 1
+                offs += 1
+                pbar.update(offs)
+
+            # } for jj
+
+
+            # Add Entry for particles with NO subhalo
+            haloNum[offs] = ii                        # Still part of halo ``ii``
+            subhNum[offs] = -1                        # `-1` means no (sub)halo
             offsets[offs,:] = cumSubhParts
 
-            # Add particles in this subhalo to offset counts
-            cumSubhParts[:] += subhCat['SubhaloLenType'][subh,:]
+            # Increment particle numbers to include this halo
+            cumSubhParts = np.copy(cumHaloParts)
 
-            # Increment subhalo and entry number
-            subh += 1
+            # Increment entry number
             offs += 1
+            pbar.update(offs)
 
-        # } for jj
+        # } for ii
 
 
-        # Add Entry for particles with NO subhalo
-        haloNum[offs] = ii                        # Still part of halo ``ii``
-        subhNum[offs] = -1                        # `-1` means no (sub)halo
+        # Add entry for particles with NO halo and NO subhalo
+        haloNum[offs] = -1
+        subhNum[offs] = -1
         offsets[offs,:] = cumSubhParts
 
-        # Increment particle numbers to include this halo
-        cumSubhParts = np.copy(cumHaloParts)
-
-        # Increment entry number
-        offs += 1
-
-    # } for ii
-
-
-    # Add entry for particles with NO halo and NO subhalo
-    haloNum[offs] = -1
-    subhNum[offs] = -1
-    offsets[offs,:] = cumSubhParts
+    # } with pbar
 
     return haloNum, subhNum, offsets
 
@@ -434,27 +455,40 @@ def _constructOffsetTable(run, snap, verbose=True):
 
 
 
-def _constructIndexTable(run, snap, verbose=True):
-    
-    if( verbose ): print " - - HaloOffsetTable._constructIndexTable()"
+def _constructBHIndexTable(run, snap, verbose=True):
+    """
+    Load all BH ID numbers and associate them with 'index' (i.e. order) numbers.
 
-    # Load Snapshot
-    snapshotPath = GET_ILLUSTRIS_SNAPSHOT_FIRST_FILENAME(run, snap)
-    if( verbose ): print " - - - Loading snapshot '%s'" % (snapshotPath)
-    start = datetime.now()
-    snap  = arepo.Snapshot(snapshotPath, fields=['id'], parttype=PARTICLE_TYPE_BH, 
-                           combineFiles=True, verbose=False)
-    stop  = datetime.now()
+    Arguments
+    ---------
+       run     <int>  : illustris simulation number {1,3}
+       snap    <int>  : illustris snapshot number {1,135}
+       verbose <bool> : optional, print verbose output
 
-    ids  = np.array(snap.id)
-    nums = len(ids)
-    inds = np.arange(nums)
-    if( verbose ): print " - - - - Loaded %d particles after %s" % (nums, str(stop-start))
+    Returns
+    -------
+       inds    <int>[N] : BH Index numbers
+       bhIDs   <int>[N] : BH particle ID numbers
 
-    return inds, ids
+    """
 
+    if( verbose ): print " - - HaloOffsetTable._constructBHIndexTable()"
 
-# _constructIndexTable()
+    # Illustris Data Directory where catalogs are stored
+    illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
+
+    # Load all BH ID numbers from snapshot (single ``fields`` parameters loads array, not dict)
+    if( verbose ): print " - - - Loading BHs from Snapshot %d in '%s'" % (snap, illpath)
+    bhIDs = ill.snapshot.loadSubset(illpath, snap, PARTICLE.BH, fields=SNAPSHOT.IDS)
+    numBHs = len(bhIDs)
+    if( verbose ): print " - - - - BHs Loaded (%7d)" % (numBHs)
+
+    # Create 'indices' of BHs
+    inds = np.arange(numBHs)
+
+    return inds, bhIDs
+
+# _constructBHIndexTable()
 
 
 
