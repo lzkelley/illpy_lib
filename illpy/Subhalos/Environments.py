@@ -33,25 +33,23 @@ import sys
 import os
 import argparse
 
-# progressbar2 (https://pypi.python.org/pypi/progressbar2)
 import progressbar
 
 from mpi4py import MPI
-from enum import Enum
 
 import zcode.InOut as zio
 import zcode.Math  as zmath
 from zcode.Constants import PC
 
-from illpy.illbh import BHMergers, BHMatcher
-from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM
-from illpy.Subhalos import Subhalo, Profiler
+from illpy.illbh import BHMergers
+from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM, MERGERS_IDS, BH_OUT
 from illpy.Subhalos.Constants import SUBHALO
-from illpy.Constants import DIST_CONV, PARTICLE_NUM
+from illpy.Constants import DIST_CONV, PARTICLE_NUM, DTYPE
 
-from GalaxyModels.MergerSubhaloCatalog import loadMergerSubhaloCatalog, MSUBH_SUBHALO_INDICES
 
 from Settings import DIR_DATA, DIR_PLOTS
+import Subhalo, Profiler, ParticleHosts
+from ParticleHosts import OFFTAB
 
 # Hard Settings
 _VERSION      = 1.2
@@ -144,27 +142,51 @@ def getMergerAndSubhaloIndices(run, verbose=True):
 
     if( verbose ): print " - - Environments.getMergerAndSubhaloIndices()"
 
-    if( verbose ): print " - - Loading Mergers"
+    if( verbose ): print " - - - Loading Mergers"
     mergers = BHMergers.loadFixedMergers(run, verbose=VERBOSE)
-    if( verbose ): print " - - - Loaded %d mergers" % (mergers[MERGERS_NUM])
+    if( verbose ): print " - - - - Loaded %d mergers" % (mergers[MERGERS_NUM])
 
-    if( verbose ): print " - - Loading Merger Subhalos Catalog"
-    mergerSubhalos = loadMergerSubhaloCatalog(run, verbose=VERBOSE)
-
-    if( verbose ): print " - - Loading Merger Details"
-    mergerDetails  = BHMatcher.loadMergerDetails(run, mergers=mergers, verbose=VERBOSE)
-
+    if( verbose ): print " - - - Loading BH Hosts Catalog"
+    bhHosts = ParticleHosts.loadBHHosts(run, loadsave=True, verbose=True, bar=True)
 
     # Snapshot for each merger
     mergSnap = mergers[MERGERS_MAP_MTOS]
     # Mergers for each snapshot
     snapMerg = mergers[MERGERS_MAP_STOM]
-    # Subhalos for each merger
-    mergSubh = mergerSubhalos[MSUBH_SUBHALO_INDICES]
+
+    # Initialize merger-subhalos array to invalid `-1`
+    mergSubh = -1*np.ones(len(mergSnap), dtype=DTYPE.INDEX)
+    
+    ## Iterate Over Snapshots, list of mergers for each
+    #  ------------------------------------------------
+    if( verbose ): print " - - - Associating Mergers with Subhalos"
+    for snap, mergs in enumerate(snapMerg):
+        # Skip if no mergers
+        if( len(mergs) <= 0 ): continue
+
+        # Get the 'out' BH ID numbers for mergers in this snapshot
+        outIDs = mergers[MERGERS_IDS][mergs, BH_OUT]
+        # Select BH-Hosts dict for this snapshot
+        #   Individual snapshot dictionaries have string keys
+        snapStr = OFFTAB.snapDictKey(snap)
+        bhHostsSnap = bhHosts[snapStr]
+        #   Convert from array(dict) to just dict
+        bhHostsSnap = bhHostsSnap.item()
+
+        # Find the subhalo hosts for these merger BHs
+        mergSubh[mergs] = ParticleHosts.subhalosForBHIDs(run, snap, outIDs, bhHosts=bhHostsSnap, 
+                                                         verbose=False)
+        
+    # } for snap, mergs
+
+    numTot = len(mergSubh)
+    numGod = np.count_nonzero( mergSubh >= 0 )
+    if( verbose ): print " - - - - Good %d/%d = %.4f" % (numGod, numTot, 1.0*numGod/numTot)
 
     return mergSnap, snapMerg, mergSubh
 
 # getMergerAndSubhaloIndices()
+
 
 
 
