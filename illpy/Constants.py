@@ -57,6 +57,14 @@ def GET_ILLUSTRIS_DM_MASS(run):
     return _DM_MASS[run]
 
 
+_BAD_SNAPS = { 1: [53, 55],
+               2: [],
+               3: [] }
+
+def GET_BAD_SNAPS(run):
+    return _BAD_SNAPS[run]
+
+
 _ILLUSTRIS_RUN_NAMES   = { 1 : "L75n1820FP",
                            2 : "L75n910FP",
                            3 : "L75n455FP" }
