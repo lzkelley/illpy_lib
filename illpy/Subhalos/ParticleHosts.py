@@ -12,12 +12,15 @@ Classes
 
 Functions
 ---------
-    loadOffsetTable            : load offset table for target run and snapshot
+    # loadOffsetTable            : load offset table for target run and snapshot
+    loadBHHostsSnap            : load (sub)halo host associations for blackholes in one snapshot
+    loadBHHosts                : load (sub)halo host associations for blackholes in all snapshots
+    main                       : 
 
     _GET_OFFSET_TABLE_FILENAME : filename which the offset table is saved/loaded to/from
     _constructOffsetTable      : construct the offset table from the group catalog
     _constructBHIndexTable     : construct mapping from BH IDs to indices in snapshot files
-
+    _getProgressBar            : create a progressbar object with default settings
 
 Notes
 -----
@@ -65,7 +68,8 @@ import numpy as np
 from datetime import datetime
 import progressbar
 
-from .. Constants import DTYPE, GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE_NUM, GET_PROCESSED_DIR, PARTICLE
+from .. Constants import DTYPE, NUM_SNAPS, PARTICLE_NUM, \
+    GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, PARTICLE
 from Constants import SNAPSHOT
 
 import zcode.InOut as zio
@@ -75,7 +79,6 @@ import illustris_python as ill
 
 
 _VERSION = 0.5
-
 
 
 class OFFTAB():
@@ -98,24 +101,35 @@ class OFFTAB():
 
 
 
-_OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%3d_offset-table_v%.2f.npz"
+_OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
 
-def _GET_OFFSET_TABLE_FILENAME(run, snap, version=_VERSION):
+def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
+    if( version is None ): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap, version)
     return fname
 
 
-_BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%3d_bh-hosts_v%.2f.npz"
+_BH_HOSTS_SNAP_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%03d_bh-hosts_v%.2f.npz"
 
-def _GET_BH_HOSTS_TABLE_FILENAME(run, snap, version=_VERSION):
+def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
+    if( version is None ): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
-    fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, snap, version)
+    fname += _BH_HOSTS_SNAP_TABLE_FILENAME_BASE % (run, snap, version)
+    return fname
+
+
+_BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_bh-hosts_v%.2f.npz"
+
+def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
+    if( version is None ): version = _VERSION
+    fname  = GET_PROCESSED_DIR(run)
+    fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
 
 
 
-
+'''
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
     """
     Load pre-existing, or manage the creation of the particle offset table.
@@ -129,11 +143,11 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 
     Returns
     -------
-       offsetTable <dict> : particle offset table, see ``HaloOffsetTable`` docs for more info.
+       offsetTable <dict> : particle offset table, see ``ParticleHosts`` docs for more info.
 
     """
 
-    if( verbose ): print " - - HaloOffsetTable.loadOffsetTable()"
+    if( verbose ): print " - - ParticleHosts.loadOffsetTable()"
 
     saveFile = _GET_OFFSET_TABLE_FILENAME(run, snap)
 
@@ -199,10 +213,11 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
     return offsetTable
 
 # loadOffsetTable()
+'''
 
 
 
-def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
+def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=None, convert=None):
     """
     Load pre-existing, or manage the creation of the particle offset table.
 
@@ -215,21 +230,25 @@ def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
 
     Returns
     -------
-       offsetTable <dict> : particle offset table, see ``HaloOffsetTable`` docs for more info.
+       offsetTable <dict> : particle offset table, see ``ParticleHosts`` docs for more info.
 
     """
 
-    if( verbose ): print " - - HaloOffsetTable.loadBHHosts()"
+    if( verbose ): print " - - ParticleHosts.loadBHHostsSnap()"
 
-    saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, snap)
+    if( bar     is None ): bar = bool(verbose)
+
+
 
     ## Load Existing Save
     #  ==================
     if( loadsave ):
+        saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version)
+
         if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
         # Make sure path exists
         if( os.path.exists(saveFile) ):
-            offsetTable = zio.npzToDict(saveFile)
+            hostTable = zio.npzToDict(saveFile)
             if( verbose ): print " - - - - Table loaded"
         else:
             if( verbose ): print " - - - - File does not Exist, reconstructing BH Hosts"
@@ -241,6 +260,9 @@ def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
     if( not loadsave ):
         if( verbose ): print " - - - Constructing Offset Table"
         start = datetime.now()
+
+        if( version is not None ): raise RuntimeError("Can only create version '%s'" % _VERSION)
+        saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap)
 
         offsetFile = ''
         if( convert is not None ): 
@@ -302,7 +324,7 @@ def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
 
     return hostTable
 
-# loadBHHosts()
+# loadBHHostsSnap()
 
 
 
@@ -310,7 +332,7 @@ def loadBHHosts(run, snap, loadsave=True, verbose=True, convert=None):
 
 
 
-def _constructOffsetTable(run, snap, verbose=True):
+def _constructOffsetTable(run, snap, verbose=True, bar=None):
     """
     Construct offset table from halo and subhalo catalogs.
 
@@ -334,7 +356,9 @@ def _constructOffsetTable(run, snap, verbose=True):
 
     """
 
-    if( verbose ): print " - - HaloOffsetTable._constructOffsetTable()"
+    if( verbose ): print " - - ParticleHosts._constructOffsetTable()"
+
+    if( bar is None ): bar = bool(verbose)
 
     ## Load (Sub)Halo Catalogs
     #  -----------------------
@@ -368,71 +392,63 @@ def _constructOffsetTable(run, snap, verbose=True):
     cumHaloParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
     cumSubhParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
 
-    # Set Progress Bar Parameters
-    widgets = [
-        progressbar.Percentage(),
-        ' ', progressbar.Bar(),
-        ' ', progressbar.AdaptiveETA(),
-        ]
+    pbar = _getProgressBar(tableSize)
+    if( bar ): pbar.start()
 
-    # Start Progress Bar
-    with progressbar.ProgressBar(widgets=widgets, maxval=tableSize, term_width=100) as pbar:
+    ## Iterate Over Each Halo
+    #  ----------------------
+    for ii in xrange(numHalos):
 
-
-        ## Iterate Over Each Halo
-        #  ----------------------
-        for ii in xrange(numHalos):
-
-            # Add the number of particles in this halo
-            cumHaloParts[:] += haloCat['GroupLenType'][ii,:]
+        # Add the number of particles in this halo
+        cumHaloParts[:] += haloCat['GroupLenType'][ii,:]
 
 
-            ## Iterate over each Subhalo, in halo ``ii``
-            #  -----------------------------------------
-            for jj in xrange(haloCat['GroupNsubs'][ii]):
+        ## Iterate over each Subhalo, in halo ``ii``
+        #  -----------------------------------------
+        for jj in xrange(haloCat['GroupNsubs'][ii]):
 
-                # Consistency check: make sure subhalo number is as expected
-                if( jj == 0 and subh != haloCat['GroupFirstSub'][ii] ):
-                    print "ii = %d, jj = %d, subh = %d" % (ii, jj, subh)
-                    raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
+            # Consistency check: make sure subhalo number is as expected
+            if( jj == 0 and subh != haloCat['GroupFirstSub'][ii] ):
+                print "ii = %d, jj = %d, subh = %d" % (ii, jj, subh)
+                raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
 
-                # Add entry for each subhalo
-                haloNum[offs] = ii
-                subhNum[offs] = subh
-                offsets[offs,:] = cumSubhParts
-
-                # Add particles in this subhalo to offset counts
-                cumSubhParts[:] += subhCat['SubhaloLenType'][subh,:]
-
-                # Increment subhalo and entry number
-                subh += 1
-                offs += 1
-                if( verbose ): pbar.update(offs)
-
-            # } for jj
-
-
-            # Add Entry for particles with NO subhalo
-            haloNum[offs] = ii                        # Still part of halo ``ii``
-            subhNum[offs] = -1                        # `-1` means no (sub)halo
+            # Add entry for each subhalo
+            haloNum[offs] = ii
+            subhNum[offs] = subh
             offsets[offs,:] = cumSubhParts
 
-            # Increment particle numbers to include this halo
-            cumSubhParts = np.copy(cumHaloParts)
+            # Add particles in this subhalo to offset counts
+            cumSubhParts[:] += subhCat['SubhaloLenType'][subh,:]
 
-            # Increment entry number
+            # Increment subhalo and entry number
+            subh += 1
             offs += 1
-            if( verbose ): pbar.update(offs)
+            if( bar ): pbar.update(offs)
 
-        # } for ii
+        # } for jj
 
 
-        # Add entry for particles with NO halo and NO subhalo
-        haloNum[offs] = -1
-        subhNum[offs] = -1
+        # Add Entry for particles with NO subhalo
+        haloNum[offs] = ii                        # Still part of halo ``ii``
+        subhNum[offs] = -1                        # `-1` means no (sub)halo
         offsets[offs,:] = cumSubhParts
 
-    # } with pbar
+        # Increment particle numbers to include this halo
+        cumSubhParts = np.copy(cumHaloParts)
+
+        # Increment entry number
+        offs += 1
+        if( bar ): pbar.update(offs)
+
+    # } for ii
+
+
+    # Add entry for particles with NO halo and NO subhalo
+    haloNum[offs] = -1
+    subhNum[offs] = -1
+    offsets[offs,:] = cumSubhParts
+
+    if( bar ): pbar.finish()
 
     return haloNum, subhNum, offsets
 
@@ -457,7 +473,7 @@ def _constructBHIndexTable(run, snap, verbose=True):
 
     """
 
-    if( verbose ): print " - - HaloOffsetTable._constructBHIndexTable()"
+    if( verbose ): print " - - ParticleHosts._constructBHIndexTable()"
 
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
@@ -476,11 +492,99 @@ def _constructBHIndexTable(run, snap, verbose=True):
 # _constructBHIndexTable()
 
 
+def loadBHHosts(run, version=None, verbose=True, bar=None, convert=None):
+    """
+    Merger individual snapshot's blackhole hosts files into a single file.
+    
+    Arguments
+    ---------
+        run     <int>  : illustris simulation number {1,3}
+        version <flt>  : optional, target version number
+        verbose <bool> :
+        bar     <bool> : 
+        convert <bool> :
+
+    Returns
+    -------
+
+    """
+
+    if( verbose ): print " - - ParticleHosts.loadBHHosts()"
+
+    if( bar is None ): bar = bool(verbose)
+
+    ## Load Existing Save
+    #  ==================
+    if( loadsave ):
+        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, version=version)
+
+        if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
+        # Make sure path exists
+        if( os.path.exists(saveFile) ):
+            allhosts = zio.npzToDict(saveFile)
+            if( verbose ): print " - - - - Table loaded"
+        else:
+            if( verbose ): print " - - - - File does not Exist, reconstructing BH Hosts"
+            loadsave = False
+
+
+    ## Reconstruct Hosts Table
+    #  =======================
+    if( not loadsave ):
+        
+        if( verbose ): print " - - - Constructing Hosts Table"
+        start = datetime.now()
+
+        if( version is not None ): raise RuntimeError("Can only create version '%s'" % _VERSION)
+        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run)
+
+        # Create progress-bar
+        pbar = _getProgressBar(NUM_SNAPS)
+        if( bar ): pbar.start()
+
+        # Select the dict-keys for snapshot hosts to transfer
+        hostKeys = [ OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS ]
+
+        ## Create dictionary
+        #  -----------------
+        allhosts = {}
+
+        # Add metadata
+        allhosts[OFFTAB.RUN] = run
+        allhosts[OFFTAB.VERSION] = _VERSION
+        allhosts[OFFTAB.CREATED] = datetime.now().ctime()
+        allhosts[OFFTAB.FILENAME] = saveFile
+
+        ## Load All BH-Hosts Files
+        #  -----------------------
+        for snap in xrange(NUM_SNAPS):
+
+            # Load Snapshot BH-Hosts
+            hdict = loadBHHostsSnap(run, snap, loadsave=True, verbose=False, convert=convert)
+            # Extract and store target data
+            allhosts[ii] = { hkey : hdict[hkey] for hkey in hostKeys }
+            if( bar ): pbar.update(ii)
+
+        # } for ii,hfile
+
+        if( bar ): pbar.finish()
+
+        # Save to file
+        zio.dictToNPZ(allhosts, saveFile, verbose=verbose)
+
+        stop = datetime.now()
+        if( verbose ): print " - - - - Done after %s" % (str(stop-start))
+
+    # } if loadsave
+
+    return allhosts
+
+# loadBHHosts()
 
 
 
 def main():
-    titleStr = "illpy.Subhalos.HaloOffsetTable.main()"
+    titleStr = "illpy.Subhalos.ParticleHosts.main()"
     print "\n%s\n%s\n" % (titleStr, "="*len(titleStr))
 
     import sys
@@ -493,7 +597,7 @@ def main():
 
     except:
         # Print Usage
-        print "usage:  HaloOffsetTable RUN SNAP_START SNAP_STOP SNAP_SKIP"
+        print "usage:  ParticleHosts RUN SNAP_START SNAP_STOP SNAP_SKIP"
         print "arguments:"
         print "    RUN        <int> : illustris simulation number {1,3}"
         print "    SNAP_START <int> : illustris snapshot   number {0,135} to start on"
@@ -512,13 +616,35 @@ def main():
             sys.stdout.flush()
 
             beg = datetime.now()
-            table = loadOffsetTable(run, sn, verbose=False)
+            table = loadBHHostsSnap(run, sn, convert=0.4, bar=False)
             end = datetime.now()
 
             sys.stdout.write(' After %s\n' % (str(end-beg)) )
             sys.stdout.flush()
 
     return
+
+# main()
+
+
+def _getProgressBar(maxval):
+    """
+    Wrapper to create a progressbar object with default settings.
+    """
+
+    # Set Progress Bar Parameters
+    widgets = [
+        progressbar.Percentage(),
+        ' ', progressbar.Bar(),
+        ' ', progressbar.AdaptiveETA(),
+        ]
+
+    # Start Progress Bar
+    pbar = progressbar.ProgressBar(widgets=widgets, maxval=maxval, term_width=100)
+
+    return pbar
+
+# _getProgressBar()
 
 
 if( __name__ == "__main__" ): main()
