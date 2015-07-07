@@ -16,8 +16,10 @@ Functions
     loadBHHostsSnap            : load (sub)halo host associations for blackholes in one snapshot
     loadBHHosts                : load (sub)halo host associations for blackholes in all snapshots
     main                       : 
+    subhalosForBHIDs           : find subhalos for given BH IDs
 
     _GET_OFFSET_TABLE_FILENAME : filename which the offset table is saved/loaded to/from
+
     _constructOffsetTable      : construct the offset table from the group catalog
     _constructBHIndexTable     : construct mapping from BH IDs to indices in snapshot files
     _getProgressBar            : create a progressbar object with default settings
@@ -99,6 +101,8 @@ class OFFTAB():
     BH_HALOS    = 'bh_halos'
     BH_SUBHALOS = 'bh_subhalos'
 
+    @staticmethod
+    def snapDictKey(snap): return "%03d" % (snap)
 
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
@@ -214,6 +218,98 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 
 # loadOffsetTable()
 '''
+
+def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, convert=None):
+    """
+    Merger individual snapshot's blackhole hosts files into a single file.
+    
+    Arguments
+    ---------
+        run      <int>  : illustris simulation number {1,3}
+        loadsave <bool> : optional, load existing save if possible
+        version  <flt>  : optional, target version number
+        verbose  <bool> : optional, 
+        bar      <bool> : optional, 
+        convert  <bool> : optional, 
+
+    Returns
+    -------
+        bhHosts <dict> : table of hosts for all snapshots
+
+    """
+
+    if( verbose ): print " - - ParticleHosts.loadBHHosts()"
+
+    if( bar is None ): bar = bool(verbose)
+
+    ## Load Existing Save
+    #  ==================
+    if( loadsave ):
+        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, version=version)
+
+        if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
+        # Make sure path exists
+        if( os.path.exists(saveFile) ):
+            bhHosts = zio.npzToDict(saveFile)
+            if( verbose ): print " - - - - Table loaded"
+        else:
+            if( verbose ): print " - - - - File does not Exist, reconstructing BH Hosts"
+            loadsave = False
+
+
+    ## Reconstruct Hosts Table
+    #  =======================
+    if( not loadsave ):
+        
+        if( verbose ): print " - - - Constructing Hosts Table"
+        start = datetime.now()
+
+        if( version is not None ): raise RuntimeError("Can only create version '%s'" % _VERSION)
+        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run)
+
+        # Create progress-bar
+        pbar = _getProgressBar(NUM_SNAPS)
+        if( bar ): pbar.start()
+
+        # Select the dict-keys for snapshot hosts to transfer
+        hostKeys = [ OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS ]
+
+        ## Create dictionary
+        #  -----------------
+        bhHosts = {}
+
+        # Add metadata
+        bhHosts[OFFTAB.RUN] = run
+        bhHosts[OFFTAB.VERSION] = _VERSION
+        bhHosts[OFFTAB.CREATED] = datetime.now().ctime()
+        bhHosts[OFFTAB.FILENAME] = saveFile
+
+        ## Load All BH-Hosts Files
+        #  -----------------------
+        for snap in xrange(NUM_SNAPS):
+            # Load Snapshot BH-Hosts
+            hdict = loadBHHostsSnap(run, snap, loadsave=True, verbose=True, convert=convert)
+            # Extract and store target data
+            snapStr = OFFTAB.snapDictKey(snap)
+            bhHosts[snapStr] = { hkey : hdict[hkey] for hkey in hostKeys }
+            if( bar ): pbar.update(snap)
+
+        # } for ii,hfile
+
+        if( bar ): pbar.finish()
+
+        # Save to file
+        zio.dictToNPZ(bhHosts, saveFile, verbose=verbose)
+
+        stop = datetime.now()
+        if( verbose ): print " - - - - Done after %s" % (str(stop-start))
+
+    # } if loadsave
+
+    return bhHosts
+
+# loadBHHosts()
+
 
 
 
@@ -346,7 +442,72 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
 
 
 
+def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
+    """
+    Find the subhalo indices for the given BH ID numbers.
 
+    Arguments
+    ---------
+        run     <int>    : illustris simulation number {1,3}
+        snap    <int>    : illustris snapshot number {0,135}
+        bhIDs   <int>[N] : target BH ID numbers
+        verbose <bool>   : optional, print verbose output
+
+    Returns
+    -------
+        foundSubh <int>[N] : subhalo index numbers (`-1` for invalid)
+
+    """
+
+
+    if( verbose ): print " - - ParticleHosts.subhalosForBHIDs()"
+
+    ## Load (Sub)Halo Offset Table
+    #  ---------------------------
+
+    if( bhHosts is None ):
+        if( verbose ): print " - - - Loading offset table"
+        bhHosts = loadBHHostsSnap(run, snap, loadsave=True, verbose=verbose)
+
+    outIDs  = bhHosts[OFFTAB.BH_IDS]
+    outInds = bhHosts[OFFTAB.BH_INDICES]
+    outSubh = bhHosts[OFFTAB.BH_SUBHALOS]
+
+
+    ## Convert IDs to Indices
+    #  ----------------------
+
+    # Sort IDs for faster searching
+    sortIDs = np.argsort(outIDs)
+    # Find matches in sorted array
+    foundSorted = np.searchsorted(outIDs, bhIDs, sorter=sortIDs)
+    # Reverse map to find matches in original array
+    found = sortIDs[foundSorted]
+
+    foundIDs  = outIDs[found]
+    foundInds = outInds[found]
+    foundSubh = outSubh[found]
+
+
+    ## Check Matches
+    #  -------------
+
+    # Find incorrect matches
+    inds = np.where( bhIDs != foundIDs )[0]
+    numIDs = len(bhIDs)
+    numBad = len(inds)
+    numGood = numIDs-numBad
+    if( verbose ): print " - - - Matched %d/%d Good, %d/%d Bad" % (numGood, numIDs, numBad, numIDs)
+    # Set incorrect matches to '-1'
+    if( len(inds) > 0 ):
+        foundIDs[inds]  = -1
+        foundInds[inds] = -1
+        foundSubh[inds] = -1
+
+
+    return foundSubh
+
+# subhalosForBHIDs()
 
 
 
@@ -510,99 +671,6 @@ def _constructBHIndexTable(run, snap, verbose=True):
 # _constructBHIndexTable()
 
 
-def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, convert=None):
-    """
-    Merger individual snapshot's blackhole hosts files into a single file.
-    
-    Arguments
-    ---------
-        run      <int>  : illustris simulation number {1,3}
-        loadsave <bool> : optional, load existing save if possible
-        version  <flt>  : optional, target version number
-        verbose  <bool> : optional, 
-        bar      <bool> : optional, 
-        convert  <bool> : optional, 
-
-    Returns
-    -------
-        bhHosts <dict> : table of hosts for all snapshots
-
-    """
-
-    if( verbose ): print " - - ParticleHosts.loadBHHosts()"
-
-    if( bar is None ): bar = bool(verbose)
-
-    ## Load Existing Save
-    #  ==================
-    if( loadsave ):
-        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, version=version)
-
-        if( verbose ): print " - - - Loading from save '%s'" % (saveFile)
-        # Make sure path exists
-        if( os.path.exists(saveFile) ):
-            bhHosts = zio.npzToDict(saveFile)
-            if( verbose ): print " - - - - Table loaded"
-        else:
-            if( verbose ): print " - - - - File does not Exist, reconstructing BH Hosts"
-            loadsave = False
-
-
-    ## Reconstruct Hosts Table
-    #  =======================
-    if( not loadsave ):
-        
-        if( verbose ): print " - - - Constructing Hosts Table"
-        start = datetime.now()
-
-        if( version is not None ): raise RuntimeError("Can only create version '%s'" % _VERSION)
-        saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run)
-
-        # Create progress-bar
-        pbar = _getProgressBar(NUM_SNAPS)
-        if( bar ): pbar.start()
-
-        # Select the dict-keys for snapshot hosts to transfer
-        hostKeys = [ OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS ]
-
-        ## Create dictionary
-        #  -----------------
-        bhHosts = {}
-
-        # Add metadata
-        bhHosts[OFFTAB.RUN] = run
-        bhHosts[OFFTAB.VERSION] = _VERSION
-        bhHosts[OFFTAB.CREATED] = datetime.now().ctime()
-        bhHosts[OFFTAB.FILENAME] = saveFile
-
-        ## Load All BH-Hosts Files
-        #  -----------------------
-        for snap in xrange(NUM_SNAPS):
-
-            print snap
-
-            # Load Snapshot BH-Hosts
-            hdict = loadBHHostsSnap(run, snap, loadsave=True, verbose=True, convert=convert)
-            # Extract and store target data
-            snapStr = '%03d' % (snap)
-            bhHosts[snapStr] = { hkey : hdict[hkey] for hkey in hostKeys }
-            if( bar ): pbar.update(snap)
-
-        # } for ii,hfile
-
-        if( bar ): pbar.finish()
-
-        # Save to file
-        zio.dictToNPZ(bhHosts, saveFile, verbose=verbose)
-
-        stop = datetime.now()
-        if( verbose ): print " - - - - Done after %s" % (str(stop-start))
-
-    # } if loadsave
-
-    return bhHosts
-
-# loadBHHosts()
 
 
 
