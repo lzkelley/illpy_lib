@@ -22,7 +22,7 @@ Functions
 
     _constructOffsetTable      : construct the offset table from the group catalog
     _constructBHIndexTable     : construct mapping from BH IDs to indices in snapshot files
-    _getProgressBar            : create a progressbar object with default settings
+
 
 Notes
 -----
@@ -68,14 +68,13 @@ Notes
 import os
 import numpy as np
 from datetime import datetime
-import progressbar
+
 
 from .. Constants import DTYPE, NUM_SNAPS, PARTICLE_NUM, PARTICLE, \
                          GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
 from Constants import SNAPSHOT
 
-import zcode.InOut as zio
-
+import zcode.InOut      as zio
 import illustris_python as ill
 
 
@@ -268,7 +267,7 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
         saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run)
 
         # Create progress-bar
-        pbar = _getProgressBar(NUM_SNAPS)
+        pbar = zio.getProgressBar(NUM_SNAPS)
         if( bar ): pbar.start()
 
         # Select the dict-keys for snapshot hosts to transfer
@@ -571,7 +570,7 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     cumHaloParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
     cumSubhParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
 
-    pbar = _getProgressBar(tableSize)
+    pbar = zio.getProgressBar(tableSize)
     if( bar ): pbar.start()
 
     ## Iterate Over Each Halo
@@ -717,25 +716,6 @@ def main():
 
 # main()
 
-
-def _getProgressBar(maxval):
-    """
-    Wrapper to create a progressbar object with default settings.
-    """
-
-    # Set Progress Bar Parameters
-    widgets = [
-        progressbar.Percentage(),
-        ' ', progressbar.Bar(),
-        ' ', progressbar.AdaptiveETA(),
-        ]
-
-    # Start Progress Bar
-    pbar = progressbar.ProgressBar(widgets=widgets, maxval=maxval, term_width=100)
-
-    return pbar
-
-# _getProgressBar()
 
 
 if( __name__ == "__main__" ): main()
