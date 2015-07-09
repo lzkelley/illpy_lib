@@ -85,7 +85,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         mostBound = Subhalo.importGroupCatalogData(run, snapNum, subhalos=subhalo, \
                                                    fields=[SUBHALO.MOST_BOUND])
 
-    if( mostBound is None ): raise RuntimeError("Could not find mostBound particle ID number!")
+    if( mostBound is None ): 
+        warnStr  = "Could not find mostBound particle ID Number!"
+        warnStr += "Run %d, Snap %d, Subhalo %d" % (run, snapNum, subhalo)
+        warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+        return None
+
 
     if( verbose ):
         print " - - - - Run %d, Snap %d, Subhalo %d, BoundID %d : Loaded %s particles" % \
@@ -126,10 +131,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
         # Make sure the expected number of particles are found
         if( data['count'] != partNums[ii] ):
-            errstr  = "Type '%s' count mismatch after loading!!\n" % (partNames[ii])
-            errstr += "\tExpecting = %d" % (partNums[ii])
-            errstr += "\tRetrieved = %d" % (data['count'])
-            raise RuntimeError(errstr)
+            warnStr  = "Run %d, Snap %d, Subhalo %d, Bound ID %d\n" % \
+                (run, snapNum, subhalo, mostBound)
+            warnStr += "Type '%s' count mismatch after loading!!  " % (partNames[ii])
+            warnStr += "Expecting %d, Retrieved %d" % (partNums[ii], data['count'])
+            warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            return None
 
 
         # Skip if this particle type has no elements
@@ -209,10 +216,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
         # Make sure the total number of particles are in bins
         if( numExp != numAct ):
-            errstr  = "Type '%s' count mismatch after binning!!\n" % (partNames[ii])
-            errstr += "\tExpecting = %d" % (numExp)
-            errstr += "\tRetrieved = %d" % (numAct)
-            raise RuntimeError(errstr)
+            warnStr  = "Run %d, Snap %d, Subhalo %d, Bound ID %d\n" % \
+                (run, snapNum, subhalo, mostBound)
+            warnStr += "Type '%s' count mismatch after binning!!  " % (partNames[ii])
+            warnStr += "Expecting %d, Retrieved %d" % (numExp, numAct)
+            warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            return None
 
     # } for ii
 
