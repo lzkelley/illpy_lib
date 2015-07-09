@@ -8,6 +8,7 @@ Functions
 
 """
 
+import warnings
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -71,9 +72,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     partNums = [ pd['count'] for pd in partData ]
     partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
     numPartTypes = len(partNums)
-    if( verbose ):
-        print " - - - - Run %d, Snap %d, Subhalo %d : Loaded %s particles" % \
-            (run, snapNum, subhalo, str(partNums))
 
 
     ## Find the most-bound Particle
@@ -84,10 +82,15 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # If no particle ID is given, find it
     if( mostBound is None ): 
         # Get group catalog
-        mostBound = Subhalo.importGroupCatalogData(3, 135, subhalos=subhalo, \
+        mostBound = Subhalo.importGroupCatalogData(run, snapNum, subhalos=subhalo, \
                                                    fields=[SUBHALO.MOST_BOUND])
 
     if( mostBound is None ): raise RuntimeError("Could not find mostBound particle ID number!")
+
+    if( verbose ):
+        print " - - - - Run %d, Snap %d, Subhalo %d, BoundID %d : Loaded %s particles" % \
+            (run, snapNum, subhalo, mostBound, str(partNums))
+
 
     # Find the most-bound particle, store its position
     for pdat,pname in zip(partData, partNames):
@@ -101,8 +104,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # } pdat,pname
 
-    if( posRef is None ): raise RuntimeError("Could not find most bound particle in snapshot!")
-
+    # Set warning and return ``None`` if most-bound particle is not found
+    if( posRef is None ): 
+        warnStr  = "Could not find most bound particle in snapshot!  "
+        warnStr += "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
+        warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+        return None
 
     mass = np.zeros(numPartTypes, dtype=object)
     rads = np.zeros(numPartTypes, dtype=object)
