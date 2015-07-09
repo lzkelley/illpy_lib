@@ -12,6 +12,7 @@ Classes
 -------
    ENVIRON : enumerator-like object for managing subhalo (environment) parameters dictionaries
    TAGS    : enumerator-like object for managing MPI communication
+   ENVSTAT : enumerator-like object for status of single subhalo environment import
 
 
 Functions
@@ -44,6 +45,7 @@ from datetime import datetime
 import sys
 import os
 import argparse
+import warnings
 
 from mpi4py import MPI
 
@@ -112,6 +114,15 @@ class TAGS():
     EXIT  = 3
 
 # } class TAGS
+
+
+class ENVSTAT():
+    FAIL = -1
+    EXST =  0
+    NEWF =  1
+
+# } class ENVSTAT
+
 
 
 _MERGER_SUBHALO_FILENAME_BASE = ( DIR_DATA + "merger_subhalos/Illustris-%d/snap%03d/" + 
@@ -254,8 +265,11 @@ def _runMaster(run, comm):
     #     distribute tasks to slave processes
     
     count = 0
-    new = 0
+    new   = 0
+    exist = 0
+    fail  = 0
     times = np.zeros(numUniTot)
+
     statFileName = 'stat_MergerSubhalos_ill%d_v%.2f.txt' % (run, _VERSION)
     statFile = open(statFileName, 'w')
     print " - - Opened status file '%s'" % (statFileName)
@@ -263,7 +277,6 @@ def _runMaster(run, comm):
     beg = datetime.now()
 
     for snap,subs in zmath.renumerate(snapSubh_uni):
-        # for snap,subs in zip([135,134], [range(200,210), [0,2]]):
 
         if( len(subs) <= 0 ): continue
 
@@ -279,20 +292,28 @@ def _runMaster(run, comm):
         # Go over each subhalo
         for boundID, subhalo in zip(mostBound, subs):
 
+            # Write status to file
             dur = (datetime.now()-beg)
-            statFile.write('Snap %3d   %8d/%8d = %.4f   in %s   %8d new\n' % 
-                           (snap, count, numUniTot, 1.0*count/numUniTot,str(dur), new) )
+            statStr = 'Snap %3d   %8d/%8d = %.4f   in %s   %8d new   %8d exist  %8d fail\n' % \
+                (snap, count, numUniTot, 1.0*count/numUniTot, str(dur), new, exist, fail)
+            statFile.write(statStr)
             statFile.flush()
 
             # Look for available slave process
             data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
             source = stat.Get_source()
             tag = stat.Get_tag()
+
             # Track number of completed profiles
             if( tag == TAGS.DONE ): 
-                times[count] = data[1]
+                retStat, durat = data
+
+                times[count] = durat
                 count += 1
-                if( data[0] ): new += 1
+                if(   retStat == ENVSTAT.NEWF ): new   += 1
+                elif( retStat == ENVSTAT.EXST ): exist += 1
+                else:                            fail  += 1
+
 
             # Distribute tasks
             comm.send([snap, subhalo, boundID], dest=source, tag=TAGS.START)
@@ -378,11 +399,11 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
             snap, subhalo, boundID = task
             beg = datetime.now()
             # Load and save Merger Environment
-            retval = _importMergerEnvironment(run, snap, subhalo, boundID, radBins=radBins, 
-                                              loadsave=True, verbose=verbose)
+            retStat = _importMergerEnvironment(run, snap, subhalo, boundID, radBins=radBins, 
+                                               loadsave=True, verbose=verbose)
             end = datetime.now()
             durat = (end-beg).total_seconds()
-            comm.send([retval,durat], dest=0, tag=TAGS.DONE)
+            comm.send([retStat,durat], dest=0, tag=TAGS.DONE)
         elif( tag == TAGS.EXIT  ):
             break
 
@@ -412,14 +433,13 @@ def _importMergerEnvironment(run, snap, subhalo, boundID, radBins=None, loadsave
 
     Returns
     -------
-        newMade  <bool>   : True if a new file was saved, False if it already existed.
+        retStat  <int>    : ``ENVSTAT`` value for status of this environment
 
     """
 
     if( verbose ): print " - - Environments._importMergerEnvironment()"
 
     fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo)
-    newMade = False
     if( verbose ): print " - - - Filename '%s'" % (fname)
 
     # If we shouldnt or cant load existing save, reload profiles
@@ -435,6 +455,9 @@ def _importMergerEnvironment(run, snap, subhalo, boundID, radBins=None, loadsave
             warnStr = "INVALID PROFILES at Run %d, Snap %d, Subhalo %d, Bound ID %d" \
                 % (run, snap, subhalo, boundID)
             warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            # Set return status to failure
+            retStat = ENVSTAT.FAIL
+
         # Valid profiles
         else:
             # Unpack data
@@ -464,8 +487,8 @@ def _importMergerEnvironment(run, snap, subhalo, boundID, radBins=None, loadsave
 
             # Save Data as NPZ file
             zio.dictToNPZ(env, fname, verbose=verbose)
-            # New file created
-            newMade = True
+            # Set return status to new file created
+            retStat = ENVSTAT.NEWF
 
         # } if radProfs
 
@@ -476,9 +499,12 @@ def _importMergerEnvironment(run, snap, subhalo, boundID, radBins=None, loadsave
             print " - - - File already exists for Run %d, Snap %d, Subhalo %d" % \
                 (run, snap, subhalo)
 
+        # Set return status to file already exists
+        retStat = ENVSTAT.EXST
+
     # } if 
     
-    return newMade
+    return retStat
 
 # _importMergerEnvironment()
 
