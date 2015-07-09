@@ -88,7 +88,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( mostBound is None ): 
         warnStr  = "Could not find mostBound particle ID Number!"
         warnStr += "Run %d, Snap %d, Subhalo %d" % (run, snapNum, subhalo)
-        warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+        warnings.warn(warnStr, RuntimeWarning)
         return None
 
 
@@ -113,7 +113,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     if( posRef is None ): 
         warnStr  = "Could not find most bound particle in snapshot!  "
         warnStr += "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
-        warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+        warnings.warn(warnStr, RuntimeWarning)
         return None
 
     mass = np.zeros(numPartTypes, dtype=object)
@@ -135,7 +135,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
                 (run, snapNum, subhalo, mostBound)
             warnStr += "Type '%s' count mismatch after loading!!  " % (partNames[ii])
             warnStr += "Expecting %d, Retrieved %d" % (partNums[ii], data['count'])
-            warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            warnings.warn(warnStr, RuntimeWarning)
             return None
 
 
@@ -220,7 +220,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
                 (run, snapNum, subhalo, mostBound)
             warnStr += "Type '%s' count mismatch after binning!!  " % (partNames[ii])
             warnStr += "Expecting %d, Retrieved %d" % (numExp, numAct)
-            warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            warnings.warn(warnStr, RuntimeWarning)
             return None
 
     # } for ii

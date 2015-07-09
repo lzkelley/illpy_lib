@@ -454,7 +454,7 @@ def _importMergerEnvironment(run, snap, subhalo, boundID, radBins=None, loadsave
         if( radProfs is None ):
             warnStr = "INVALID PROFILES at Run %d, Snap %d, Subhalo %d, Bound ID %d" \
                 % (run, snap, subhalo, boundID)
-            warnings.warn(warnStr, RuntimeWarning, stacklevel=2)
+            warnings.warn(warnStr, RuntimeWarning)
             # Set return status to failure
             retStat = ENVSTAT.FAIL
 
