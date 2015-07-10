@@ -55,7 +55,6 @@ Notes
 
 ### Builtin Modules ###
 import os, sys
-from glob import glob
 
 import numpy as np
 from datetime import datetime
@@ -71,7 +70,7 @@ _DEF_PRECISION = -8                               # Default precision
 
 
 
-def processDetails(run, loadsave=True, verbose=VERBOSE):
+def processDetails(run, loadsave=True, verbose=True):
 
     if( verbose ): print " - - BHDetails.processDetails()"
 
@@ -88,7 +87,7 @@ def processDetails(run, loadsave=True, verbose=VERBOSE):
 
 
 
-def organizeDetails(run, loadsave=True, verbose=VERBOSE):
+def organizeDetails(run, loadsave=True, verbose=True):
 
     if( verbose ): print " - - BHDetails.organizeDetails()"
 
@@ -132,7 +131,7 @@ def organizeDetails(run, loadsave=True, verbose=VERBOSE):
 
 
 
-def formatDetails(run, loadsave=True, verbose=VERBOSE):
+def formatDetails(run, loadsave=True, verbose=True):
 
     if( verbose ): print " - - BHDetails.formatDetails()"
 
@@ -182,7 +181,7 @@ def formatDetails(run, loadsave=True, verbose=VERBOSE):
 
 
 
-def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE):
+def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
     if( verbose ): print " - - BHDetails._reorganizeBHDetailsFiles()"
 
@@ -297,7 +296,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=VERBOSE)
 
 
 
-def _convertDetailsASCIItoNPZ(run, verbose=VERBOSE):
+def _convertDetailsASCIItoNPZ(run, verbose=True):
     """
     Convert all snapshot ASCII details files to dictionaries in NPZ files.
     """
@@ -346,7 +345,7 @@ def _convertDetailsASCIItoNPZ(run, verbose=VERBOSE):
 
 
 
-def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=VERBOSE):
+def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
     """
     Convert a single snapshot ASCII Details file to dictionary saved to NPZ file.
 
@@ -421,7 +420,7 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=VERBOSE
 
 
 
-def _loadBHDetails_ASCII(asciiFile, verbose=VERBOSE):
+def _loadBHDetails_ASCII(asciiFile, verbose=True):
 
     ## Files have some blank lines in them... Clean
     lines  = open(asciiFile).readlines()
@@ -492,7 +491,7 @@ def _parseIllustrisBHDetailsLine(instr):
 
 
 
-def loadBHDetails(run, snap, verbose=VERBOSE):
+def loadBHDetails(run, snap, verbose=True):
     """
     Load Blackhole Details dictionary for the given snapshot.
 
@@ -503,7 +502,7 @@ def loadBHDetails(run, snap, verbose=VERBOSE):
     ---------
     run     : <int>, illustris simulation number {1,3}
     snap    : <int>, illustris snapshot number {0,135}
-    verbose : <bool>, (optional=VERBOSE), print verbose output
+    verbose : <bool>, (optional=True), print verbose output
 
     Returns
     -------

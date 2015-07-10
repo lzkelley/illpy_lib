@@ -22,7 +22,7 @@ VERSION = 0.21
 
 
 
-def loadTree(run, mergers=None, loadsave=True, verbose=VERBOSE):
+def loadTree(run, mergers=None, loadsave=True, verbose=True):
     """
     Load tree data from save file if possible, or recalculate directly.
 
@@ -31,7 +31,7 @@ def loadTree(run, mergers=None, loadsave=True, verbose=VERBOSE):
     run      : <int>, Illlustris run number {1,3}
     mergers  : <dict>, (optional=None), BHMerger data, reloaded if not provided
     loadsave : <bool>, (optional=True), try to load tree data from previous save
-    verbose  : <bool>, (optional=VERBOSE), Print verbose output
+    verbose  : <bool>, (optional=True), Print verbose output
 
     Returns
     -------
@@ -93,7 +93,7 @@ def loadTree(run, mergers=None, loadsave=True, verbose=VERBOSE):
 
 
 
-def _constructBHTree(run, mergers, verbose=VERBOSE):
+def _constructBHTree(run, mergers, verbose=True):
     """
     Use merger data to find and connect BHs which merge multiple times.
 
@@ -101,7 +101,7 @@ def _constructBHTree(run, mergers, verbose=VERBOSE):
     ---------
     run     : <int>, Illlustris run number {1,3}
     mergers : <dict>, BHMergers dictionary
-    verbose : <bool>, (optional=VERBOSE), Print verbose output
+    verbose : <bool>, (optional=True), Print verbose output
 
     Returns
     -------
@@ -157,7 +157,7 @@ def _constructBHTree(run, mergers, verbose=VERBOSE):
 
 
 
-def analyzeTree(tree, verbose=VERBOSE):
+def analyzeTree(tree, verbose=True):
     """
     Analyze the merger tree data to obtain typical number of repeats, etc.
 
@@ -165,7 +165,7 @@ def analyzeTree(tree, verbose=VERBOSE):
     ---------
     tree : <dict>
         container for tree data - see BHTree doc
-    verbose : <bool>, (optional=VERBOSE)
+    verbose : <bool>, (optional=True)
         Print verbose output
 
     Returns

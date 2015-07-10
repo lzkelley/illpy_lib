@@ -8,38 +8,35 @@ Constants for Blackhole related functions and submodules.
 import numpy as np
 from glob import glob
 
-from .. Constants import NUM_SNAPS, INT, LNG, FLT, DBL, ULNG, _ILLUSTRIS_RUN_NAMES
-
-VERBOSE = True
+from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR
 
 
 ### Illustris Parameters ###
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
-_ILLUSTRIS_MERGERS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
-                                    2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
-                                    1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/" ]
-                                    }
+_ILLUSTRIS_MERGERS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
+                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
+                            1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/" ]
+                            }
 
-_ILLUSTRIS_DETAILS_DIRS         = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
-                                    2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
-                                    1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_details/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_details/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
-                                         "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/" ]
-                                    }
+_ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
+                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
+                            1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_details/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_details/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/" ]
+                            }
 
 
 ### Post-Processing Parameters ###
-_PROCESSED_DIR                  = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
@@ -54,14 +51,6 @@ _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
-
-
-
-
-TYPE_ID      = ULNG
-
-NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
-NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
 
 
 # Key Names for Mergers Dictionary
@@ -80,6 +69,12 @@ MERGERS_MAP_MTOS  = 'm2s'
 MERGERS_MAP_ONTOP = 'ontop'
 
 MERGERS_PHYSICAL_KEYS = [ MERGERS_IDS, MERGERS_SCALES, MERGERS_MASSES ]
+
+
+
+NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
+NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
+
 
 
 # Index of [N,2] arrays corresponding to each BH
@@ -135,13 +130,7 @@ TREE_VERSION      = 'version'
 
 
 
-
-def GET_ILLUSTRIS_RUN_NAMES(run):
-    """ Get canonical name of illustris simulation runs, e.g. 'L75n1820FP' """
-    return _ILLUSTRIS_RUN_NAMES[run]
-
-
-def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
+def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
 
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
 
@@ -160,7 +149,7 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=VERBOSE):
     return files
 
 
-def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
+def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
 
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
 
@@ -178,9 +167,6 @@ def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=VERBOSE):
 
     return files
 
-
-def GET_PROCESSED_DIR(run):
-    return _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
 
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
