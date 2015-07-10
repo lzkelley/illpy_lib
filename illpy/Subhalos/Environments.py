@@ -144,6 +144,10 @@ def GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
     return _MERGER_ENVIRONMENT_FILENAME % (run, version)
 
 
+_ENVIRONMENTS_STATUS_FILENAME = 'stat_Environments_ill%d_v%.2f.txt'
+def GET_ENVIRONMENTS_STATUS_FILENAME(run):
+    return _ENVIRONMENTS_STATUS_FILENAME % (run, _VERSION)
+
 
 
 def getMergerAndSubhaloIndices(run, verbose=True):
@@ -270,7 +274,7 @@ def _runMaster(run, comm):
     fail  = 0
     times = np.zeros(numUniTot)
 
-    statFileName = 'stat_MergerSubhalos_ill%d_v%.2f.txt' % (run, _VERSION)
+    statFileName = GET_ENVIRONMENTS_STATUS_FILENAME(run)
     statFile = open(statFileName, 'w')
     print " - - Opened status file '%s'" % (statFileName)
     statFile.write('%s\n' % (str(datetime.now())))
