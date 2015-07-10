@@ -169,10 +169,13 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     #  ------------------
 
     # Create radial bin spacings, these are the upper-bound radii
-    if( radBins is None ): radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
+    if( radBins is None ): 
+        radExtrema[1] = radExtrema[1]*1.01
+        radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
 
     # Find average bin positions, and radial bin (shell) volumes
-    binVols = np.zeros(nbins)
+    numBins = len(radBins)
+    binVols = np.zeros(numBins)
     for ii in range(len(radBins)):
         if( ii == 0 ): binVols[ii] = np.power(radBins[ii],3.0)
         else:          binVols[ii] = np.power(radBins[ii],3.0) - np.power(radBins[ii-1],3.0)
@@ -183,13 +186,13 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     ## Bin Properties for all Particle Types
     #  -------------------------------------
 
-    densBins = np.zeros([numPartTypes, nbins], dtype=DTYPE.SCALAR)    # Density
-    massBins = np.zeros([numPartTypes, nbins], dtype=DTYPE.SCALAR)    # Mass
-    numsBins = np.zeros([numPartTypes, nbins], dtype=DTYPE.INDEX )    # Count of particles
+    densBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Density
+    massBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Mass
+    numsBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.INDEX )    # Count of particles
 
     # second dimension to store averages [0] and standard-deviations [1]
-    potsBins = np.zeros([nbins, 2], dtype=DTYPE.SCALAR)               # Grav Potential Energy
-    dispBins = np.zeros([nbins, 2], dtype=DTYPE.SCALAR)               # Velocity dispersion
+    potsBins = np.zeros([numBins, 2], dtype=DTYPE.SCALAR)               # Grav Potential Energy
+    dispBins = np.zeros([numBins, 2], dtype=DTYPE.SCALAR)               # Velocity dispersion
 
     # Iterate over particle types
     if( verbose ): print " - - - Binning properties by radii"
@@ -197,6 +200,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
         # Skip if this particle type has no elements
         if( data['count'] == 0 ): continue
+
 
         # Get the total mass in each bin
         numsBins[ii,:], massBins[ii,:] = zmath.histogram(rads[ii], radBins, weights=mass[ii],
@@ -211,7 +215,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # Consistency check on numbers of particles
     for ii in xrange(numPartTypes):
 
-        numExp = partNums[ii]
+        # numExp = partNums[ii]
+        numExp = np.size( np.where( rads[ii] <= radBins[-1] )[0] )
         numAct = np.sum(numsBins[ii])
 
         # Make sure the total number of particles are in bins
