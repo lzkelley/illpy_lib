@@ -11,7 +11,7 @@ Functions
 import warnings
 from datetime import datetime
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 from illpy.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
 
@@ -20,17 +20,15 @@ import Constants
 from Constants import SNAPSHOT, SUBHALO
 
 import zcode.Math     as zmath
-import zcode.Plotting as zplot
 import zcode.InOut    as zio
 
-VERBOSE = True
 
 NUM_RAD_BINS = 100
 
 
 
 def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS, 
-                          mostBound=None, verbose=VERBOSE):
+                          mostBound=None, verbose=True):
     """
     Construct binned, radial profiles of density for each particle species.
 
@@ -255,96 +253,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
 
 
-def plotSubhaloRadialProfiles(run, snapNum, subhalo, mostBound=None, verbose=VERBOSE):
-
-    #plot1 = False
-    plot1 = True
-    plot2 = True
-
-    if( verbose ): print " - - Profiler.plotSubhaloRadialProfiles()"
-
-    if( verbose ): print " - - - Loading Profiles"
-    radBins, partTypes, massBins, densBins, potsBins, dispBins = \
-        subhaloRadialProfiles(run, snapNum, subhalo, mostBound=mostBound)
-
-    partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
-    numParts = len(partNames)
-
-
-    ## Figure 1
-    #  --------
-    if( plot1 ):
-        fname = '1_%05d.png' % (subhalo)
-        fig1 = plot_1(partNames, radBins, densBins, massBins)
-        fig1.savefig(fname)
-        plt.close(fig1)
-        print fname
-
-
-    ## Figure 2
-    #  --------
-    if( plot2 ):
-        fname = '2_%05d.png' % (subhalo)
-        fig2 = plot_2(radBins, potsBins, dispBins)
-        fig2.savefig(fname)
-        plt.close(fig2)
-        print fname
-
-
-
-    return
-
-# plotSubhaloRadialProfiles()
-
-def plot_1(partNames, radBins, densBins, massBins):
-
-    numParts = len(partNames)
-    fig, axes = zplot.subplots(figsize=[10,6])
-    cols = zplot.setColorCycle(numParts)
-
-    LW = 2.0
-    ALPHA = 0.5
-
-    plotBins = np.concatenate([ [zmath.extend(radBins)[0]], radBins] )
-    
-    for ii in range(numParts):
-        zplot.plotHistLine(axes, plotBins, densBins[ii], ls='-',
-                           c=cols[ii], lw=LW, alpha=ALPHA, nonzero=True, label=partNames[ii])
-
-
-    axes.legend(loc='upper right', ncol=1, prop={'size':'small'}, 
-                   bbox_transform=axes.transAxes, bbox_to_anchor=(0.99,0.99) )
-
-    return fig
-
-# plot_1()
-
-
-
-def plot_2(radBins, potsBins, dispBins):
-
-    FS = 12
-    LW = 2.0
-    ALPHA = 0.8
-
-
-    fig, ax = plt.subplots(figsize=[10,6])
-    zplot.setAxis(ax, axis='x', label='Distance', fs=FS, scale='log')
-    zplot.setAxis(ax, axis='y', label='Dispersion', c='red', fs=FS)
-    tw = zplot.twinAxis(ax, axis='x', label='Potential', c='blue', fs=FS)
-    tw.set_yscale('linear')
-
-    plotBins = np.concatenate([ [zmath.extend(radBins)[0]], radBins] )
-    
-    zplot.plotHistLine(ax, plotBins, dispBins[:,0], yerr=dispBins[:,1], ls='-',
-                       c='red', lw=LW, alpha=ALPHA, nonzero=True)
-
-    zplot.plotHistLine(tw, plotBins, potsBins[:,0], yerr=potsBins[:,1], ls='-',
-                       c='blue', lw=LW, alpha=ALPHA, nonzero=True)
-
-    return fig
-
-# plot_2()
 
 
 
