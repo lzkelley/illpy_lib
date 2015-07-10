@@ -53,11 +53,6 @@ _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
 
 
-
-NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
-NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
-
-
 # Key Names for Mergers Dictionary
 MERGERS_RUN       = 'run'
 MERGERS_CREATED   = 'created'
@@ -74,6 +69,12 @@ MERGERS_MAP_MTOS  = 'm2s'
 MERGERS_MAP_ONTOP = 'ontop'
 
 MERGERS_PHYSICAL_KEYS = [ MERGERS_IDS, MERGERS_SCALES, MERGERS_MASSES ]
+
+
+
+NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
+NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
+
 
 
 # Index of [N,2] arrays corresponding to each BH
