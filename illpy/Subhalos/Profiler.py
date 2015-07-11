@@ -246,7 +246,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     dispBins[:,1] = stds
 
 
-    return radBins, posRef, partTypes, partNames, numsBins, massBins, densBins, potsBins, dispBins
+    return radBins, posRef, mostBound, partTypes, partNames, \
+        numsBins, massBins, densBins, potsBins, dispBins
 
 # subhaloRadialProfiles()
 
