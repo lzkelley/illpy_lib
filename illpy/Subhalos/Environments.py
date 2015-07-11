@@ -404,8 +404,8 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
             snap, subhalo, boundID = task
             beg = datetime.now()
             # Load and save Merger Environment
-            retStat = loadMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
-                                               loadsave=True, verbose=verbose)
+            retEnv, retStat = loadMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
+                                            loadsave=True, verbose=verbose)
             end = datetime.now()
             durat = (end-beg).total_seconds()
             comm.send([retStat,durat], dest=0, tag=TAGS.DONE)
@@ -422,8 +422,7 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
 
 
 
-def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, 
-                             retdat=False, loadsave=True, verbose=False):
+def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True, verbose=False):
     """
     Import and save merger-subhalo environment data.
 
@@ -434,15 +433,14 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None,
         subhalo  <int>    : subhalo index number for shit snapshot
         boundID  <int>    : ID of this subhalo's most-bound particle
         radBins  <flt>[N] : optional, positions of radial bins for creating profiles
-        retdat   <bool>   : optional, return data (loaded dictionary), otherwise return status
         loadSave <bool>   : optional, load existing save file if possible
         verbose  <bool>   : optional, print verbose output
 
     Returns
     -------
-        If ``retdat`` is True, return (1), otherwise return (2)
-        (1) retStat  <int>    : ``ENVSTAT`` value for status of this environment
-        (2) env      <dict>   : loaded dictionary of environment data
+        env      <dict>   : loaded dictionary of environment data        
+        retStat  <int>    : ``ENVSTAT`` value for status of this environment
+        
 
     """
 
@@ -510,8 +508,8 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None,
     # File already exists
     else:
 
-        # If we want to return the data, import it from file
-        if( retdat ): env = zio.npzToDict(fname)
+        # Load data from save file
+        env = zio.npzToDict(fname)
 
         if( verbose ): 
             print " - - - File already exists for Run %d, Snap %d, Subhalo %d" % \
@@ -522,10 +520,7 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None,
 
     # } if 
 
-    # Return loaded data
-    if( retdat ): return env
-    
-    return retStat
+    return env, retStat
 
 # loadMergerEnv()
 
