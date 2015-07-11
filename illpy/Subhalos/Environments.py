@@ -24,10 +24,10 @@ Functions
    getMergerAndSubhaloIndices           : get merger, snapshot and subhalo index numbers
    checkSubhaloFiles                    : check which subhalo files exist or are missing
    loadMergerEnvironments               : primary API - load all subhalo environments as dict
+   loadMergerEnv                : load a single merger-subhalo environment and save
 
    _runMaster                           : process manages all secondary ``slave`` processes
    _runSlave                            : secondary process loads and saves data for each subhalo
-   _importMergerEnvironment             : load a single merger-subhalo environment and save
    _collectMergerEnvironments           : merge all subhalo environment files into single dict
    _initStorage                         : initializes dict to store data for all subhalos
    _parseArguments                      : parse commant line arguments
@@ -404,7 +404,7 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
             snap, subhalo, boundID = task
             beg = datetime.now()
             # Load and save Merger Environment
-            retStat = _importMergerEnvironment(run, snap, subhalo, boundID, radBins=radBins, 
+            retStat = loadMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
                                                loadsave=True, verbose=verbose)
             end = datetime.now()
             durat = (end-beg).total_seconds()
@@ -422,7 +422,8 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
 
 
 
-def _importMergerEnvironment(run, snap, subhalo, boundID=None, radBins=None, loadsave=True, verbose=False):
+def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, 
+                             retdat=False, loadsave=True, verbose=False):
     """
     Import and save merger-subhalo environment data.
 
@@ -433,16 +434,19 @@ def _importMergerEnvironment(run, snap, subhalo, boundID=None, radBins=None, loa
         subhalo  <int>    : subhalo index number for shit snapshot
         boundID  <int>    : ID of this subhalo's most-bound particle
         radBins  <flt>[N] : optional, positions of radial bins for creating profiles
+        retdat   <bool>   : optional, return data (loaded dictionary), otherwise return status
         loadSave <bool>   : optional, load existing save file if possible
         verbose  <bool>   : optional, print verbose output
 
     Returns
     -------
-        retStat  <int>    : ``ENVSTAT`` value for status of this environment
+        If ``retdat`` is True, return (1), otherwise return (2)
+        (1) retStat  <int>    : ``ENVSTAT`` value for status of this environment
+        (2) env      <dict>   : loaded dictionary of environment data
 
     """
 
-    if( verbose ): print " - - Environments._importMergerEnvironment()"
+    if( verbose ): print " - - Environments.loadMergerEnv()"
 
     fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo)
     if( verbose ): print " - - - Filename '%s'" % (fname)
@@ -469,7 +473,7 @@ def _importMergerEnvironment(run, snap, subhalo, boundID=None, radBins=None, loa
             outRadBins, posRef, retBoundID, partTypes, partNames, numsBins, \
                 massBins, densBins, potsBins, dispBins = radProfs
 
-            if( retBoundID != boundID ):
+            if( boundID is not None and retBoundID != boundID ):
                 warnStr  = "Run %d, SNap %d, Subhalo %d" % (run, snap, subhalo)
                 warnStr += "\nSent BoundID = %d, Returned = %d!" % (boundID, retBoundID)
                 warnings.warn(warnStr, RuntimeWarning)
@@ -506,6 +510,9 @@ def _importMergerEnvironment(run, snap, subhalo, boundID=None, radBins=None, loa
     # File already exists
     else:
 
+        # If we want to return the data, import it from file
+        if( retdat ): env = zio.npzToDict(fname)
+
         if( verbose ): 
             print " - - - File already exists for Run %d, Snap %d, Subhalo %d" % \
                 (run, snap, subhalo)
@@ -514,10 +521,13 @@ def _importMergerEnvironment(run, snap, subhalo, boundID=None, radBins=None, loa
         retStat = ENVSTAT.EXST
 
     # } if 
+
+    # Return loaded data
+    if( retdat ): return env
     
     return retStat
 
-# _importMergerEnvironment()
+# loadMergerEnv()
 
 
 
@@ -731,6 +741,7 @@ def _collectMergerEnvironments(run, verbose=True, version=_VERSION):
                 datStr  = ', '.join(['{:d}'.format(num) for num in datNumTypes ])
                 warnStr  = "Numbers mismatch at Run %d, Merger %d: Snap %d, Subhalo %d" % \
                     (run, ind_merg, snap, subh[ind_subh])
+                warnStr += "\nFilename '%s'" % (fname)
                 warnStr += "\nGcat = '%s', dat = '%s'" % (gcatStr, datStr)
                 warnings.warn(warnStr, RuntimeWarning)
 
