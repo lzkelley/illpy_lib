@@ -71,7 +71,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
     numPartTypes = len(partNums)
 
-
     ## Find the most-bound Particle
     #  ----------------------------
 
@@ -90,10 +89,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         return None
 
 
-    if( verbose ):
-        print " - - - - Run %d, Snap %d, Subhalo %d, BoundID %d : Loaded %s particles" % \
-            (run, snapNum, subhalo, mostBound, str(partNums))
-
+    thisStr = "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
+    if( verbose ): print " - - - - %s : Loaded %s particles" % (thisStr, str(partNums))
 
     # Find the most-bound particle, store its position
     for pdat,pname in zip(partData, partNames):
@@ -109,8 +106,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # Set warning and return ``None`` if most-bound particle is not found
     if( posRef is None ): 
-        warnStr  = "Could not find most bound particle in snapshot!  "
-        warnStr += "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
+        warnStr = "Could not find most bound particle in snapshot! %s" % (thisStr)
         warnings.warn(warnStr, RuntimeWarning)
         return None
 
@@ -129,8 +125,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
         # Make sure the expected number of particles are found
         if( data['count'] != partNums[ii] ):
-            warnStr  = "Run %d, Snap %d, Subhalo %d, Bound ID %d\n" % \
-                (run, snapNum, subhalo, mostBound)
+            warnStr  = "%s" % (thisStr)
             warnStr += "Type '%s' count mismatch after loading!!  " % (partNames[ii])
             warnStr += "Expecting %d, Retrieved %d" % (partNums[ii], data['count'])
             warnings.warn(warnStr, RuntimeWarning)
@@ -146,8 +141,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
             disp[ii] = []
             continue
 
-        # Extract relevant data from dictionary
-        posn   = reflectPos(data[SNAPSHOT.POS])
+        # Extract positions from snapshot, make sure reflections are nearest most-bound particle
+        posn = reflectPos(data[SNAPSHOT.POS], center=posRef)
 
         # DarkMatter Particles all have the same mass, store that single value
         if( ptype == PARTICLE.DM ): mass[ii] = [ GET_ILLUSTRIS_DM_MASS(run) ]
@@ -162,12 +157,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # } for data, ptype
 
 
-
     ## Create Radial Bins
     #  ------------------
 
     # Create radial bin spacings, these are the upper-bound radii
     if( radBins is None ): 
+        radExtrema[0] = radExtrema[0]*0.99
         radExtrema[1] = radExtrema[1]*1.01
         radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
 
@@ -209,22 +204,36 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     # } for ii, pt1
 
+    if( verbose ): print " - - - - Binned %s particles" % (str(np.sum(numsBins, axis=1)))
 
-    # Consistency check on numbers of particles
+
+    ## Consistency check on numbers of particles
+    #  -----------------------------------------
+    #      The total number of particles ``numTot`` shouldn't necessarily be in bins.
+    #      The expected number of particles ``numExp`` are those that are within the bounds of bins
+
     for ii in xrange(numPartTypes):
 
-        # numExp = partNums[ii]
         numExp = np.size( np.where( rads[ii] <= radBins[-1] )[0] )
         numAct = np.sum(numsBins[ii])
+        numTot = np.size(rads[ii])
 
-        # Make sure the total number of particles are in bins
+        # If there is a discrepancy return ``None`` for error
         if( numExp != numAct ):
-            warnStr  = "Run %d, Snap %d, Subhalo %d, Bound ID %d\n" % \
-                (run, snapNum, subhalo, mostBound)
-            warnStr += "Type '%s' count mismatch after binning!!  " % (partNames[ii])
-            warnStr += "Expecting %d, Retrieved %d" % (numExp, numAct)
+            warnStr  = "%s\nType '%s' count mismatch after binning!" % (thisStr, partNames[ii])
+            warnStr += "\nExpecting %d, Retrieved %d" % (numExp, numAct)
             warnings.warn(warnStr, RuntimeWarning)
             return None
+
+        # If a noticeable number of particles are not binned, warn, but still continue
+        elif( numAct < numTot-10 and numAct < 0.9*numTot ):
+            warnStr  = "%s : Type %s" % (thisStr, partNames[ii])
+            warnStr += "\nTotal = %d, Expected = %d, Binned = %d" % (numTot, numExp, numAct)
+            warnStr += "\nBin Extrema = %s" % (str(zmath.minmax(radBins)))
+            warnStr += "\nRads = %s" % (str(rads[ii]))
+            warnings.warn(warnStr, RuntimeWarning)
+            raise RuntimeError("")
+            
 
     # } for ii
 
@@ -246,7 +255,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     dispBins[:,1] = stds
 
 
-    return radBins, posRef, partTypes, partNames, numsBins, massBins, densBins, potsBins, dispBins
+    return radBins, posRef, mostBound, partTypes, partNames, \
+        numsBins, massBins, densBins, potsBins, dispBins
 
 # subhaloRadialProfiles()
 
@@ -260,17 +270,17 @@ def reflectPos(pos, center=None):
     """
     Given a set of position vectors, reflect those which are on the wrong edge of the box.
 
-    NOTE: Input positions ``pos`` MUST BE GIVEN IN illustris simulation units: [ckpc/h] !!!!
+    Input positions ``pos`` MUST BE GIVEN IN illustris simulation units: [ckpc/h] !
     If a particular ``center`` point is not given, the median position is used.
     
     Arguments
     ---------
-    pos    : <float>[N,3], array of ``N`` vectors, MUST BE IN SIMULATION UNITS
-    center : <float>[3],   (optional=None), center coordinates, defaults to median of ``pos``
+        pos    <flt>[N,3] : array of ``N`` vectors, MUST BE IN SIMULATION UNITS
+        center <flt>[3]   : optional, center coordinates, defaults to median of ``pos``
 
     Returns
     -------
-    fix    : <float>[N,3], array of 'fixed' positions with bad elements reflected
+        fix    <flt>[N,3] : array of 'fixed' positions with bad elements reflected
 
     """
 
@@ -282,7 +292,6 @@ def reflectPos(pos, center=None):
 
     # Use median position as center if not provided
     if( center is None ): center = np.median(fix, axis=0)
-    else:                 center = ref
 
     # Find distances to center
     offsets = fix - center
