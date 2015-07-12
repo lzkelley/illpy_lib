@@ -492,17 +492,17 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
                 ENVIRON.SNAP : snap,
                 ENVIRON.VERS : _VERSION,
                 ENVIRON.DATE : datetime.now().ctime(),
+                ENVIRON.TYPE : partTypes,
+                ENVIRON.NAME : partNames,
 
                 ENVIRON.SUBH : subhalo,
                 ENVIRON.BPID : retBoundID,
                 ENVIRON.CENT : posRef,
-                ENVIRON.TYPE : partTypes,
-                ENVIRON.NAME : partNames,
 
                 ENVIRON.RADS : outRadBins,
                 ENVIRON.NUMS : numsBins,
-                ENVIRON.MASS : massBins,
                 ENVIRON.DENS : densBins,
+                ENVIRON.MASS : massBins,
                 ENVIRON.POTS : potsBins,
                 ENVIRON.DISP : dispBins
                 }
@@ -905,14 +905,16 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
 
                 # Store Subhalo number for each merger
                 env[ENVIRON.SUBH][merger] = subhalo
+                env[ENVIRON.SNAP][merger] = snap
+                env[ENVIRON.BPID][merger] = dat[ENVIRON.BPID]
+                env[ENVIRON.CENT][merger] = dat[ENVIRON.CENT]
 
-                ## Extract data
+                # Profiles Data
+                env[ENVIRON.NUMS][merger,...] = dat[ENVIRON.NUMS]
                 env[ENVIRON.DENS][merger,...] = dat[ENVIRON.DENS]
                 env[ENVIRON.MASS][merger,...] = dat[ENVIRON.MASS]
                 env[ENVIRON.POTS][merger,...] = dat[ENVIRON.POTS]
                 env[ENVIRON.DISP][merger,...] = dat[ENVIRON.DISP]
-
-                env[ENVIRON.NUMS][merger,...] = dat[ENVIRON.NUMS]
 
                 # Set as good merger-environment
                 env[ENVIRON.STAT][merger] = 1
