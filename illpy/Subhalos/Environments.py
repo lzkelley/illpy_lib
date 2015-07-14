@@ -64,7 +64,7 @@ import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
 
 # Hard Settings
-_VERSION      = 1.3
+_VERSION      = 1.4
 
 # Soft (Default) Settings (Can be changed from command line)
 VERBOSE      = False
