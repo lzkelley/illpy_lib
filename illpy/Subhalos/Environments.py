@@ -22,7 +22,6 @@ Functions
    GET_MERGER_ENVIRONMENT_FILENAME      : get filename for dictionary of all subhalos
 
    getMergerAndSubhaloIndices           : get merger, snapshot and subhalo index numbers
-   checkSubhaloFiles                    : check which subhalo files exist or are missing
    loadMergerEnvironments               : primary API - load all subhalo environments as dict
    loadMergerEnv                        : load a single merger-subhalo environment and save
 
@@ -32,9 +31,6 @@ Functions
    _initStorage                         : initializes dict to store data for all subhalos
    _parseArguments                      : parse commant line arguments
    _mpiError                            : raise an error through MPI and exit all processes   
-
-
-
 
 
 """
@@ -611,69 +607,6 @@ def _loadAndCheckEnv(fname, rads, lenTypeExp, warn=False, care=True):
 # _loadAndCheckEnv()
 
 
-'''
-def checkSubhaloFiles(run, verbose=True, version=_VERSION):
-    """
-    Check each Merger to make sure its subhalo profile has been found and saved.
-
-    Writes missing merger subhalos to file ``GET_MISSING_LIST_FILENAME``.
-    """
-    
-    if( verbose ): print " - - Environments.checkSubhaloFiles()"
-
-    if( verbose ): print " - - - Initializing parameters"
-    # Load indices for mergers, snapshots and subhalos
-    mergSnap, snapMerg, mergSubh = getMergerAndSubhaloIndices(run, verbose=verbose)
-    numMergers = len(mergSnap)
-
-    missing_fname = GET_MISSING_LIST_FILENAME(run, version=version)
-
-    beg = datetime.now()
-    count = 0
-    numYa = 0
-    numNo = 0
-
-    # Open file to store missing entries
-    with open(missing_fname, 'w') as missing:
-        if( verbose ): print " - - - Opening file '%s'" % (os.path.split(missing_fname)[1])
-        missing.write('# Merger Snap Subhalo\n')
-        
-        if( verbose ): print " - - - Checking files"
-        # Start progress-bar
-        pbar = zio.getProgressBar(numMergers)
-
-        ## Iterate over all mergers
-        #  ------------------------
-        for ii, (snap, subh) in enumerate(zip(mergSnap, mergSubh)):
-            fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subh, version=version)
-            count += 1
-
-            # Count success
-            if( os.path.exists(fname) ):
-                numYa += 1
-            # Count failure, save to output file
-            else:
-                numNo += 1
-                missing.write('%6d  %3d  %6d\n' % (ii, snap, subh))
-                missing.flush()
-
-            # Update progress bar
-            pbar.update(count)
-
-        # } for ii
-
-    # } with missing
-
-    end = datetime.now()
-    if( verbose ): print " - - - - Checked %d files after '%s'" % (count, end-beg)
-    print " - - - - %d Files Found  " % (numYa)
-    print " - - - - %d Files Missing" % (numNo)
-
-    return
-
-# checkSubhaloFiles()
-'''
-
 
 def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
     """
@@ -1045,6 +978,7 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     #  ------------------------------------
     if( verbose ): print " - - - Loading Catalog for Sample: Snap %d, Subhalo %d" % (snap, sample)
     gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=sample, verbose=True)
+    if( verbose ): print " - - - Loading Group-Cat Keys: '%s'" % (str(gcat.keys()))
 
     # Initialize catalog properties automatically
     env[ENVIRON.GCAT_KEYS] = gcat.keys()
