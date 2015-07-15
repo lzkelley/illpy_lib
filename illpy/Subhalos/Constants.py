@@ -29,51 +29,58 @@ class SNAPSHOT():
     '''
 
 
-
 class SUBHALO():
 
     POS                  = "SubhaloPos"
-    # SubhaloBHMdot
-    VMAX                 = "SubhaloVmax"
-    # SubhaloWindMass
-    # SubhaloGasMetallicityMaxRad
-    VDISP                = "SubhaloVelDisp"
-    VMAX                 = "SubhaloVmax"
-    SFR                  = "SubhaloSFR"
-    # SubhaloStarMetallicityMaxRad
+    COM                  = "SubhaloCM"
+    SUBH_PARENT          = "SubhaloParent"
+    MOST_BOUND           = "SubhaloIDMostbound"
+    NUM_GROUP            = "SubhaloGrNr"
+
     NUM_PARTS            = "SubhaloLen"
-    SFR_HALF_RAD         = "SubhaloSFRinHalfRad"
+    NUM_PARTS_TYPE       = "SubhaloLenType"
+
     PHOTOS               = "SubhaloStellarPhotometrics"
+
     METZ_GAS             = "SubhaloGasMetallicity"
     METZ_STAR            = "SubhaloStarMetallicity"
+
     BH_MASS              = "SubhaloBHMass"
     BH_MDOT              = "SubhaloBHMdot"
-    MOST_BOUND           = "SubhaloIDMostbound"
-    MASS_TYPE            = "SubhaloMassType"
-    # SubhaloStellarPhotometricsMassInRad
-    RAD_HALF_MASS        = "SubhaloHalfmassRad"
-    # SubhaloParent
-    SubhaloSpin          = "SubhaloSpin"
-    # SubhaloStarMetallicityHalfRad
+
     VEL                  = "SubhaloVel"
-    NUM_PARTS_TYPE       = "SubhaloLenType"
+    VMAX                 = "SubhaloVmax"
+    VDISP                = "SubhaloVelDisp"
+    VMAX                 = "SubhaloVmax"
+    SPIN                 = "SubhaloSpin"
+
+    SFR                  = "SubhaloSFR"
+    SFR_HALF_RAD         = "SubhaloSFRinHalfRad"
+    SFR_IN_MAX_RAD       = "SubhaloSFRinMaxRad"
+    SFR_IN_RAD           = "SubhaloSFRinRad"
+
+    MASS                 = "SubhaloMass"
+    MASS_TYPE            = "SubhaloMassType"
+    MASS_HALF_RAD        = "SubhaloMassInHalfRad"
+    MASS_IN_HALF_RAD_TYPE = "SubhaloMassInHalfRadType"
+    MASS_IN_MAX_RAD      = "SubhaloMassInMaxRad"
+    MASS_IN_MAX_RAD_TYPE = "SubhaloMassInMaxRadType"
+    MASS_IN_RAD          = "SubhaloMassInRad"
+    MASS_IN_RAD_TYPE     = "SubhaloMassInRadType"
+    MASS_WIND            = "SubhaloWindMass"
+
+    RAD_HALF_MASS        = "SubhaloHalfmassRad"
+    RAD_HALF_MASS_TYPE   = "SubhaloHalfmassRadType"
+    RAD_VMAX             = "SubhaloVmaxRad"
+    RAD_PHOTOS           = "SubhaloStellarPhotometricsRad"
+
+    # SubhaloGasMetallicityMaxRad
+    # SubhaloStarMetallicityMaxRad
+    # SubhaloStellarPhotometricsMassInRad
+    # SubhaloStarMetallicityHalfRad
     # SubhaloGasMetallicitySfrWeighted
     # SubhaloGasMetallicityHalfRad
-    # SubhaloMassInRad
-    NUM_GROUP            = "SubhaloGrNr"
-    MASS_HALF_RAD        = "SubhaloMassInHalfRad"
-    # SubhaloSFRinRad
-    # SubhaloMassInMaxRad
-    # SubhaloHalfmassRadType
-    # SubhaloMassInMaxRadType
-    COM                  = "SubhaloCM"
     # SubhaloStarMetallicity
-    # SubhaloMassInHalfRadType
-    MASS                 = "SubhaloMass"
-    # SubhaloMassInRadType
-    RAD_VMAX             = "SubhaloVmaxRad"
-    # SubhaloSFRinMaxRad
-    # SubhaloStellarPhotometricsRad
     # SubhaloGasMetallicitySfr
 
     @staticmethod
