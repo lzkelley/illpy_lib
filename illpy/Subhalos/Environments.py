@@ -98,8 +98,9 @@ class ENVIRON():
     # Radial profiles
     RADS  = "rads"                                # Positions of right-edges of radial bins 
     NUMS  = "nums"                                # Number of particles by type in each bin
-    MASS  = "mass"                                # Mass   of particle  by type in each bin
     DENS  = "dens"                                # Dens (ave)          by type    each bin
+    MASS  = "mass"                                # Mass   of particle  by type in each bin
+
     POTS  = "pots"                                # Grav potential for all types   each bin
     DISP  = "disp"                                # Vel dispersion     all types   each bin
 
@@ -1015,23 +1016,26 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     if( verbose ): print " - - - Shape of Profile Arrays = %s" % (str(shape_type))
 
     # Initialize meta data
-    env[ENVIRON.RADS] = subh[ENVIRON.RADS]
     env[ENVIRON.RUN]  = subh[ENVIRON.RUN]
-    env[ENVIRON.TYPE] = subh[ENVIRON.TYPE]
-    env[ENVIRON.NAME] = subh[ENVIRON.NAME]
+    env[ENVIRON.SNAP] = np.zeros(numMergers, dtype=int)
     env[ENVIRON.VERS] = version
     env[ENVIRON.DATE] = datetime.now().ctime()
-    env[ENVIRON.SUBH] = np.zeros(numMergers, dtype=DTYPE.INDEX)
-
-    # Status for each subhalo
     env[ENVIRON.STAT] = np.zeros(numMergers, dtype=int)
 
+    # For each merger/subhalo
+    env[ENVIRON.SUBH] = np.zeros(numMergers, dtype=DTYPE.INDEX)
+    env[ENVIRON.BPID] = np.zeros(numMergers, dtype=DTYPE.ID)
+    env[ENVIRON.CENT] = np.zeros([numMergers,3], dtype=DTYPE.SCALAR)
+    env[ENVIRON.TYPE] = subh[ENVIRON.TYPE]
+    env[ENVIRON.NAME] = subh[ENVIRON.NAME]
+
     # Initialize Profiles Storage Manually
+    env[ENVIRON.RADS] = subh[ENVIRON.RADS]
     #    [ mergers, part-types, rad-bins ]
+    env[ENVIRON.NUMS] = np.zeros(shape_type)
     env[ENVIRON.DENS] = np.zeros(shape_type)
     env[ENVIRON.MASS] = np.zeros(shape_type)
-    env[ENVIRON.NUMS] = np.zeros(shape_type)
-    
+
     #    [ mergers, rad-bins ]
     env[ENVIRON.DISP] = np.zeros(shape_all)
     env[ENVIRON.POTS] = np.zeros(shape_all)
