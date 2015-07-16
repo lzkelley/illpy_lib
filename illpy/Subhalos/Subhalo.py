@@ -3,9 +3,8 @@ Submodule to import particle data from illustris snapshots.  Wrappers for `illus
 
 Functions
 ---------
-   importSubhaloParticles() : 
-
-
+   importSubhaloParticles : import snapshot data for a given subhalo
+   importGroupCatalogData : import group catalog data for subhalo(s)
 
 """
 
@@ -114,8 +113,9 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
     ---------
        run      <int>      : illustris simulation run number {1,3}
        snapNum  <int>      : illustris snapshot number {1,135}
-       subhalos <int>([N]) : optional, target subhalo numbers
-       verbose  <bool>     : optional, print verbose output
+       subhalos <int>([N]) : target subhalo numbers
+       fields   <str>([M]) : target catalog parameters
+       verbose  <bool>     : print verbose output
 
     Returns
     -------

@@ -22,7 +22,6 @@ Functions
    GET_MERGER_ENVIRONMENT_FILENAME      : get filename for dictionary of all subhalos
 
    getMergerAndSubhaloIndices           : get merger, snapshot and subhalo index numbers
-   checkSubhaloFiles                    : check which subhalo files exist or are missing
    loadMergerEnvironments               : primary API - load all subhalo environments as dict
    loadMergerEnv                        : load a single merger-subhalo environment and save
 
@@ -32,9 +31,6 @@ Functions
    _initStorage                         : initializes dict to store data for all subhalos
    _parseArguments                      : parse commant line arguments
    _mpiError                            : raise an error through MPI and exit all processes   
-
-
-
 
 
 """
@@ -64,7 +60,7 @@ import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
 
 # Hard Settings
-_VERSION      = 1.3
+_VERSION      = 1.4
 
 # Soft (Default) Settings (Can be changed from command line)
 VERBOSE      = False
@@ -98,8 +94,9 @@ class ENVIRON():
     # Radial profiles
     RADS  = "rads"                                # Positions of right-edges of radial bins 
     NUMS  = "nums"                                # Number of particles by type in each bin
-    MASS  = "mass"                                # Mass   of particle  by type in each bin
     DENS  = "dens"                                # Dens (ave)          by type    each bin
+    MASS  = "mass"                                # Mass   of particle  by type in each bin
+
     POTS  = "pots"                                # Grav potential for all types   each bin
     DISP  = "disp"                                # Vel dispersion     all types   each bin
 
@@ -492,17 +489,17 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
                 ENVIRON.SNAP : snap,
                 ENVIRON.VERS : _VERSION,
                 ENVIRON.DATE : datetime.now().ctime(),
+                ENVIRON.TYPE : partTypes,
+                ENVIRON.NAME : partNames,
 
                 ENVIRON.SUBH : subhalo,
                 ENVIRON.BPID : retBoundID,
                 ENVIRON.CENT : posRef,
-                ENVIRON.TYPE : partTypes,
-                ENVIRON.NAME : partNames,
 
                 ENVIRON.RADS : outRadBins,
                 ENVIRON.NUMS : numsBins,
-                ENVIRON.MASS : massBins,
                 ENVIRON.DENS : densBins,
+                ENVIRON.MASS : massBins,
                 ENVIRON.POTS : potsBins,
                 ENVIRON.DISP : dispBins
                 }
@@ -609,69 +606,6 @@ def _loadAndCheckEnv(fname, rads, lenTypeExp, warn=False, care=True):
 
 # _loadAndCheckEnv()
 
-
-'''
-def checkSubhaloFiles(run, verbose=True, version=_VERSION):
-    """
-    Check each Merger to make sure its subhalo profile has been found and saved.
-
-    Writes missing merger subhalos to file ``GET_MISSING_LIST_FILENAME``.
-    """
-    
-    if( verbose ): print " - - Environments.checkSubhaloFiles()"
-
-    if( verbose ): print " - - - Initializing parameters"
-    # Load indices for mergers, snapshots and subhalos
-    mergSnap, snapMerg, mergSubh = getMergerAndSubhaloIndices(run, verbose=verbose)
-    numMergers = len(mergSnap)
-
-    missing_fname = GET_MISSING_LIST_FILENAME(run, version=version)
-
-    beg = datetime.now()
-    count = 0
-    numYa = 0
-    numNo = 0
-
-    # Open file to store missing entries
-    with open(missing_fname, 'w') as missing:
-        if( verbose ): print " - - - Opening file '%s'" % (os.path.split(missing_fname)[1])
-        missing.write('# Merger Snap Subhalo\n')
-        
-        if( verbose ): print " - - - Checking files"
-        # Start progress-bar
-        pbar = zio.getProgressBar(numMergers)
-
-        ## Iterate over all mergers
-        #  ------------------------
-        for ii, (snap, subh) in enumerate(zip(mergSnap, mergSubh)):
-            fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subh, version=version)
-            count += 1
-
-            # Count success
-            if( os.path.exists(fname) ):
-                numYa += 1
-            # Count failure, save to output file
-            else:
-                numNo += 1
-                missing.write('%6d  %3d  %6d\n' % (ii, snap, subh))
-                missing.flush()
-
-            # Update progress bar
-            pbar.update(count)
-
-        # } for ii
-
-    # } with missing
-
-    end = datetime.now()
-    if( verbose ): print " - - - - Checked %d files after '%s'" % (count, end-beg)
-    print " - - - - %d Files Found  " % (numYa)
-    print " - - - - %d Files Missing" % (numNo)
-
-    return
-
-# checkSubhaloFiles()
-'''
 
 
 def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
@@ -905,14 +839,16 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
 
                 # Store Subhalo number for each merger
                 env[ENVIRON.SUBH][merger] = subhalo
+                env[ENVIRON.SNAP][merger] = snap
+                env[ENVIRON.BPID][merger] = dat[ENVIRON.BPID]
+                env[ENVIRON.CENT][merger] = dat[ENVIRON.CENT]
 
-                ## Extract data
+                # Profiles Data
+                env[ENVIRON.NUMS][merger,...] = dat[ENVIRON.NUMS]
                 env[ENVIRON.DENS][merger,...] = dat[ENVIRON.DENS]
                 env[ENVIRON.MASS][merger,...] = dat[ENVIRON.MASS]
                 env[ENVIRON.POTS][merger,...] = dat[ENVIRON.POTS]
                 env[ENVIRON.DISP][merger,...] = dat[ENVIRON.DISP]
-
-                env[ENVIRON.NUMS][merger,...] = dat[ENVIRON.NUMS]
 
                 # Set as good merger-environment
                 env[ENVIRON.STAT][merger] = 1
@@ -1013,23 +949,26 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     if( verbose ): print " - - - Shape of Profile Arrays = %s" % (str(shape_type))
 
     # Initialize meta data
-    env[ENVIRON.RADS] = subh[ENVIRON.RADS]
     env[ENVIRON.RUN]  = subh[ENVIRON.RUN]
-    env[ENVIRON.TYPE] = subh[ENVIRON.TYPE]
-    env[ENVIRON.NAME] = subh[ENVIRON.NAME]
+    env[ENVIRON.SNAP] = np.zeros(numMergers, dtype=int)
     env[ENVIRON.VERS] = version
     env[ENVIRON.DATE] = datetime.now().ctime()
-    env[ENVIRON.SUBH] = np.zeros(numMergers, dtype=DTYPE.INDEX)
-
-    # Status for each subhalo
     env[ENVIRON.STAT] = np.zeros(numMergers, dtype=int)
 
+    # For each merger/subhalo
+    env[ENVIRON.SUBH] = np.zeros(numMergers, dtype=DTYPE.INDEX)
+    env[ENVIRON.BPID] = np.zeros(numMergers, dtype=DTYPE.ID)
+    env[ENVIRON.CENT] = np.zeros([numMergers,3], dtype=DTYPE.SCALAR)
+    env[ENVIRON.TYPE] = subh[ENVIRON.TYPE]
+    env[ENVIRON.NAME] = subh[ENVIRON.NAME]
+
     # Initialize Profiles Storage Manually
+    env[ENVIRON.RADS] = subh[ENVIRON.RADS]
     #    [ mergers, part-types, rad-bins ]
+    env[ENVIRON.NUMS] = np.zeros(shape_type)
     env[ENVIRON.DENS] = np.zeros(shape_type)
     env[ENVIRON.MASS] = np.zeros(shape_type)
-    env[ENVIRON.NUMS] = np.zeros(shape_type)
-    
+
     #    [ mergers, rad-bins ]
     env[ENVIRON.DISP] = np.zeros(shape_all)
     env[ENVIRON.POTS] = np.zeros(shape_all)
@@ -1039,6 +978,7 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     #  ------------------------------------
     if( verbose ): print " - - - Loading Catalog for Sample: Snap %d, Subhalo %d" % (snap, sample)
     gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=sample, verbose=True)
+    if( verbose ): print " - - - Loading Group-Cat Keys: '%s'" % (str(gcat.keys()))
 
     # Initialize catalog properties automatically
     env[ENVIRON.GCAT_KEYS] = gcat.keys()
