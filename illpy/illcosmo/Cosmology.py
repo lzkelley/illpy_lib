@@ -1,14 +1,7 @@
-# ==================================================================================================
-# Cosmology.py
-# ------------
-#
-#
-#
-#
-# ------------------
-# Luke Zoltan Kelley
-# LKelley@cfa.harvard.edu
-# ==================================================================================================
+"""
+
+"""
+
 
 import numpy as np
 import scipy as sp
@@ -32,7 +25,7 @@ MAXIMUM_SCALE_FACTOR = 0.9999                                                   
 
 
 class Cosmology(object):
-    '''
+    """
     Class to access cosmological parameters over Illustris simulation times.
 
     Cosmology loads a preformatted data file which contains cosmological
@@ -54,14 +47,14 @@ class Cosmology(object):
     hubbleConstant(sf) : hubble constant [km/s/Mpc]
     hubbleFunction(sf) : hubble function []
 
-    snapshotTimes(num)    : scale-factor of the given snapshot number
+    scales(num)    : scale-factor of the given snapshot number
 
 
 
     Additionally, `Cosmology` supports the `len()` function, which returns the
     number of snapshots.  The scale-factor for an individual snapshot can be
     retrieved using the standard array accessor `[i]`.  This is equivalent to
-    the `snapshotTimes()` method.
+    the `scales()` method.
 
 
     Examples
@@ -78,7 +71,7 @@ class Cosmology(object):
     >> # Find the luminosity distance at a scale factor of a=0.5
     >> lumDist = cosmo.lumDist(0.5)
 
-    '''
+    """
 
     __REDSHIFT  = 'redshift'
     __SCALEFACT = 'scale'
@@ -109,17 +102,17 @@ class Cosmology(object):
 
 
     def __getitem__(self, it):
-        ''' Get scalefactor for a given snapshot number '''
-        return self.snapshotTimes(it)
+        """ Get scalefactor for a given snapshot number """
+        return self.scales(it)
 
 
     def __len__(self):
-        ''' Return number of snapshots '''
+        """ Return number of snapshots """
         return self.num
 
 
     def __initInterp(self, key):
-        ''' Initialize an interpolation function '''
+        """ Initialize an interpolation function """
         return sp.interpolate.interp1d(self.__cosmo[self.__SCALEFACT], self.__cosmo[key], kind=INTERP)
 
 
@@ -143,16 +136,20 @@ class Cosmology(object):
         else:
             return False
 
-
-
+    '''
     def snapshotTimes(self, num=None):
-        ''' Get scalefactor for all snapshots, or given snapshot number '''
+        """ Get scalefactor for all snapshots, or given snapshot number """
         if( num == None ): return self.__cosmo[self.__SCALEFACT]
         else:              return self.__cosmo[self.__SCALEFACT][num]
+    '''
 
+    def scales(self, num=None):
+        """ Get scalefactor for all snapshots, or given snapshot number """
+        if( num is None ): return self.__cosmo[self.__SCALEFACT]
+        else:              return self.__cosmo[self.__SCALEFACT][num]
 
     def redshift(self, sf):
-        ''' Calculate redshift analytically from the given scalefactor '''
+        """ Calculate redshift analytically from the given scalefactor """
         return (1.0/sf) - 1.0
 
 
@@ -165,7 +162,7 @@ class Cosmology(object):
 
 
     def __parameter(self, sf, key):
-        '''
+        """
         Retrieve a target parameter at a certain snapshot or scalefactor
 
         Arguments
@@ -188,7 +185,7 @@ class Cosmology(object):
             ValueError: if ``sf`` is outside of the scalefactor range
             KeyError: if ``key`` is not in the ``self.__cosmo`` dictionary
 
-        '''
+        """
 
         # If this is a snapshot number, return value from that snapshot
         if( self.__validSnap(sf) ):
@@ -207,45 +204,45 @@ class Cosmology(object):
 
 
     def hubbleConstant(self, sf):
-        ''' Get Hubble Constant for given snapshot or scalefactor '''
+        """ Get Hubble Constant for given snapshot or scalefactor """
         return self.__parameter(sf, self.__HUB_CONST)
 
     def hubbleFunction(self, sf):
-        ''' Get Hubble Function [E(z)] for given snapshot or scalefactor '''
+        """ Get Hubble Function [E(z)] for given snapshot or scalefactor """
         return self.__parameter(sf, self.__HUB_FUNC)
 
     def lumDist(self, sf):
-        ''' Get luminosity distance for given snapshot or scalefactor '''
+        """ Get luminosity distance for given snapshot or scalefactor """
         return self.__parameter(sf, self.__LUM_DIST)
 
     def comDist(self, sf):
-        ''' Get comoving distance for given snapshot or scalefactor '''
+        """ Get comoving distance for given snapshot or scalefactor """
         return self.__parameter(sf, self.__COM_DIST)
 
     def angDist(self, sf):
-        ''' Get angular-diameter distance for given snapshot or scalefactor '''
+        """ Get angular-diameter distance for given snapshot or scalefactor """
         return self.__parameter(sf, self.__ANG_DIST)
 
     def arcSize(self, sf):
-        ''' Get arcsecond size for given snapshot or scalefactor '''
+        """ Get arcsecond size for given snapshot or scalefactor """
         return self.__parameter(sf, self.__ARC_SIZE)
 
     def lookbackTime(self, sf):
-        ''' Get lookback time for given snapshot or scalefactor '''
+        """ Get lookback time for given snapshot or scalefactor """
         return self.__parameter(sf, self.__LB_TIME)
 
     def age(self, sf):
-        ''' Get age of the universe for given snapshot or scalefactor '''
+        """ Get age of the universe for given snapshot or scalefactor """
         return self.__parameter(sf, self.__AGE)
 
     def distMod(self, sf):
-        ''' Get distance modulus for given snapshot or scalefactor '''
+        """ Get distance modulus for given snapshot or scalefactor """
         return self.__parameter(sf, self.__DIST_MOD)
 
 
 
     def cosmologicalCorrection(self, sf):
-        '''
+        """
         Simulations only sample a small volume, must compensate and extrapolate to
         actual cosmological event rates.
         For a number per comoving-volume 'R(z)'; the detected rate per redshift is
@@ -259,7 +256,7 @@ class Cosmology(object):
 
         Returns
         -------
-        '''
+        """
 
         # Generalize argument to always be iterable
         if( not np.iterable(sf) ): sf = np.array([sf])
@@ -298,4 +295,6 @@ class Cosmology(object):
 
         return cosmoFactor
 
+    # cosmologicalCorrection()
 
+# } class Cosmology
