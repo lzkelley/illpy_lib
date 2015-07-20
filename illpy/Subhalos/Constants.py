@@ -1,94 +1,91 @@
-"""
-Provide common constants and hard-settings.
-
-"""
-
-import numpy as np
-
-import illpy
-from illpy.illbh.BHConstants import GET_PROCESSED_DIR
-
-TYPE_ID     = np.uint64
-TYPE_SCALAR = np.float64
 
 
-### Subhalo Properties ###
-SUBHALO_ID                        = "id"
-SUBHALO_RUN                       = "run"
-SUBHALO_SNAPSHOT                  = "snapshot"
-SUBHALO_CREATED                   = "created"
-SUBHALO_VERSION                   = "version"
+class SNAPSHOT():
+    IDS                  = "ParticleIDs"
+    POS                  = "Coordinates"
 
-SNAPSHOT_BH_MASS                  = "BH_Mass"
-SNAPSHOT_BH_HSML                  = "BH_Hsml"
-SNAPSHOT_BH_MDOT                  = "BH_Mdot"
-SNAPSHOT_STELLAR_PHOTOS           = "GFM_StellarPhotometrics"
-SNAPSHOT_FORM_TIME                = "GFM_StellarFormationTime"
-SNAPSHOT_PARENT                   = "ParentID"
-SNAPSHOT_SUBFIND_HSML             = "SubfindHsml"
-SNAPSHOT_SUBFIND_VDISP            = "SubfindVelDisp"
-SNAPSHOT_FILENAME                 = "filename"
-SNAPSHOT_HSML                     = "hsml"
-SNAPSHOT_MASS                     = "mass"
-SNAPSHOT_MASSES                   = "masses"
-SNAPSHOT_NPART                    = "npart_loaded"
-SNAPSHOT_POS                      = "pos"
-SNAPSHOT_POT                      = "pot"
-SNAPSHOT_DENS                     = "rho"
-SNAPSHOT_SFR                      = "sfr"
-SNAPSHOT_VEL                      = "vel"
-SNAPSHOT_EINT                     = "internalenergy"
+    POT                  = "Potential"
+    DENS                 = "Denity"
+    SFR                  = "StarFormationRate"
+    VEL                  = "Velocities"
+    EINT                 = "InternalEnergy"
+    MASS                 = "Masses"
+
+    HSML                 = "SmoothingLength"      # 2x max triangle radius
+
+    SUBF_HSML            = "SubfindHsml"
+    SUBF_VDISP           = "SubfindVelDisp"
 
 
-SNAPSHOT_PROPERTIES = [ SNAPSHOT_BH_MASS, SNAPSHOT_BH_HSML, SNAPSHOT_BH_MDOT, SNAPSHOT_STELLAR_PHOTOS, 
-                        SNAPSHOT_FORM_TIME, SNAPSHOT_PARENT, SNAPSHOT_SUBFIND_HSML, SNAPSHOT_SUBFIND_VDISP,
-                        SNAPSHOT_FILENAME, SNAPSHOT_HSML, SNAPSHOT_MASS, SNAPSHOT_MASSES, 
-                        SNAPSHOT_NPART, SNAPSHOT_POS, SNAPSHOT_POT, SNAPSHOT_DENS, 
-                        SNAPSHOT_SFR, SNAPSHOT_VEL, SNAPSHOT_EINT ]
+    '''
+    BH_MASS                  = "BH_Mass"
+    BH_HSML                  = "BH_Hsml"
+    BH_MDOT                  = "BH_Mdot"
+    STELLAR_PHOTOS           = "GFM_StellarPhotometrics"
+    FORM_TIME                = "GFM_StellarFormationTime"
 
-_SUBHALO_PARTICLES_PATH_BASE     = "subhalos/snap_%d/"
-_SUBHALO_PARTICLES_FILENAME_BASE = "ill-%d_snap-%d_subhalo-%d.npz"
-
-
-def GET_SUBHALO_PARTICLES_FILENAMES(run, snap, subhalo): 
-    fileName  = GET_PROCESSED_DIR(run) + _SUBHALO_PARTICLES_PATH_BASE % (snap)
-    fileName += _SUBHALO_PARTICLES_FILENAME_BASE % (run, snap, subhalo)
-    return fileName
+    PARENT                   = "ParentID"
+    NPART                    = "npart_loaded"
+    '''
 
 
-### Subfind Catalog Parameters ###
+class SUBHALO():
 
-SH_BH_MASS                    = "SubhaloBHMass"
-SH_RAD_TYPE                   = "SubhaloHalfmassRadType"
-SH_MASS_TYPE                  = "SubhaloMassType"
-SH_SFR                        = "SubhaloSFR"
-SH_PHOTO                      = "SubhaloStellarPhotometrics"
-SH_VEL_DISP                   = "SubhaloVelDisp"
-SH_SPIN                       = "SubhaloSpin"
-SH_LEN_TYPE                   = "SubhaloLenType"
-SH_GROUP_NUM                  = "SubhaloGrNr"
-SH_FILENAME                   = "filebase"
-SH_PARENT                     = "SubhaloParent"
+    POS                  = "SubhaloPos"
+    COM                  = "SubhaloCM"
+    SUBH_PARENT          = "SubhaloParent"
+    MOST_BOUND           = "SubhaloIDMostbound"
+    NUM_GROUP            = "SubhaloGrNr"
 
+    NUM_PARTS            = "SubhaloLen"
+    NUM_PARTS_TYPE       = "SubhaloLenType"
 
-SUBFIND_PARAMETERS            = [ SH_BH_MASS,  SH_RAD_TYPE, SH_MASS_TYPE, SH_SFR,       SH_PHOTO, 
-                                  SH_VEL_DISP, SH_LEN_TYPE, SH_SPIN,      SH_GROUP_NUM, SH_PARENT ]
+    PHOTOS               = "SubhaloStellarPhotometrics"
 
-SUBFIND_PARAMETER_TYPES       = [ TYPE_SCALAR, TYPE_SCALAR, TYPE_SCALAR,  TYPE_SCALAR,  TYPE_SCALAR, 
-                                  TYPE_SCALAR, TYPE_ID,     TYPE_SCALAR,  TYPE_ID,      TYPE_ID    ]
+    METZ_GAS             = "SubhaloGasMetallicity"
+    METZ_STAR            = "SubhaloStarMetallicity"
 
+    BH_MASS              = "SubhaloBHMass"
+    BH_MDOT              = "SubhaloBHMdot"
 
-SH_SNAPSHOT_NUM               = "snapshot"
+    VEL                  = "SubhaloVel"
+    VMAX                 = "SubhaloVmax"
+    VDISP                = "SubhaloVelDisp"
+    VMAX                 = "SubhaloVmax"
+    SPIN                 = "SubhaloSpin"
 
+    SFR                  = "SubhaloSFR"
+    SFR_HALF_RAD         = "SubhaloSFRinHalfRad"
+    SFR_IN_MAX_RAD       = "SubhaloSFRinMaxRad"
+    SFR_IN_RAD           = "SubhaloSFRinRad"
 
-### Subhalo Profiles ###
+    MASS                 = "SubhaloMass"
+    MASS_TYPE            = "SubhaloMassType"
+    MASS_HALF_RAD        = "SubhaloMassInHalfRad"
+    MASS_IN_HALF_RAD_TYPE = "SubhaloMassInHalfRadType"
+    MASS_IN_MAX_RAD      = "SubhaloMassInMaxRad"
+    MASS_IN_MAX_RAD_TYPE = "SubhaloMassInMaxRadType"
+    MASS_IN_RAD          = "SubhaloMassInRad"
+    MASS_IN_RAD_TYPE     = "SubhaloMassInRadType"
+    MASS_WIND            = "SubhaloWindMass"
 
-PROFILE_BIN_EDGES = 'bin_edges'
-PROFILE_BIN_AVES  = 'bin_aves'
-PROFILE_GAS       = 'gas'
-PROFILE_STARS     = 'stars'
-PROFILE_DM        = 'dm'
-PROFILE_COLS      = 'cols'
-PROFILE_CREATED   = 'created'
-PROFILE_VERSION   = 'version'
+    RAD_HALF_MASS        = "SubhaloHalfmassRad"
+    RAD_HALF_MASS_TYPE   = "SubhaloHalfmassRadType"
+    RAD_VMAX             = "SubhaloVmaxRad"
+    RAD_PHOTOS           = "SubhaloStellarPhotometricsRad"
 
+    # SubhaloGasMetallicityMaxRad
+    # SubhaloStarMetallicityMaxRad
+    # SubhaloStellarPhotometricsMassInRad
+    # SubhaloStarMetallicityHalfRad
+    # SubhaloGasMetallicitySfrWeighted
+    # SubhaloGasMetallicityHalfRad
+    # SubhaloStarMetallicity
+    # SubhaloGasMetallicitySfr
+
+    @staticmethod
+    def PROPERTIES(): 
+        return [getattr(SUBHALO,it) for it in vars(SUBHALO) 
+                if not it.startswith('_') and not callable(getattr(SUBHALO,it)) ]
+
+# } class SUBHALO

@@ -103,7 +103,7 @@ VERSION_MAP = 0.21
 VERSION_FIX = 0.31
 
 
-def processMergers(run, verbose=VERBOSE):
+def processMergers(run, verbose=True):
 
     if( verbose ): print " - - BHMergers.processMergers()"
 
@@ -119,7 +119,7 @@ def processMergers(run, verbose=VERBOSE):
 
 
 
-def loadRawMergers(run, verbose=VERBOSE, recombine=False):
+def loadRawMergers(run, verbose=True, recombine=False):
     """
     Load raw merger events into dictionary.
 
@@ -164,7 +164,7 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
 
 
 
-def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
+def loadMappedMergers(run, verbose=True, loadsave=True ):
     """
     Load or create Mapped Mergers Dictionary as needed.
     """
@@ -229,7 +229,7 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
 
 
-def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
+def loadFixedMergers(run, verbose=True, loadsave=True ):
     """
     Load BH Merger data with duplicats removes, and masses corrected.
 
@@ -285,7 +285,7 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
 
 
 
-def _fixMergers(run, mergers, verbose=VERBOSE):
+def _fixMergers(run, mergers, verbose=True):
     """
     Filter and 'fix' input merger catalog.
 
@@ -397,7 +397,7 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
 # _fixMergers()
 
 
-def _importRawMergers(files, verbose=VERBOSE):
+def _importRawMergers(files, verbose=True):
     """
     Fill the given arrays with merger data from the given target files.
 
@@ -497,7 +497,7 @@ def _parseMergerLine(line):
 # _parseMergerLine()
 
 
-def _mapToSnapshots(scales, verbose=VERBOSE):
+def _mapToSnapshots(scales, verbose=True):
     """
     Find the snapshot during which, or following each merger
 

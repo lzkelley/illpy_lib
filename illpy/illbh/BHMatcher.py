@@ -63,7 +63,7 @@ AFT = BH_AFTER
 
 
 
-def main(run, verbose=VERBOSE):
+def main(run, verbose=True):
 
     if( verbose ): print " - BHMatcher.py"
     start = datetime.now()
@@ -87,7 +87,7 @@ def main(run, verbose=VERBOSE):
 
 
 
-def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
+def loadMergerDetails(run, loadsave=True, mergers=None, verbose=True):
 
     if( verbose ): print " - - BHMatcher.loadMergerDetails()"
 
@@ -140,7 +140,7 @@ def loadMergerDetails(run, loadsave=True, mergers=None, verbose=VERBOSE):
 
 
 
-def detailsForMergers(run, mergers, verbose=VERBOSE):
+def detailsForMergers(run, mergers, verbose=True):
     """
     Given a set of mergers, retrieve corresponding 'details' entries for BHs.
 
@@ -151,7 +151,7 @@ def detailsForMergers(run, mergers, verbose=VERBOSE):
     ---------
     mergers : dict, data arrays for mergers
     run : int, illustris run number {1,3}
-    verbose : bool (optional : ``VERBOSE``), flag to print verbose output.
+    verbose : bool (optional : ``True``), flag to print verbose output.
 
     
     Returns
@@ -370,7 +370,7 @@ def checkMatches(matches, mergers):
 # checkMatches()
 
 
-def inferMergerOutMasses(run, mergers=None, mdets=None, verbose=VERBOSE, debug=False):
+def inferMergerOutMasses(run, mergers=None, mdets=None, verbose=True, debug=False):
     """
     Based on 'merger' and 'details' information, infer the 'out' BH masses at time of mergers.
 

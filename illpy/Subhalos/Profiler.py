@@ -1,125 +1,267 @@
 """
+Process radial profiles of Illustris subhalos.
+
+Functions
+---------
+ - subhaloRadialProfiles() : construct binned, radial density profiles for all particle types
 
 
 """
 
-
-import sys
-import os
+import warnings
 from datetime import datetime
-
 import numpy as np
-import scipy as sp
-from scipy import optimize
-
-import illpy
-from illpy import Cosmology
-from illpy.Constants import *
-from illpy import AuxFuncs as aux
-
-from Constants import *
-
-VERBOSE = True
-_VERSION = 0.1
 
 
-NUM_RAD_BINS = 40
-RAD_EXTREMA = [ 1.0, 1.0e6 ]                      # [parsecs]
+from illpy.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
+
+import Subhalo
+import Constants
+from Constants import SNAPSHOT, SUBHALO
+
+import zcode.Math     as zmath
+import zcode.InOut    as zio
 
 
-def getSubhaloRadialProfiles(data, bins=None, nbins=NUM_RAD_BINS, verbose=VERBOSE):
-
-    if( verbose ): print " - - Profiler.getSubhaloRadialProfiles()"
-
-    numParts = data[SNAPSHOT_NPART]
-    cumNumParts = np.concatenate([[0],np.cumsum(numParts)])
-    slices = [ slice( cumNumParts[ii], cumNumParts[ii+1] ) for ii in range(len(numParts)) ]
-
-    # Get Number of Particles
-    ngas      = data[SNAPSHOT_NPART][PARTICLE_TYPE_GAS]
-    nstars    = data[SNAPSHOT_NPART][PARTICLE_TYPE_STAR]
-    ndm       = data[SNAPSHOT_NPART][PARTICLE_TYPE_DM]
-
-    if( verbose ): print " - - - Number of DM %d, Stars %d, Gas %d" % (ndm, nstars, ngas)
-
-
-    ### Load Masses, Densities and Create Profiles ###
-    rhoGas    = data[SNAPSHOT_DENS]*DENS_CONV      # Only gas has 'density'/'rho'
-    massGas   = data[SNAPSHOT_MASS][:ngas]*MASS_CONV
-    massStars = data[SNAPSHOT_MASS][ngas:(ngas+nstars)]*MASS_CONV
-    massDM    = data[SNAPSHOT_MASSES][PARTICLE_TYPE_DM]*MASS_CONV
-
-
-    posAll = data[SNAPSHOT_POS]
-    posAll = reflectPos(posAll)
-
-
-    ### Get Positions and Radii of Each Particle ###
-    bhmass = data[SNAPSHOT_BH_MASS]
-    posBH = posAll[slices[PARTICLE_TYPE_BH  ]]
-    # If there are multiple BHs, use the most-massive as the CoM
-    if( len(bhmass) > 1 ):
-        bhind = np.argmax(bhmass)
-        posBH = posBH[bhind]
-
-
-    posGas    = posAll[slices[PARTICLE_TYPE_GAS ]]
-    posDM     = posAll[slices[PARTICLE_TYPE_DM  ]]
-    posStars  = posAll[slices[PARTICLE_TYPE_STAR]]
+NUM_RAD_BINS = 100
 
 
 
-    # Select a center position
-    # posCenter = posBH
-    # posCenter = posAve
-    posCenter = np.median(posStars, axis=0)
+def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS, 
+                          mostBound=None, verbose=True):
+    """
+    Construct binned, radial profiles of density for each particle species.
 
-    # Subtract off BH position
-    posGas   -= posCenter
-    posDM    -= posCenter
-    posStars -= posCenter
+    Profiles for the velocity dispersion and gravitational potential are also constructed for 
+    all particle types together.
 
-    radsGas   = np.array([ aux.getMagnitude(vec) for vec in posGas   ])*DIST_CONV
-    radsDM    = np.array([ aux.getMagnitude(vec) for vec in posDM    ])*DIST_CONV
-    radsStars = np.array([ aux.getMagnitude(vec) for vec in posStars ])*DIST_CONV
+    Arguments
+    ---------
+       run       <int>    : illustris simulation run number {1,3}
+       snapNum   <int>    : illustris simulation snapshot number {1,135}
+       subhalo   <int>    : subhalo index number for target snapshot
+       radBins   <flt>[N] : optional, right-edges of radial bins in simulation units
+       nbins     <int>    : optional, numbers of bins to create if ``radBins`` is `None`
+       mostBound <int>    : optional, ID number of the most-bound particle for this subhalo
+       verbose   <bool>   : optional, print verbose output
 
-    # Create Radial Bins if they are not provided
-    if( bins is None ):
-        radsExtr  = np.concatenate([radsGas, radsDM, radsStars])
-        radsExtr  = aux.extrema(radsExtr, nonzero=True)
-        bins      = np.logspace( *np.log10(radsExtr), num=nbins+1 )
+    Returns
+    -------
+       radBins   <flt>[N]   : coordinates of right-edges of ``N`` radial bins
+       posRef    <flt>[3]   : coordinates in simulation box of most-bound particle (used as C.O.M.)
+       partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy.Constants.PARTICLE``)
+       partNames <str>[M]   : particle type strings for each type
+       numsBins  <int>[M,N] : binned number of particles for ``M`` particle types, ``N`` bins each
+       massBins  <flt>[M,N] : binned radial mass profile 
+       densBins  <flt>[M,N] : binned mass density profile
+       potsBins  <flt>[N]   : binned gravitational potential energy profile for all particles
+       dispBins  <flt>[N]   : binned velocity dispersion profile for all particles
 
+    """
+
+
+    if( verbose ): print " - - Profiler.subhaloRadialProfiles()"
+
+    if( verbose ): print " - - - Loading subhalo partile data"
+    # Redirect output during this call
+    with zio.StreamCapture() as strCap:
+        partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
+
+    partNums = [ pd['count'] for pd in partData ]
+    partNames = [ PARTICLE.NAMES(pt) for pt in partTypes ]
+    numPartTypes = len(partNums)
+
+    ## Find the most-bound Particle
+    #  ----------------------------
+
+    posRef = None
+
+    # If no particle ID is given, find it
+    if( mostBound is None ): 
+        # Get group catalog
+        mostBound = Subhalo.importGroupCatalogData(run, snapNum, subhalos=subhalo, \
+                                                   fields=[SUBHALO.MOST_BOUND])
+
+    if( mostBound is None ): 
+        warnStr  = "Could not find mostBound particle ID Number!"
+        warnStr += "Run %d, Snap %d, Subhalo %d" % (run, snapNum, subhalo)
+        warnings.warn(warnStr, RuntimeWarning)
+        return None
+
+
+    thisStr = "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
+    if( verbose ): print " - - - - %s : Loaded %s particles" % (thisStr, str(partNums))
+
+    # Find the most-bound particle, store its position
+    for pdat,pname in zip(partData, partNames):
+        # Skip, if no particles of this type
+        if( pdat['count'] == 0 ): continue
+        inds = np.where( pdat[SNAPSHOT.IDS] == mostBound )[0]
+        if( len(inds) == 1 ): 
+            if( verbose ): print " - - - Found Most Bound Particle in '%s'" % (pname)
+            posRef = pdat[SNAPSHOT.POS][inds[0]]
+            break
+
+    # } pdat,pname
+
+    # Set warning and return ``None`` if most-bound particle is not found
+    if( posRef is None ): 
+        warnStr = "Could not find most bound particle in snapshot! %s" % (thisStr)
+        warnings.warn(warnStr, RuntimeWarning)
+        return None
+
+    mass = np.zeros(numPartTypes, dtype=object)
+    rads = np.zeros(numPartTypes, dtype=object)
+    pots = np.zeros(numPartTypes, dtype=object)
+    disp = np.zeros(numPartTypes, dtype=object)
+    radExtrema = None
+
+
+    ## Iterate over all particle types and their data
+    #  ==============================================
+    
+    if( verbose ): print " - - - Extracting and processing particle properties"
+    for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
+
+        # Make sure the expected number of particles are found
+        if( data['count'] != partNums[ii] ):
+            warnStr  = "%s" % (thisStr)
+            warnStr += "Type '%s' count mismatch after loading!!  " % (partNames[ii])
+            warnStr += "Expecting %d, Retrieved %d" % (partNums[ii], data['count'])
+            warnings.warn(warnStr, RuntimeWarning)
+            return None
+
+
+        # Skip if this particle type has no elements
+        #    use empty lists so that call to ``np.concatenate`` below works (ignored)
+        if( data['count'] == 0 ): 
+            mass[ii] = []
+            rads[ii] = []
+            pots[ii] = []
+            disp[ii] = []
+            continue
+
+        # Extract positions from snapshot, make sure reflections are nearest most-bound particle
+        posn = reflectPos(data[SNAPSHOT.POS], center=posRef)
+
+        # DarkMatter Particles all have the same mass, store that single value
+        if( ptype == PARTICLE.DM ): mass[ii] = [ GET_ILLUSTRIS_DM_MASS(run) ]
+        else:                       mass[ii] = data[SNAPSHOT.MASS]
+
+        # Convert positions to radii from ``posRef`` (most-bound particle), and find radial extrema
+        rads[ii] = zmath.dist(posn, posRef)
+        pots[ii] = data[SNAPSHOT.POT]
+        disp[ii] = data[SNAPSHOT.SUBF_VDISP]
+        radExtrema = zmath.minmax(rads[ii], prev=radExtrema, nonzero=True)
+
+    # } for data, ptype
+
+
+    ## Create Radial Bins
+    #  ------------------
+
+    # Create radial bin spacings, these are the upper-bound radii
+    if( radBins is None ): 
+        radExtrema[0] = radExtrema[0]*0.99
+        radExtrema[1] = radExtrema[1]*1.01
+        radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
 
     # Find average bin positions, and radial bin (shell) volumes
-    binAves = np.zeros(nbins)
-    binVols = np.zeros(nbins)
-    for ii in range(len(bins)-1):
-        binAves[ii] = np.average([bins[ii], bins[ii+1]])
-        binVols[ii] = np.power(bins[ii+1],3.0) - np.power(bins[ii],3.0)
-
-
-    colsStars = data[SNAPSHOT_STELLAR_PHOTOS]     # Only stars have photometric entries
-    gmr       = np.array([ cols[PHOTO_g] - cols[PHOTO_r] for cols in colsStars])
-
-
-    ### Create Radial profiles ###
-
-    # Average gas densities in each bin
-    hg = aux.histogram(radsGas,   bins, weights=rhoGas,    ave=True )
-    # Sum Stellar masses in each bin, divide by shell volumes
-    hs = aux.histogram(radsStars, bins, weights=massStars, scale=1.0/binVols)
-    # Sum DM Masses in each bin
-    hd = aux.histogram(radsDM,    bins) 
-    # Weight DM profile by masses and volumes
-    hd = hd*massDM/binVols
-    # Average colors in each bin
-    hc = aux.histogram(radsStars, bins, weights=gmr, ave=True )
+    numBins = len(radBins)
+    binVols = np.zeros(numBins)
+    for ii in range(len(radBins)):
+        if( ii == 0 ): binVols[ii] = np.power(radBins[ii],3.0)
+        else:          binVols[ii] = np.power(radBins[ii],3.0) - np.power(radBins[ii-1],3.0)
+    # } ii
 
 
 
-    return bins, binAves, hg, hs, hd, hc
+    ## Bin Properties for all Particle Types
+    #  -------------------------------------
 
-# getSubhaloRadialProfiles()
+    densBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Density
+    massBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Mass
+    numsBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.INDEX )    # Count of particles
+
+    # second dimension to store averages [0] and standard-deviations [1]
+    potsBins = np.zeros([numBins, 2], dtype=DTYPE.SCALAR)               # Grav Potential Energy
+    dispBins = np.zeros([numBins, 2], dtype=DTYPE.SCALAR)               # Velocity dispersion
+
+    # Iterate over particle types
+    if( verbose ): print " - - - Binning properties by radii"
+    for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
+
+        # Skip if this particle type has no elements
+        if( data['count'] == 0 ): continue
+
+
+        # Get the total mass in each bin
+        numsBins[ii,:], massBins[ii,:] = zmath.histogram(rads[ii], radBins, weights=mass[ii],
+                                                         edges='right', func='sum', stdev=False)
+
+        # Divide by volume to get density
+        densBins[ii,:] = massBins[ii,:]/binVols
+
+    # } for ii, pt1
+
+    if( verbose ): print " - - - - Binned %s particles" % (str(np.sum(numsBins, axis=1)))
+
+
+    ## Consistency check on numbers of particles
+    #  -----------------------------------------
+    #      The total number of particles ``numTot`` shouldn't necessarily be in bins.
+    #      The expected number of particles ``numExp`` are those that are within the bounds of bins
+
+    for ii in xrange(numPartTypes):
+
+        numExp = np.size( np.where( rads[ii] <= radBins[-1] )[0] )
+        numAct = np.sum(numsBins[ii])
+        numTot = np.size(rads[ii])
+
+        # If there is a discrepancy return ``None`` for error
+        if( numExp != numAct ):
+            warnStr  = "%s\nType '%s' count mismatch after binning!" % (thisStr, partNames[ii])
+            warnStr += "\nExpecting %d, Retrieved %d" % (numExp, numAct)
+            warnings.warn(warnStr, RuntimeWarning)
+            return None
+
+        # If a noticeable number of particles are not binned, warn, but still continue
+        elif( numAct < numTot-10 and numAct < 0.9*numTot ):
+            warnStr  = "%s : Type %s" % (thisStr, partNames[ii])
+            warnStr += "\nTotal = %d, Expected = %d, Binned = %d" % (numTot, numExp, numAct)
+            warnStr += "\nBin Extrema = %s" % (str(zmath.minmax(radBins)))
+            warnStr += "\nRads = %s" % (str(rads[ii]))
+            warnings.warn(warnStr, RuntimeWarning)
+            raise RuntimeError("")
+            
+
+    # } for ii
+
+    # Convert list of arrays into 1D arrays of all elements
+    rads = np.concatenate(rads)
+    pots = np.concatenate(pots)
+    disp = np.concatenate(disp)
+
+    # Bin Grav Potentials
+    counts, aves, stds = zmath.histogram(rads, radBins, weights=pots, 
+                                         edges='right', func='ave', stdev=True)
+    potsBins[:,0] = aves
+    potsBins[:,1] = stds
+
+    # Bin Velocity Dispersion
+    counts, aves, stds = zmath.histogram(rads, radBins, weights=disp,
+                                         edges='right', func='ave', stdev=True)
+    dispBins[:,0] = aves
+    dispBins[:,1] = stds
+
+
+    return radBins, posRef, mostBound, partTypes, partNames, \
+        numsBins, massBins, densBins, potsBins, dispBins
+
+# subhaloRadialProfiles()
+
+
+
 
 
 
@@ -128,17 +270,17 @@ def reflectPos(pos, center=None):
     """
     Given a set of position vectors, reflect those which are on the wrong edge of the box.
 
-    NOTE: Input positions ``pos`` MUST BE GIVEN IN illustris simulation units: [ckpc/h] !!!!
+    Input positions ``pos`` MUST BE GIVEN IN illustris simulation units: [ckpc/h] !
     If a particular ``center`` point is not given, the median position is used.
     
     Arguments
     ---------
-    pos    : <float>[N,3], array of ``N`` vectors, MUST BE IN SIMULATION UNITS
-    center : <float>[3],   (optional=None), center coordinates, defaults to median of ``pos``
+        pos    <flt>[N,3] : array of ``N`` vectors, MUST BE IN SIMULATION UNITS
+        center <flt>[3]   : optional, center coordinates, defaults to median of ``pos``
 
     Returns
     -------
-    fix    : <float>[N,3], array of 'fixed' positions with bad elements reflected
+        fix    <flt>[N,3] : array of 'fixed' positions with bad elements reflected
 
     """
 
@@ -150,7 +292,6 @@ def reflectPos(pos, center=None):
 
     # Use median position as center if not provided
     if( center is None ): center = np.median(fix, axis=0)
-    else:                 center = ref
 
     # Find distances to center
     offsets = fix - center
@@ -161,176 +302,7 @@ def reflectPos(pos, center=None):
 
     return fix
 
-
-
-
-def powerLaw(rr,y0,r0,alpha):
-    """ Single power law ``n(r) = y0*(r/r0)^alpha`` """
-    return y0*np.power(rr/r0, alpha)
-
-def powerLaw_ll(lr,ly0,lr0,alpha):
-    """ log-log transform of ``n(r) = y0*(r/r0)^alpha`` """
-    return ly0 + alpha*(lr - lr0)
-
-
-
-def powerLaw_broken(rr,y0,r0,alpha,beta):
-    """ Two power-laws linked together piece-wise at the scale radius ``r0`` """
-    y1 = (powerLaw(rr,y0,r0,alpha))[rr<=r0]
-    y2 = (powerLaw(rr,y0,r0,beta ))[rr> r0]
-    yy = np.concatenate((y1,y2))
-    return yy
-
-def powerLaw_broken_ll(rr,y0,r0,alpha,beta):
-    """ Log-log transform of a broken (piece-wise defined) power-law """
-    y1 = (powerLaw_ll(rr,y0,r0,alpha))[rr<=r0]
-    y2 = (powerLaw_ll(rr,y0,r0,beta ))[rr> r0]
-    yy = np.concatenate((y1,y2))
-    return yy
-
-
-
-
-def fit_powerLaw(xx, yy, pars=None):
-    """
-    Fit the given data with a single power-law function
-    
-    Notes: the data is first transformed into log-log space, where a linear
-           function is fit.  That is transformed back into linear-space and
-           returned.
-           
-    Arguments
-    ---------
-    xx : <float>[N], independent variable given in normal (linear) space
-    yy : <float>[N],   dependent variable given in normal (linear) space
-    
-    Returns
-    -------
-    func  : <callable>, fitting function with the fit parameters already plugged-in
-    y0    : <float>   , normalization to the fitting function
-    pars1 : <float>[2], fit parameters defining the power-law function.
-    """
-    
-    # Transform to log-log space and scale towards unity
-    y0 = np.max(yy)                                                                                
-    
-    lx = np.log10(xx)
-    ly = np.log10(yy/y0)
-    
-    # Guess Power Law Parameters if they are not provided
-    if( pars is None ): 
-        pars0 = [1.0, -3.0]
-    # Convert to log-space if they are provided
-    else:                
-        pars0 = np.array(pars)
-        pars0[0] = np.log10(pars0[0])
-
-
-    # Do not fit for normalization parameter ``y0``
-    func = lambda rr,p0,p1: powerLaw_ll(rr, y0, p0, p1)
-    pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-    
-    # Transform fit parameters from log-log space, back to normal
-    pars1[0] = np.power(10.0, pars1[0])
-
-    # Add global normalization ``y0`` back in
-    pars1 = np.insert(pars1, 0, y0)
-
-    # Create fitting function using the determined parameters
-    func = lambda rr: powerLaw(rr, *pars1)
-    
-    # Return function and fitting parameters
-    return func, pars1
-
-# fit_powerLaw()
-
-
-
-def fit_powerLaw_broken(xx0, yy0, inner=None, outer=None, xlo=None, xhi=None):
-    """
-    Fit a broken power law function to the given data, the inner slope can be fixed.
-    """
-
-    xx = np.array(xx0)
-    yy = np.array(yy0)
-
-    ## Select subsample of input arrays
-
-    if( xlo is not None ):
-        inds = np.where( xx >= xlo )
-        xx = xx[inds]
-        yy = yy[inds]
-
-    if( xhi is not None ):
-        inds = np.where( xx <= xhi )
-        xx = xx[inds]
-        yy = yy[inds]
-
-
-    # Transform to log-log space and scale towards unity
-    y0 = np.max(yy)
-    lx = np.log10(xx)
-    ly = np.log10(yy/y0)
-
-        
-    # Guess Power Law Parameters
-    
-    guess_x0 = np.average(lx)
-    guess_x0 = np.power(10.0, guess_x0)
-
-    # pars0 = [100.0*PC, -1.0, -4.0]
-    pars0 = [guess_x0, -1.0, -4.0]
-    pars0 = np.array(pars0)
-    # Convert to log-space
-    pars0[0] = np.log10(pars0[0])
-
-
-    ## Fit all parameters  (``r0``, ``alpha`` and ``beta``)
-    if( inner is None and outer is None ):
-        func = lambda rr,r0,alp,bet: powerLaw_broken_ll(rr, y0, r0, alp, bet)
-        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-    ## Fir outer profile If ``inner`` is specified
-    elif( outer is None ):
-        func = lambda rr,r0,bet: powerLaw_broken_ll(rr, y0, r0, inner, bet)
-        # Remove inner-guess parameter
-        pars0 = np.delete(pars0, 1)
-        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-        # Replace inner parameter with given value
-        pars1 = np.insert(pars1, 1, inner)
-    ## Fit inner profile If ``outer`` is specified
-    elif( inner is None ):
-        func = lambda rr,r0,alp: powerLaw_broken_ll(rr, y0, r0, alp, outer)
-        # Remove outer-guess parameter
-        pars0 = np.delete(pars0, 2)
-        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-        # Replace inner parameter with given value
-        pars1 = np.insert(pars1, 2, outer)
-    # Only fit break radius
-    else:
-        func = lambda rr,r0: powerLaw_broken_ll(rr, y0, r0, inner, outer)
-        # Remove guess parameters for slopes
-        pars0 = np.delete(pars0, 2)
-        pars0 = np.delete(pars0, 1)
-        pars1, covar = sp.optimize.curve_fit(func, lx, ly, p0=pars0)
-        # Replace parameters with given values
-        pars1 = np.insert(pars1, 1, inner)
-        pars1 = np.insert(pars1, 2, outer)
-
-
-
-    # Transform fit parameter ``r0`` from log-log space, back to normal space
-    pars1[0] = np.power(10.0, pars1[0])
-
-    # Add global normalization back into parameters
-    pars1 = np.insert(pars1, 0, y0)
-
-    # Create fitting function
-    func = lambda rr: powerLaw_broken(rr, *pars1)
-    
-    # Return function and fitting parameters
-    return func, pars1
-
-# fit_powerLaw_broken()
+# reflectPos()
 
 
 
