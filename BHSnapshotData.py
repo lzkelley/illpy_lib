@@ -7,14 +7,11 @@ import numpy as np
 import scipy as sp
 from datetime import datetime
 from enum import Enum
-import os
-from cStringIO import StringIO
-import sys
+import os, sys
 
-import illpy
 from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR
 from illpy.illbh import BHMergers
-from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_STOM, MERGERS_IDS, BH_IN, BH_OUT
+from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 
 from Settings import *
 
@@ -24,9 +21,7 @@ import zcode
 import zcode.InOut as zio
 
 
-RUN_NUM = 3
 VERSION = 0.2
-
 
 _SAVE_FILE_NAME = "./data/ill-%d_bh_snapshot_data_v-%.1f.npz"
 def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
@@ -39,21 +34,23 @@ class SNAP():
 
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 
-class Capturing(list):
 
-    def __enter__(self):
-        self._stdout = sys.stdout
-        self._stderr = sys.stderr
-        sys.stdout = self._stringio = StringIO()
-        sys.stderr = self._stringio = StringIO()
-        return self
 
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        sys.stdout = self._stdout
-        sys.stderr = self._stderr
-    
+def main():
 
+    if( len(sys.argv) > 1 ): run = np.int(sys.argv[1])
+    else:                    run = RUN_NUM
+
+    print " - BHSnapshotData.main()"
+    print " - - Loading BH Snapshot Data for run %d" % (run)
+    beg = datetime.now()
+    loadBHSnapshotData(run, verbose=True)
+    end = datetime.now()
+    print " - Done after %s" % (str(end-beg))
+
+    return
+
+# main()
 
 
 def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
@@ -129,7 +126,7 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
        data    <dict> : BH snapshot particle data for each merger
        
                         Each entry in the dictionary is shapes [N,2] for ``N`` mergers,
-                        and each of ``BH_IN`` and ``BH_OUT``.
+                        and each of ``BH_TYPE.IN`` and ``BH_TYPE.OUT``.
 
     """
 
@@ -141,8 +138,8 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
     ## Load BH Mergers
     #  ===============
     if( verbose ): print " - - - Loading BH Mergers"
-    mergers = BHMergers.loadFixedMergers(3, verbose=verbose, loadsave=True)
-    numMergers = mergers[MERGERS_NUM]
+    mergers = BHMergers.loadFixedMergers(run, verbose=verbose, loadsave=True)
+    numMergers = mergers[MERGERS.NUM]
     if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
 
     data = {}
@@ -154,17 +151,17 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
     first = True
     if( verbose ): print " - - - Iterating over snapshots"
     beg = datetime.now()
-    if( not debug ): print "\t\t|%s|\n\t\t|" % (" "*(NUM_SNAPS-2)),
-    for snap in xrange(NUM_SNAPS-1):
-
-        # if( num_pos > 100 ): break
-
-        if( debug ): print "Snapshot %d/%d" % (snap, NUM_SNAPS)
+    if( not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
+    # Go over snapshots in random order to get a better estimate of ETA/duration
+    snapList = np.arange(NUM_SNAPS-1)
+    np.random.shuffle(snapList)
+    for snapNum in snapList:
+        if( debug ): print "Snapshot %d/%d" % (snapNum, NUM_SNAPS)
         
         # Get Mergers occuring just after this Snapshot
-        mrgs = mergers[MERGERS_MAP_STOM][snap+1]
+        mrgs = mergers[MERGERS.MAP_STOM][snapNum+1]
         nums = len(mrgs)
-        targetIDs = mergers[MERGERS_IDS][mrgs]
+        targetIDs = mergers[MERGERS.IDS][mrgs]
         if( debug ): print "Targeting %d mergers" % (nums)
         
         pos = 0
@@ -172,10 +169,9 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
         # If there are any mergers, load snapshot
         if( nums > 0 ):
-
             # catch non-fatal output
-            with Capturing() as output:
-                snap = ill.snapshot.loadSubset(dir_illustris, snap, 'bh', fields=SNAPSHOT_FIELDS)
+            with zio.StreamCapture() as output:
+                snap = ill.snapshot.loadSubset(dir_illustris, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
 
             snap_keys = snap.keys()
             if( 'count' in snap_keys ): snap_keys.remove('count')
@@ -193,7 +189,7 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
             # Match target BHs
             if( debug ): print "Matching BHs"
             for index,tid in zip(mrgs,targetIDs):
-                for BH in [BH_IN, BH_OUT]:
+                for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
                     ind = np.where( snap['ParticleIDs'] == tid[BH] )[0]
                     if( len(ind) == 1 ):
                         pos += 1
@@ -211,12 +207,11 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
         # } if nums
 
-        sys.stdout.write('.')
-        sys.stdout.flush()
+        if( not debug ): pbar.update(snapNum)
 
     # } for snap
 
-    if( not debug ): print "|"
+    if( not debug ): pbar.finish()
     end = datetime.now()
 
     if( verbose ): print " - - - - %d Good, %d Bad - after %s" % (num_pos, num_neg, str(end-beg))
@@ -233,5 +228,6 @@ def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
 
 
 
+if( __name__ == "__main__" ): main()
 
 
