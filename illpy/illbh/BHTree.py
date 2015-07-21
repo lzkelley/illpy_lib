@@ -19,7 +19,7 @@ from datetime import datetime
 from ..Constants import DTYPE
 from .. import Cosmology
 import BHConstants
-from BHConstants import MERGERS, BH_TYPE, BH_TREE
+from BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
 import BHMergers
 import BuildTree
 
@@ -110,9 +110,9 @@ def _constructBHTree(run, mergers, verbose=True):
     cosmo = Cosmology()
 
     numMergers = mergers[MERGERS.NUM]
-    last     = -1*  np.ones([numMergers,len(BH_TYPE)], dtype=DTYPE.INDEX)
+    last     = -1*  np.ones([numMergers,NUM_BH_TYPES], dtype=DTYPE.INDEX)
     next     = -1*  np.ones([numMergers],              dtype=DTYPE.INDEX)
-    lastTime = -1.0*np.ones([numMergers,len(BH_TYPE)], dtype=DTYPE.SCALAR)
+    lastTime = -1.0*np.ones([numMergers,NUM_BH_TYPES], dtype=DTYPE.SCALAR)
     nextTime = -1.0*np.ones([numMergers],              dtype=DTYPE.SCALAR)
 
     # Convert merger scale factors to ages
@@ -231,7 +231,7 @@ def analyzeTree(tree, verbose=True):
 
     indsInt = np.where( timeNext >= 0.0 )[0]
     numInts = len(indsInt)
-    timeStats = aux.avestd( timeNext[indsInt] )
+    timeStats = np.average(timeNext[indsInt]), np.std(timeNext[indsInt])
     inds = np.where( timeNext == 0.0 )[0]
     numZeroInts = len(inds)
 

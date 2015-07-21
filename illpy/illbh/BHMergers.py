@@ -98,9 +98,7 @@ from BHConstants import MERGERS, BH_TYPE
 import BHMatcher
 
 from .. Constants import DTYPE
-
 from .. import Cosmology
-#from .. import AuxFuncs as aux
 
 import zcode.InOut as zio
 
@@ -252,7 +250,7 @@ def loadFixedMergers(run, verbose=True, loadsave=True ):
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (fixedFilename)
         if( os.path.exists(fixedFilename) ):
-            mergersFixed = aux.npzToDict(fixedFilename) 
+            mergersFixed = zio.npzToDict(fixedFilename) 
         else:
             print " - - - - '%s' does not exist.  Recreating." % (fixedFilename)
             loadsave = False
@@ -592,7 +590,7 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
 
     # Print warning on error
     if( low == None or high == None ):
-        print "AuxFuncs._findBoundingBins: target = %e, bins = {%e,%e}; low,high = %s,%s !" % \
+        print "BHMergers._findBoundingBins: target = %e, bins = {%e,%e}; low,high = %s,%s !" % \
             ( target, bins[0], bins[-1], str(low), str(high) )
         raise RuntimeError("Could not find bins!")
 

@@ -43,7 +43,7 @@ import numpy as np
 from datetime import datetime
 
 import BHDetails, BHMergers, BHConstants
-from BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME
+from BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, NUM_BH_TIMES
 from MatchDetails import getDetailIndicesForMergers
 from ..Constants import DTYPE, NUM_SNAPS
 
@@ -145,19 +145,20 @@ def detailsForMergers(run, mergers, verbose=True):
 
     numMergers = mergers[MERGERS.NUM]
     numSnaps   = Constants.NUM_SNAPS
+    shape = [numMergers, NUM_BH_TYPES, NUM_BH_TIMES]
+
 
     # Search for all Mergers in each snapshot (easier, though less efficient)
     targets = np.arange(numMergers)
 
     snapNumbers = reversed(xrange(numSnaps))
 
-    matchInds  = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=DTYPE.INDEX)
-    matchTimes = -1*np.ones([numMergers, NUM_BH_TYPES, NUM_BH_TIMES], dtype=DTYPE.SCALAR)
+    matchInds  = -1*np.ones(shape, dtype=DTYPE.INDEX)
+    matchTimes = -1*np.ones(shape, dtype=DTYPE.SCALAR)
 
 
     ## Create Dictionary To Store Results
     mergDets = {}
-    shape = [numMergers, len(BH_TYPE), len(BH_TIME)]
     # Initialize Dictionary to Invalid entries (-1)
     for KEY in DETAILS_PHYSICAL_KEYS:
         if( KEY == DETAILS.IDS ): mergDets[KEY] = np.zeros(shape, dtype=DTYPE.ID)
@@ -184,9 +185,9 @@ def detailsForMergers(run, mergers, verbose=True):
         ## Store Matches Data
 
         # iterate over in/out BHs
-        for TYPE in BH_TYPE:
+        for TYPE in [BH_TYPE.IN, BH_TYPE.OUT]:
             # Iterate over match times
-            for TIME in BH_TIME:
+            for TIME in [BH_TIME.FIRST, BH_TIME.BEFORE, BH_TIME.AFTER]:
                 # Find valid matches
                 inds = np.where( matchNew[:, TYPE, TIME] >= 0 )[0]
                 if( len(inds) > 0 ):
@@ -233,10 +234,10 @@ def checkMatches(matches, mergers):
     print "             First  Before After"
 
     # Iterate over both BHs
-    for TYPE in BH_TYPE:
+    for TYPE in [BH_TYPE.IN, BH_TYPE.OUT]:
         num_str = ""
         # Iterate over match times
-        for TIME in BH_TIME:
+        for TIME in [BH_TIME.FIRST, BH_TIME.BEFORE, BH_TIME.AFTER]:
             inds = np.where( matches[DETAILS.SCALES][:,TYPE,TIME] >= 0.0 )[0]
             good[inds, BH, FBA] = True
             num_str += "%5d  " % (len(inds))
@@ -287,11 +288,11 @@ def checkMatches(matches, mergers):
     print "\n - - - Number of BAD ID Matches:"
     print "             First  Before After"
     # Iterate over both BHs
-    for BH in BH_TYPE:
+    for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
         num_str = ""
         eg = None
         # Iterate over match times
-        for FBA in BH_TIME:
+        for FBA in [BH_TIME.FIRST, BH_TIME.BEFORE, BH_TIME.AFTER]:
             dids = matches[DETAILS.IDS][:,BH,FBA]
             mids = mergers[MERGERS.IDS][:,BH]
             inds = np.where( (good[:,BH,FBA]) & (dids != mids) )[0]
@@ -311,21 +312,21 @@ def checkMatches(matches, mergers):
     ## Check Time Matches
     print "\n - - - Number of BAD time Matches:"
     # Iterate over both BHs
-    for BH in BH_TYPE:
+    for TYPE in [BH_TYPE.IN, BH_TYPE.OUT]:
         num_str = ""
         eg = None
         # Iterate over match times
-        for FBA in BH_TIME:
-            dt = matches[DETAILS.SCALES][:,BH,FBA]
+        for TIME in [BH_TIME.FIRST, BH_TIME.BEFORE, BH_TIME.AFTER]:
+            dt = matches[DETAILS.SCALES][:,TYPE,TIME]
             mt = mergers[MERGERS.SCALES]
 
-            if( FBA == BH_TIME.AFTER): inds = np.where( (good[:,BH,FBA]) & (dt <  mt) )[0]
-            else:                      inds = np.where( (good[:,BH,FBA]) & (dt >= mt) )[0]
+            if( TIME == BH_TIME.AFTER): inds = np.where( (good[:,TYPE,TIME]) & (dt <  mt) )[0]
+            else:                       inds = np.where( (good[:,TYPE,TIME]) & (dt >= mt) )[0]
 
             num_str += "%5d  " % (len(inds))
             if( len(inds) > 0 ): eg = inds[0]
             
-        print "       %s : %s" % ( bh_str[BH], num_str )
+        print "       %s : %s" % ( bh_str[TYPE], num_str )
         if( eg is not None ):
             tmat = matches[DETAILS.SCALES][eg,BH_TYPE.OUT,:]
             tt = mergers[MERGERS.SCALES][eg]

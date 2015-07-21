@@ -61,7 +61,7 @@ from datetime import datetime
 from illpy.Constants import DTYPE
 
 import BHConstants
-from BHConstants import DETAILS, BH_TYPE, BH_TIME
+from BHConstants import DETAILS
 
 import zcode.InOut as zio
 

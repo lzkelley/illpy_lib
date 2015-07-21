@@ -24,7 +24,6 @@ Functions
 """
 
 import numpy as np
-from enum import Enum
 from glob import glob
 
 from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR
@@ -75,7 +74,7 @@ _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
 
 
-class MERGERS(Enum):
+class MERGERS():
     # Meta Data
     RUN       = 'run'
     CREATED   = 'created'
@@ -98,7 +97,7 @@ class MERGERS(Enum):
 MERGERS_PHYSICAL_KEYS = [ MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES ]
 
 
-class DETAILS(Enum):
+class DETAILS():
     RUN     = 'run'
     CREATED = 'created'
     VERSION = 'version'
@@ -119,18 +118,20 @@ DETAILS_PHYSICAL_KEYS = [ DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
                           DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS ]
 
 
-class BH_TYPE(Enum):
+class BH_TYPE():
     IN  = 0
     OUT = 1
 
+NUM_BH_TYPES = 2
 
-class BH_TIME(Enum):
+class BH_TIME():
     BEFORE  = 0                                   # Before merger time (MUST = 0!)
     AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
     FIRST   = 2                                   # First matching details entry (MUST = 2!)
 
+NUM_BH_TIMES = 3
 
-class BH_TREE(Enum):
+class BH_TREE():
     LAST         = 'last'
     NEXT         = 'next'
     LAST_TIME    = 'lastTime'
@@ -225,10 +226,10 @@ def GET_BLACKHOLE_TREE_FILENAME(run, version):
     return fname
 
 
-assert BH_TYPE.IN.value == 0 and BH_TYPE.OUT.value == 1, \
+assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
     "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
 
 
-assert BH_TIME.BEFORE.value == 0 and BH_TIME.AFTER.value == 1 and BH_TIME.FIRST.value == 2, \
+assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
     "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
 
