@@ -6,7 +6,9 @@
 import numpy as np
 cimport numpy as np
 
-from BHConstants import BH_IN, BH_OUT
+from BHConstants import BH_TYPE
+BH_IN = BH_TYPE.IN
+BH_OUT = BH_TYPE.OUT
 
 # A uint64 type (works with np.uint64)
 ctypedef unsigned long long ULNG
