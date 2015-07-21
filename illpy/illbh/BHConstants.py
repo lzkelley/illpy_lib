@@ -54,80 +54,87 @@ _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
 
 # Key Names for Mergers Dictionary
-MERGERS_RUN       = 'run'
-MERGERS_CREATED   = 'created'
-MERGERS_NUM       = 'num'
-MERGERS_VERSION   = 'version'
-MERGERS_FILE      = 'filename'
+class MERGERS(Enum):
+    # Meta Data
+    RUN       = 'run'
+    CREATED   = 'created'
+    NUM       = 'num'
+    VERSION   = 'version'
+    FILE      = 'filename'
 
-MERGERS_IDS       = 'ids'
-MERGERS_SCALES    = 'scales'
-MERGERS_MASSES    = 'masses'
+    # Physical Parameters
+    IDS       = 'ids'
+    SCALES    = 'scales'
+    MASSES    = 'masses'
 
-MERGERS_MAP_STOM  = 's2m'
-MERGERS_MAP_MTOS  = 'm2s'
-MERGERS_MAP_ONTOP = 'ontop'
+    # Maps
+    MAP_STOM  = 's2m'
+    MAP_MTOS  = 'm2s'
+    MAP_ONTOP = 'ontop'
 
-MERGERS_PHYSICAL_KEYS = [ MERGERS_IDS, MERGERS_SCALES, MERGERS_MASSES ]
+# } MERGERS
 
-
-
-NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
-NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
-
+MERGERS_PHYSICAL_KEYS = [ MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES ]
 
 
-# Index of [N,2] arrays corresponding to each BH
-BH_IN  = 0
-BH_OUT = 1
 
-assert BH_IN == 0 and BH_OUT == 1, \
-    "``BH_{IN/OUT}`` MUST be in the proper order!"
+
+class BH_TYPE(Enum):
+    IN  = 0
+    OUT = 1
+# } BH_TYPE
+
+assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
+    "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
 
 
 # Types of matches between mergers and details
-BH_BEFORE  = 0                                                                                 # Before merger time (MUST = 0!)
-BH_AFTER   = 1                                                                                 # After (or equal) merger time (MUST = 1!)
-BH_FIRST   = 2                                                                                 # First matching details entry (MUST = 2!)
+class BH_TIME(Enum):
+    BEFORE  = 0                                   # Before merger time (MUST = 0!)
+    AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
+    FIRST   = 2                                   # First matching details entry (MUST = 2!)
+# } BH_TIME
 
-
-assert BH_BEFORE == 0 and BH_AFTER == 1 and BH_FIRST == 2, \
-    "``BH_{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
+assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
+    "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
 
 
 ### Dictionary Keys for Details Parameters ###
-DETAILS_RUN     = 'run'
-DETAILS_CREATED = 'created'
-DETAILS_VERSION = 'version'
-DETAILS_NUM     = 'num'
-DETAILS_SNAP    = 'snap'
-DETAILS_FILE    = 'filename'
+class DETAILS(Enum):
+    RUN     = 'run'
+    CREATED = 'created'
+    VERSION = 'version'
+    NUM     = 'num'
+    SNAP    = 'snap'
+    FILE    = 'filename'
 
-DETAILS_IDS     = 'id'
-DETAILS_SCALES  = 'scales'
-DETAILS_MASSES  = 'masses'
-DETAILS_MDOTS   = 'mdots'
-DETAILS_RHOS    = 'rhos'
-DETAILS_CS      = 'cs'
+    IDS     = 'id'
+    SCALES  = 'scales'
+    MASSES  = 'masses'
+    MDOTS   = 'mdots'
+    RHOS    = 'rhos'
+    CS      = 'cs'
 
-DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_SCALES, DETAILS_MASSES,
-                          DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
+# } DETAILS
+
+DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_SCALES, DETAILS_MASSES,  DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
 
 
 ### BH Merger Tree ###
+class BH_TREE(Enum):
+    LAST         = 'last'
+    NEXT         = 'next'
+    LAST_TIME    = 'lastTime'
+    NEXT_TIME    = 'nextTime'
+    NUM_FUTURE   = 'numFuture'
+    NUM_PAST     = 'numPast'
+    TIME_BETWEEN = 'timeBetween'
 
-TREE_LAST         = 'last'
-TREE_NEXT         = 'next'
-TREE_LAST_TIME    = 'lastTime'
-TREE_NEXT_TIME    = 'nextTime'
-TREE_NUM_FUTURE   = 'numFuture'
-TREE_NUM_PAST     = 'numPast'
-TREE_TIME_BETWEEN = 'timeBetween'
+    CREATED      = 'created'
+    RUN          = 'run'
+    VERSION      = 'version'
 
-TREE_CREATED      = 'created'
-TREE_RUN          = 'run'
-TREE_VERSION      = 'version'
-
+# } BH_TREE
 
 
 def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
