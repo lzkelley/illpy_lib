@@ -53,7 +53,7 @@ def main():
 # main()
 
 
-def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
+def loadBHSnapshotData(run, loadsave=True, verbose=True, debug=False):
     """
     Load Blackhole snapshot particle data.
 
@@ -111,7 +111,7 @@ def loadBHSnapshotData(run, loadsave=True, verbose=VERBOSE, debug=False):
 # loadBHSnapshotData()
 
 
-def _importBHSnapshotData(run, verbose=VERBOSE, debug=False):
+def _importBHSnapshotData(run, verbose=True, debug=False):
     """
     Import BH particle data directly from illustris snapshots.
 
