@@ -8,10 +8,11 @@ import scipy as sp
 from datetime import datetime
 from enum import Enum
 import os, sys
+import argparse
 
 from mpi4py import MPI
 
-from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR
+from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR
 from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 
@@ -22,10 +23,30 @@ import illustris_python as ill
 import zcode
 import zcode.InOut as zio
 
-_VERSION = 0.2
 
-_SAVE_FILE_NAME = "./data/ill-%d_bh_snapshot_data_v-%.1f.npz"
-def GET_SAVE_FILE_NAME(run, vers): return _SAVE_FILE_NAME % (run, vers)
+
+_VERSION = 0.2
+DEBUG = False
+
+
+
+def _GET_BH_SNAPSHOT_DIR(run):
+    return GET_PROCESSED_DIR(run) + "blackhole_particles/"
+
+_BH_SINGLE_SNAPSHOT_FILENAME = "snap{0:03d}/ill-{1:d}_snap{0:03d}_merger-bh_snapshot_{2:.2f}.npz"
+def _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snap, version=_VERSION):
+    return _GET_BH_SNAPSHOT_DIR(run) + _BH_SINGLE_SNAPSHOT_FILENAME.format(run,snap,version)
+
+_BH_SNAPSHOT_FILENAME = "ill-{0:d}_merger-bh_snapshot_v{1:.2f}.npz"
+def GET_BH_SNAPSHOT_FILENAME(run, version=_VERSION):
+    return _GET_BH_SNAPSHOT_DIR(run) + _BH_SNAPSHOT_FILENAME.format(run,version)
+
+
+_STATUS_FILENAME = 'stat_BHSnapshotData_ill%d_v%.2f.txt'
+def _GET_STATUS_FILENAME(run):
+    return _STATUS_FILENAME % (run, _VERSION)
+
+
 
 class SNAP():
     VERSION = 'version'
@@ -73,15 +94,17 @@ def main():
     args    = _parseArguments()
     run     = args.run
     verbose = args.verbose
+    debug   = args.debug
 
     ## Master Process
     #  --------------
     if( rank == 0 ):
-        print "RUN           = %d  " % (run)
-        print "VERSION       = %.2f" % (_VERSION)
-        print "MPI COMM SIZE = %d  " % (size)
+        print "run           = %d  " % (run)
+        print "version       = %.2f" % (_VERSION)
+        print "MPI comm size = %d  " % (size)
         print ""
-        print "VERBOSE       = %s  " % (str(verbose))
+        print "verbose       = %s  " % (str(verbose))
+        print "debug         = %s  " % (str(verbose))
         print ""
         beg_all = datetime.now()
 
@@ -119,7 +142,7 @@ def main():
 
 
 
-def _runMaster(run, comm):
+def _runMaster(run, comm, verbose=True):
     """
     Run master process which manages all of the secondary ``slave`` processes.
 
@@ -132,84 +155,68 @@ def _runMaster(run, comm):
     rank = comm.rank
     size = comm.size
 
-    print " - Initializing"
+    if( verbose ): print " - Initializing"
 
-    mergSnap, snapMerg, mergSubh = getMergerAndSubhaloIndices(run, verbose=True)
+    # Create output directory
+    #    don't let slave processes create it - makes conflicts
+    fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, 0)
+    zio.checkPath(fname)
 
-    # Get all subhalos for each snapshot (including duplicates and missing)
-    snapSubh     = [ mergSubh[smrg] for smrg in snapMerg ]
-    # Get unique subhalos for each snapshot, discard duplicates
-    snapSubh_uni = [ np.array(list(set(ssubh))) for ssubh in snapSubh ]
-    # Discard missing matches ('-1')
-    snapSubh_uni = [ ssubh[np.where(ssubh != -1)] for ssubh in snapSubh_uni ]
+    ## Load BH Mergers
+    if( verbose ): print " - - - Loading BH Mergers"
+    mergers = BHMergers.loadFixedMergers(run, verbose=verbose, loadsave=True)
+    numMergers = mergers[MERGERS.NUM]
+    if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
 
-    numUni = [len(ssubh) for ssubh in snapSubh_uni]
-    numUniTot = np.sum(numUni)
-    numMSnaps = np.count_nonzero(numUni)
-
-    print " - - %d Unique subhalos over %d Snapshots" % (numUniTot, numMSnaps)
-
-    ## Iterate over Snapshots and Subhalos
-    #  ===================================
-    #     distribute tasks to slave processes
-    
-    count = 0
-    new   = 0
-    exist = 0
-    fail  = 0
-    times = np.zeros(numUniTot)
-
-    statFileName = GET_ENVIRONMENTS_STATUS_FILENAME(run)
+    ## Init status file
+    statFileName = _GET_STATUS_FILENAME(run)
     statFile = open(statFileName, 'w')
     print " - - Opened status file '%s'" % (statFileName)
     statFile.write('%s\n' % (str(datetime.now())))
     beg = datetime.now()
 
-    for snap,subs in zmath.renumerate(snapSubh_uni):
+    num_pos = 0
+    num_neg = 0
+    count = 0
 
-        if( len(subs) <= 0 ): continue
+    # Go over snapshots in random order to get a better estimate of ETA/duration
+    snapList = np.arange(NUM_SNAPS-1)
+    np.random.shuffle(snapList)
+    for snapNum in snapList:
+        
+        # Get Mergers occuring just after Snapshot `snapNum`
+        mrgs = mergers[MERGERS.MAP_STOM][snapNum+1]
+        nums = len(mrgs)
+        targetIDs = mergers[MERGERS.IDS][mrgs]
 
-        # Create output directory (subhalo doesn't matter since only creating dir)
-        #    don't let slave processes create it - makes conflicts
-        fname = GET_MERGER_SUBHALO_FILENAME(run, snap, 0)
-        zio.checkPath(fname)
+        # if( len(subs) <= 0 ): continue
 
-        # Get most bound particles for each subhalo in this snapshot
-        mostBound = Subhalo.importGroupCatalogData(run, snap, subhalos=subs, 
-                                                   fields=[SUBHALO.MOST_BOUND], verbose=False)
+        # Look for available slave process
+        data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
+        source = stat.Get_source()
+        tag = stat.Get_tag()
 
-        # Go over each subhalo
-        for boundID, subhalo in zip(mostBound, subs):
+        # Track number of completed profiles
+        if( tag == TAGS.DONE ): 
+            durat, pos, neg = data
 
-            # Write status to file
-            dur = (datetime.now()-beg)
-            statStr = 'Snap %3d   %8d/%8d = %.4f   in %s   %8d new   %8d exist  %8d fail\n' % \
-                (snap, count, numUniTot, 1.0*count/numUniTot, str(dur), new, exist, fail)
-            statFile.write(statStr)
-            statFile.flush()
-
-            # Look for available slave process
-            data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
-            source = stat.Get_source()
-            tag = stat.Get_tag()
-
-            # Track number of completed profiles
-            if( tag == TAGS.DONE ): 
-                retStat, durat = data
-
-                times[count] = durat
-                count += 1
-                if(   retStat == ENVSTAT.NEWF ): new   += 1
-                elif( retStat == ENVSTAT.EXST ): exist += 1
-                else:                            fail  += 1
+            times[count] = durat
+            num_pos += pos
+            num_neg += neg
+            count += 1
 
 
-            # Distribute tasks
-            comm.send([snap, subhalo, boundID], dest=source, tag=TAGS.START)
+        # Distribute tasks
+        comm.send([snapNum, mrgs, targetIDs, numMergers], dest=source, tag=TAGS.START)
 
-        # } for boundID, subhalo 
+        # Write status to file
+        dur = (datetime.now()-beg)
+        statStr = 'Snap %3d   %8d/%8d = %.4f   in %s   %8d pos   %8d neg\n' % \
+            (snapNum, count, NUM_SNAPS-1, 1.0*count/(NUM_SNAPS-1), str(dur), num_pos, num_neg)
+        statFile.write(statStr)
+        statFile.flush()
 
-    # } for snap, subs
+    # snapNum
 
     statFile.write('\n\nDone after %s' % (str(datetime.now()-beg)))
     statFile.close()
@@ -231,17 +238,17 @@ def _runMaster(run, comm):
         else:
             # If a process just completed, count it
             if( tag == TAGS.DONE ): 
-                times[count] = data[1]
+                durat, pos, neg = data
+                times[count] = durat
                 count += 1
-                if( data[0] ): new += 1
 
             # Send exit command
             comm.send(None, dest=source, tag=TAGS.EXIT)
 
+    # } while
 
-
-    print " - - %d/%d = %.4f Completed tasks!" % (count, numUniTot, 1.0*count/numUniTot)
-    print " - - %d New Files" % (new)
+    print " - - %d/%d = %.4f Completed tasks!" % (count, numSnaps-1, 1.0*count/(numSnaps-1))
+    print " - - Totals: pos = %5d   neg = %5d" % (num_pos, num_neg)
 
     return
     
@@ -250,7 +257,7 @@ def _runMaster(run, comm):
 
 
 
-def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
+def _runSlave(run, comm, loadsave=True, verbose=False, debug=False):
     """
 
     Arguments
@@ -272,26 +279,30 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
     rank = comm.rank
     size = comm.size
 
-    if( verbose ): print " - - Environments._runSlave() : rank %d/%d" % (rank, size)
+    dir_illustris = GET_ILLUSTRIS_OUTPUT_DIR(run)
+    data = {}
+    first = True
+
+    if( verbose ): print " - - BHSnapshotData._runSlave() : rank %d/%d" % (rank, size)
 
     # Keep looking for tasks until told to exit
     while True:
         # Tell Master this process is ready
         comm.send(None, dest=0, tag=TAGS.READY)
-        # Receive ``task`` ([snap,boundID,subhalo])
+        # Receive ``task`` ([snap,idxs,bhids,numMergers])
         task = comm.recv(source=0, tag=MPI.ANY_TAG, status=stat)
         tag = stat.Get_tag()
 
         if( tag == TAGS.START ):
-            # Extract parameters of environment
-            snap, subhalo, boundID = task
+            # Extract parameters
+            snap, idxs, bhids, numMergers = task
             beg = datetime.now()
-            # Load and save Merger Environment
-            retEnv, retStat = loadMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
-                                            loadsave=True, verbose=verbose)
+            # Load and save Snapshot BHs
+            data, first, pos, neg = _loadSnapshotBHs(run, dir_illustris, numMergers, snap, data,
+                                                     first, idxs, bhids, debug=debug)
             end = datetime.now()
             durat = (end-beg).total_seconds()
-            comm.send([retStat,durat], dest=0, tag=TAGS.DONE)
+            comm.send([durat,pos,neg], dest=0, tag=TAGS.DONE)
         elif( tag == TAGS.EXIT  ):
             break
 
@@ -304,6 +315,55 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
 # _runSlave()
 
 
+
+def _loadSnapshotBHs(run, illdir, numMergers, snapNum, data, first, idxs, bhids, debug=False):
+    """
+    Load the data for BHs in a single snapshot
+    """
+
+    ## Load Snapshot
+    #  -------------
+    with zio.StreamCapture() as output:
+        snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
+
+    snap_keys = snapshot.keys()
+    if( 'count' in snap_keys ): 
+        snap_keys.remove('count')
+        if( debug ): print "Loaded %d particles" % (snapshot['count'])
+
+    # First time through, initialize dictionary of results
+    if( first ):
+        for key in snap_keys: 
+            data[key] = np.zeros([numMergers, 2], dtype=np.dtype(snapshot[key][0]))
+
+        first = False
+
+
+    ## Match target BHs
+    #  ----------------
+    pos = 0
+    neg = 0
+    for index,tid in zip(mrgs,targetIDs):
+        for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
+            ind = np.where( snapshot['ParticleIDs'] == tid[BH] )[0]
+            if( len(ind) == 1 ):
+                pos += 1
+                for key in snap_keys: data[key][index,BH] = snapshot[key][ind[0]]
+            else:
+                neg += 1
+
+        # BH
+    # index, tid
+
+
+    ## Save Data
+    #  ---------
+    fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snapNum)
+    zio.npzToDict(data, fname, verbose=debug)
+
+    return data, first, pos, neg
+
+# _loadSnapshotBHs()
 
 
 
@@ -332,7 +392,7 @@ def loadBHSnapshotData(run, loadsave=True, verbose=True, debug=False):
 
     if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
     
-    saveFileName = GET_SAVE_FILE_NAME(run, _VERSION)
+    saveFileName = GET_SAVE_FILENAME(run, _VERSION)
 
     ## Load Existing Data
     if( loadsave ):
@@ -385,9 +445,6 @@ def _importBHSnapshotData(run, verbose=True, debug=False):
     """
 
     if( verbose ): print " - - BHSnapshotData._importBHSnapshotData()"
-
-    dir_illustris = GET_ILLUSTRIS_OUTPUT_DIR(run)
-    if( verbose ): print " - - - Using illustris data dir '%s'" % (dir_illustris)
 
     ## Load BH Mergers
     #  ===============
@@ -491,6 +548,9 @@ def _parseArguments():
     parser.add_argument('--version', action='version', version='%s %.2f' % (sys.argv[0], _VERSION))
     parser.add_argument('-v', '--verbose', action='store_true', 
                         help='Verbose output', default=Settings.VERBOSE)
+    parser.add_argument('--debug', action='store_true', 
+                        help='Very verbose output', default=DEBUG)
+
 
     '''
     group = parser.add_mutually_exclusive_group()
