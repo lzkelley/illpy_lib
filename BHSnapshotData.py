@@ -1,5 +1,23 @@
 """
+Collect snapshot/particle data for merger BHs.
 
+Objects
+-------
+    SNAP
+    TAGS
+    
+Functions
+---------
+    main
+    loadBHSnapshotData
+
+    _runMaster
+    _runSlave
+    _loadSingleSnapshotBHs
+    _mergeBHSnapshotFiles
+    _initStorage
+    _parseArguments
+    _mpiError
 
 """
 
@@ -12,7 +30,8 @@ import argparse
 
 from mpi4py import MPI
 
-from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR
+from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, DTYPE, \
+    GET_BAD_SNAPS
 from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 
@@ -24,16 +43,14 @@ import zcode
 import zcode.InOut as zio
 
 
-
-_VERSION = 0.2
+_VERSION = 0.4
 DEBUG = False
-
 
 
 def _GET_BH_SNAPSHOT_DIR(run):
     return GET_PROCESSED_DIR(run) + "blackhole_particles/"
 
-_BH_SINGLE_SNAPSHOT_FILENAME = "snap{0:03d}/ill-{1:d}_snap{0:03d}_merger-bh_snapshot_{2:.2f}.npz"
+_BH_SINGLE_SNAPSHOT_FILENAME = "ill-{0:d}_snap{1:03d}_merger-bh_snapshot_{2:.2f}.npz"
 def _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snap, version=_VERSION):
     return _GET_BH_SNAPSHOT_DIR(run) + _BH_SINGLE_SNAPSHOT_FILENAME.format(run,snap,version)
 
@@ -49,27 +66,23 @@ def _GET_STATUS_FILENAME(run):
 
 
 class SNAP():
+    RUN     = 'run'
+    SNAP    = 'snap'
     VERSION = 'version'
     CREATED = 'created'
-    RUN     = 'run'
     DIR_SRC = 'directory'
+    VALID   = 'valid'
+    TARGET  = 'target'
 
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
-
+SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
 class TAGS():
     READY = 0
     START = 1
     DONE  = 2
     EXIT  = 3
-# } class TAGS
 
-
-class ENVSTAT():
-    FAIL = -1
-    EXST =  0
-    NEWF =  1
-# } class ENVSTAT
 
 
 
@@ -109,40 +122,69 @@ def main():
         beg_all = datetime.now()
 
         try: 
-            _runMaster(run, comm)
+            _runMaster(run, comm, debug=debug)
         except Exception as err:
             _mpiError(comm, err)
 
         end_all = datetime.now()
         print " - - Total Duration '%s'" % (str(end_all-beg_all))
 
+        if( verbose ): print " - - - Merging Files"
+        # allData = _mergeBHSnapshotFiles(run, verbose=verbose)
+        allData = loadBHSnapshotData(run, loadsave=False, verbose=verbose, debug=debug)
 
     ## Slave Processes
     #  ---------------
     else:
 
         try:    
-            _runSlave(run, comm, verbose=True)
+            _runSlave(run, comm, debug=debug)
         except Exception as err:
             _mpiError(comm, err)
 
             
     return 
 
-
-
-    beg = datetime.now()
-    loadBHSnapshotData(run, verbose=True)
-    end = datetime.now()
-    print " - Done after %s" % (str(end-beg))
-
-    return
-
 # main()
 
 
+def loadBHSnapshotData(run, loadsave=True, verbose=True, debug=False):
 
-def _runMaster(run, comm, verbose=True):
+    if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
+
+    fname = GET_BH_SNAPSHOT_FILENAME(run)
+
+    ## Load Existing File
+    #  ------------------
+    if( loadsave ): 
+        if( verbose ): print " - - - Loading from '%s'" % (fname)
+        if( os.path.exists(fname) ):
+            data = zio.npzToDict(fname)
+        else:
+            print "WARNING: '%s' does not exist!  Recreating!" % ( fname )
+            loadsave = False
+
+    ## Recreate data (Merge individual snapshot files)
+    #  -----------------------------------------------
+    else:
+        if( verbose ): print " - - - Recreating '%s'" % (fname)
+        data = _mergeBHSnapshotFiles(run, verbose=verbose, debug=debug)
+        
+        # Add Metadata
+        data[SNAP.RUN] = run
+        data[SNAP.VERSION] = _VERSION
+        data[SNAP.CREATED] = datetime.now().ctime()
+
+        # Save
+        zio.dictToNPZ(data, fname, verbose=verbose)
+
+
+    return data
+
+# loadBHSnapshotData()
+
+
+def _runMaster(run, comm, verbose=True, debug=False):
     """
     Run master process which manages all of the secondary ``slave`` processes.
 
@@ -171,17 +213,22 @@ def _runMaster(run, comm, verbose=True):
     ## Init status file
     statFileName = _GET_STATUS_FILENAME(run)
     statFile = open(statFileName, 'w')
-    print " - - Opened status file '%s'" % (statFileName)
+    print " - - - Opened status file '%s'" % (statFileName)
     statFile.write('%s\n' % (str(datetime.now())))
     beg = datetime.now()
 
     num_pos = 0
     num_neg = 0
+    num_new = 0
+    countDone = 0
     count = 0
+    times = np.zeros(NUM_SNAPS-1)
 
     # Go over snapshots in random order to get a better estimate of ETA/duration
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
+    if( verbose ): print " - - - Iterating over snapshots"
+    if( verbose and not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snapNum in snapList:
         
         # Get Mergers occuring just after Snapshot `snapNum`
@@ -193,33 +240,38 @@ def _runMaster(run, comm, verbose=True):
 
         # Look for available slave process
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
-        source = stat.Get_source()
+        src = stat.Get_source()
         tag = stat.Get_tag()
 
         # Track number of completed profiles
         if( tag == TAGS.DONE ): 
-            durat, pos, neg = data
+            durat, pos, neg, new = data
 
-            times[count] = durat
+            times[countDone] = durat
             num_pos += pos
             num_neg += neg
-            count += 1
+            num_new += new
+            countDone += 1
 
 
         # Distribute tasks
-        comm.send([snapNum, mrgs, targetIDs, numMergers], dest=source, tag=TAGS.START)
+        comm.send([snapNum, mrgs, targetIDs, numMergers], dest=src, tag=TAGS.START)
 
         # Write status to file
         dur = (datetime.now()-beg)
-        statStr = 'Snap %3d   %8d/%8d = %.4f   in %s   %8d pos   %8d neg\n' % \
-            (snapNum, count, NUM_SNAPS-1, 1.0*count/(NUM_SNAPS-1), str(dur), num_pos, num_neg)
+        fracDone = 1.0*countDone/(NUM_SNAPS-1)
+        statStr = 'Snap %3d (rank %03d)   %8d/%8d = %.4f  in %s  %8d pos  %8d neg  %3d new\n' % \
+            (snapNum, src, countDone, NUM_SNAPS-1, fracDone, str(dur), num_pos, num_neg, num_new)
         statFile.write(statStr)
         statFile.flush()
+        count += 1
+        if( verbose and not debug ): pbar.update(count)
 
     # snapNum
 
     statFile.write('\n\nDone after %s' % (str(datetime.now()-beg)))
     statFile.close()
+    if( verbose and not debug ): pbar.finish()
 
     ## Close out all Processes
     #  =======================
@@ -230,7 +282,7 @@ def _runMaster(run, comm, verbose=True):
         
         # Find available slave process
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
-        source = stat.Get_source()
+        src = stat.Get_source()
         tag = stat.Get_tag()
 
         # If we're recieving exit confirmation, count it
@@ -238,17 +290,22 @@ def _runMaster(run, comm, verbose=True):
         else:
             # If a process just completed, count it
             if( tag == TAGS.DONE ): 
-                durat, pos, neg = data
-                times[count] = durat
-                count += 1
+                durat, pos, neg, new = data
+                times[countDone] = durat
+                countDone += 1
+                num_pos += pos
+                num_neg += neg
+                num_new += new
 
             # Send exit command
-            comm.send(None, dest=source, tag=TAGS.EXIT)
+            comm.send(None, dest=src, tag=TAGS.EXIT)
 
     # } while
 
-    print " - - %d/%d = %.4f Completed tasks!" % (count, numSnaps-1, 1.0*count/(numSnaps-1))
-    print " - - Totals: pos = %5d   neg = %5d" % (num_pos, num_neg)
+    fracDone = 1.0*countDone/(NUM_SNAPS-1)
+    print " - - %d/%d = %.4f Completed tasks!" % (countDone, NUM_SNAPS-1, fracDone)
+    print " - - Average time %.4f +- %.4f" % (np.average(times), np.std(times))
+    print " - - Totals: pos = %5d   neg = %5d   new = %3d" % (num_pos, num_neg, num_new)
 
     return
     
@@ -257,7 +314,7 @@ def _runMaster(run, comm, verbose=True):
 
 
 
-def _runSlave(run, comm, loadsave=True, verbose=False, debug=False):
+def _runSlave(run, comm, loadsave=True, debug=False):
     """
 
     Arguments
@@ -279,35 +336,43 @@ def _runSlave(run, comm, loadsave=True, verbose=False, debug=False):
     rank = comm.rank
     size = comm.size
 
-    dir_illustris = GET_ILLUSTRIS_OUTPUT_DIR(run)
     data = {}
     first = True
 
-    if( verbose ): print " - - BHSnapshotData._runSlave() : rank %d/%d" % (rank, size)
+    if( debug ): print "%d : BHSnapshotData._runSlave()" % (rank)
 
     # Keep looking for tasks until told to exit
     while True:
         # Tell Master this process is ready
+        if( debug ): print "%d : sending ready" % (rank)
         comm.send(None, dest=0, tag=TAGS.READY)
         # Receive ``task`` ([snap,idxs,bhids,numMergers])
         task = comm.recv(source=0, tag=MPI.ANY_TAG, status=stat)
         tag = stat.Get_tag()
+        if( debug ): print "%d : received tag %d" % (rank, tag)
 
         if( tag == TAGS.START ):
             # Extract parameters
             snap, idxs, bhids, numMergers = task
+            if( debug ): print "%d : starting snapshot %d" % (rank, snap)
             beg = datetime.now()
-            # Load and save Snapshot BHs
-            data, first, pos, neg = _loadSnapshotBHs(run, dir_illustris, numMergers, snap, data,
-                                                     first, idxs, bhids, debug=debug)
+
+            data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, idxs, bhids, 
+                                                   rank=rank, loadsave=loadsave, debug=debug)
+
+
+
             end = datetime.now()
             durat = (end-beg).total_seconds()
-            comm.send([durat,pos,neg], dest=0, tag=TAGS.DONE)
+            if( debug ): print "%d : sending done after %f" % (rank, durat)
+            comm.send([durat,pos,neg,new], dest=0, tag=TAGS.DONE)
         elif( tag == TAGS.EXIT  ):
+            if( debug ): print "%d : received exit" % (rank)
             break
 
 
     # Finish, return done
+    if( debug ): print "%d : sending exit" % (rank)
     comm.send(None, dest=0, tag=TAGS.EXIT)
 
     return
@@ -316,227 +381,217 @@ def _runSlave(run, comm, loadsave=True, verbose=False, debug=False):
 
 
 
-def _loadSnapshotBHs(run, illdir, numMergers, snapNum, data, first, idxs, bhids, debug=False):
+def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids, 
+                           rank=0, loadsave=True, debug=False):
     """
-    Load the data for BHs in a single snapshot
+    Load the data for BHs in a single snapshot, save to npz file.
+
+    If no indices (``idxs``) or BH IDs (``bhids``) are given, or this is a 'bad' snapshot,
+    then it isn't actually loaded and processed.  An NPZ file with all zero entries is still
+    produced.
+
     """
+    illdir = GET_ILLUSTRIS_OUTPUT_DIR(run)
+    fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snapNum)
+    if( debug ): print "%d : snap %d - filename '%s'" % (rank, snapNum, fname)
 
-    ## Load Snapshot
-    #  -------------
-    with zio.StreamCapture() as output:
-        snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
-
-    snap_keys = snapshot.keys()
-    if( 'count' in snap_keys ): 
-        snap_keys.remove('count')
-        if( debug ): print "Loaded %d particles" % (snapshot['count'])
-
-    # First time through, initialize dictionary of results
-    if( first ):
-        for key in snap_keys: 
-            data[key] = np.zeros([numMergers, 2], dtype=np.dtype(snapshot[key][0]))
-
-        first = False
-
-
-    ## Match target BHs
-    #  ----------------
     pos = 0
     neg = 0
-    for index,tid in zip(mrgs,targetIDs):
+    new = 0
+
+    ## Load and Return existing save if desired
+    #  ----------------------------------------
+    if( loadsave and os.path.exists(fname) ):
+        if( debug ): print "%d : file exists for snap %d" % (rank, snapNum)
+        data = zio.npzToDict(fname)
+        return data, pos, neg, new
+
+
+    ## Initialize dictionary of results
+    #  --------------------------------
+    if( debug ): print "%d : initializing storage" % (rank)
+    data = _initStorage(numMergers)
+    for index,tid in zip(idxs,bhids):
         for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
-            ind = np.where( snapshot['ParticleIDs'] == tid[BH] )[0]
-            if( len(ind) == 1 ):
-                pos += 1
-                for key in snap_keys: data[key][index,BH] = snapshot[key][ind[0]]
-            else:
-                neg += 1
-
-        # BH
-    # index, tid
+            data[SNAP.TARGET][index,BH] = tid[BH]
 
 
-    ## Save Data
-    #  ---------
-    fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snapNum)
-    zio.npzToDict(data, fname, verbose=debug)
+    ## Decide if this is a valid Snapshot
+    #  ----------------------------------
+    process_snapshot = True
+    # Some illustris-1 snapshots are bad
+    if( snapNum in GET_BAD_SNAPS(run) ): 
+        if( debug ): print "%d : skipping bad snapshot %d" % (rank, snapNum)
+        process_snapshot = False
 
-    return data, first, pos, neg
-
-# _loadSnapshotBHs()
-
-
-
-def loadBHSnapshotData(run, loadsave=True, verbose=True, debug=False):
-    """
-    Load Blackhole snapshot particle data.
-
-    If ``loadsave``, first data is attempted to be loaded from existing savefile.  If this fails,
-    of if ``loadsave`` is `False`, then the data is reimported directly from illustris snapshots.
-
-    Arguments
-    ---------
-       run      <int>  : illustris simulation number {1,3}
-       loadsave <bool> : optional, attempt to load previous save
-       verbose  <bool> : optional, print verbose output
-       debug    <bool> : optional, print extremely verbose diagnostic output
-
-    Returns
-    -------
-       snapData <dict> : dictionary of snapshot particle data for all merger BHs
-
-                         Each entry in the dictionary is shaped as [N,2] where ``N`` is the 
-                         number of mergers
-
-    """
-
-    if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
-    
-    saveFileName = GET_SAVE_FILENAME(run, _VERSION)
-
-    ## Load Existing Data
-    if( loadsave ):
-        # If save file exists, load it
-        if( os.path.exists(saveFileName) ):
-            if( verbose ): print " - - - Snapshot Data save file '%s' Exists" % (saveFileName)
-            snapData = zio.npzToDict(saveFileName)
-            # Make sure version matches
-            if( snapData[SNAP.VERSION] == _VERSION ):
-                if( verbose ): print " - - - Snapshot Particle Data loaded"
-            else:
-                print " - - - Snapshot Data save file '%s' is out of date!" % (saveFileName)
-                loadsave = False
-
-        else:
-            print " - - - Snapshot Data save file '%s' does not exist!" % (saveFileName)
-            loadsave = False
+    # Make sure there are mergers in this snapshot
+    if( len(idxs) <= 0 or len(bhids) <= 0 ):
+        if( debug ): print "%d : skipping snap %d with no valid BHs" % (rank, snapNum)
+        process_snapshot = False
 
 
-    ## Import data directly from Illustris
-    if( not loadsave ):
-        # Import data
-        snapData = _importBHSnapshotData(run, verbose=verbose, debug=debug)
-        # Save data to NPZ file
-        zio.dictToNPZ(snapData, saveFileName, verbose=verbose)
+    ## Load And Process Snapshot if its good
+    #  =====================================
+    if( process_snapshot ):
+
+        ## Load Snapshot
+        #  -------------
+        if( debug ): print "%d : loading snapshot %d" % (rank, snapNum)
+        with zio.StreamCapture() as output:
+            snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
+
+        snap_keys = snapshot.keys()
+        if( 'count' in snap_keys ): 
+            snap_keys.remove('count')
+            if( debug ): print "%d : Loaded %d particles" % (rank, snapshot['count'])
+
+        # Make sure all target keys are present
+        union = list(set(snap_keys) & set(SNAPSHOT_FIELDS))
+        if( len(union) != len(SNAPSHOT_FIELDS) ):
+            print ""
+            print "%d: snap_keys       = " % (rank), snap_keys
+            print "%d: SNAPSHOT_FIELDS = " % (rank), SNAPSHOT_FIELDS
+            raise RuntimeError("Rank %d, Snap %d : fields mismatch!" % (rank, snapNum))
+
+        ## Match target BHs
+        #  ----------------
+        if( debug ): print "%d : matching %d BH Mergers" % (rank, len(bhids))
+        for index,tid in zip(idxs,bhids):
+            for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
+                ind = np.where( snapshot['ParticleIDs'] == tid[BH] )[0]
+                if( len(ind) == 1 ):
+                    pos += 1
+                    data[SNAP.VALID][index,BH] = True
+                    for key in SNAPSHOT_FIELDS: data[key][index,BH] = snapshot[key][ind[0]]
+                else:
+                    neg += 1
+
+            # BH
+        # index, tid
+
+        if( debug ): print "%d : pos %d, neg %d" % (rank, pos, neg)
+
+    # } if( process_snapshot )
 
 
-    return snapData
+    ## Add Metadata and Save File
+    #  ==========================
+    data[SNAP.RUN]     = run
+    data[SNAP.SNAP]    = snapNum
+    #data[SNAP.VALID]   = valid
+    #data[SNAP.TARGET]  = targets
+    data[SNAP.VERSION] = _VERSION
+    data[SNAP.CREATED] = datetime.now().ctime()
+    data[SNAP.DIR_SRC] = illdir
 
-# loadBHSnapshotData()
+    zio.dictToNPZ(data, fname, verbose=debug)
+    new = 1
+
+    return data, pos, neg, new
+
+# _loadSingleSnapshotBHs()
 
 
-def _importBHSnapshotData(run, verbose=True, debug=False):
-    """
-    Import BH particle data directly from illustris snapshots.
 
-    Arguments
-    ---------
-       run     <int>  : illustris simulation number {1,3}
-       verbose <bool> : optional, print verbose output
-       debug   <bool> : optional, print extremely verbose output for diagnostics
+def _mergeBHSnapshotFiles(run, verbose=True, debug=False):
 
-    Returns
-    -------
-       data    <dict> : BH snapshot particle data for each merger
-       
-                        Each entry in the dictionary is shapes [N,2] for ``N`` mergers,
-                        and each of ``BH_TYPE.IN`` and ``BH_TYPE.OUT``.
+    if( verbose ): print " - - BHSnapshotData._mergeBHSnapshotFiles()"
 
-    """
+    snapList = np.arange(NUM_SNAPS-1)
+    np.random.shuffle(snapList)
+    count = 0
+    newFiles = 0
+    oldFiles = 0
+    num_pos = 0
+    num_neg = 0
+    num_val = 0
+    num_tar = 0
 
-    if( verbose ): print " - - BHSnapshotData._importBHSnapshotData()"
 
     ## Load BH Mergers
-    #  ===============
     if( verbose ): print " - - - Loading BH Mergers"
     mergers = BHMergers.loadFixedMergers(run, verbose=verbose, loadsave=True)
     numMergers = mergers[MERGERS.NUM]
     if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
 
-    data = {}
-    num_pos = 0
-    num_neg = 0
+    allData = _initStorage(numMergers)    
 
-    ## Iterate Over Each Snapshot, Loading Data
-    #  ========================================
-    first = True
+    ## Load each snapshot file
+    #  -----------------------
     if( verbose ): print " - - - Iterating over snapshots"
     beg = datetime.now()
-    if( not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
-    # Go over snapshots in random order to get a better estimate of ETA/duration
-    snapList = np.arange(NUM_SNAPS-1)
-    np.random.shuffle(snapList)
-    for snapNum in snapList:
-        if( debug ): print "Snapshot %d/%d" % (snapNum, NUM_SNAPS)
-        
-        # Get Mergers occuring just after this Snapshot
-        mrgs = mergers[MERGERS.MAP_STOM][snapNum+1]
+    if( verbose and not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
+    for snap in snapList:
+
+        mrgs = mergers[MERGERS.MAP_STOM][snap+1]
         nums = len(mrgs)
         targetIDs = mergers[MERGERS.IDS][mrgs]
-        if( debug ): print "Targeting %d mergers" % (nums)
+
+        ## Load Snapshot Data
+        data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, mrgs, targetIDs,
+                                                     loadsave=True, debug=debug)
         
-        pos = 0
-        neg = 0
-
-        # If there are any mergers, load snapshot
-        if( nums > 0 ):
-            # catch non-fatal output
-            with zio.StreamCapture() as output:
-                snap = ill.snapshot.loadSubset(dir_illustris, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
-
-            snap_keys = snap.keys()
-            if( 'count' in snap_keys ): snap_keys.remove('count')
-            if( debug ): print "Loaded %d particles" % (snap['count'])
-
-            # First time through, initialize dictionary of results
-            if( first ):
-                if( debug ): print "Initializing output dictionary"
-                for key in snap_keys: 
-                    data[key] = np.zeros([numMergers, 2], dtype=np.dtype(snap[key][0]))
-                    
-                first = False
+        ## Store to global dictionary
+        valids = data[SNAP.VALID]
+        numValid   = np.count_nonzero(valids)
+        numTargets = np.count_nonzero(data[SNAP.TARGET] > 0)
+        
+        # Copy valid elements
+        allData[SNAP.TARGET][valids] = data[SNAP.TARGET][valids]
+        allData[SNAP.VALID][valids] = data[SNAP.VALID][valids]
+        for key in SNAPSHOT_FIELDS:
+            allData[key][valids] = data[key][valids]
 
 
-            # Match target BHs
-            if( debug ): print "Matching BHs"
-            for index,tid in zip(mrgs,targetIDs):
-                for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
-                    ind = np.where( snap['ParticleIDs'] == tid[BH] )[0]
-                    if( len(ind) == 1 ):
-                        pos += 1
-                        for key in snap_keys: data[key][index,BH] = snap[key][ind[0]]
-                    else:
-                        neg += 1
+        if( new == 1 ): 
+            newFiles += 1
+            if( verbose ): 
+                print " - - - Snap %d : new" % (snap)
+                print " - - - - pos %d, neg %d, (sum %d) expected %d" % (pos, neg, nums)
+                print " - - - - Targets %d, Valid %d" % (numTargets, numValid)
+        else:
+            oldFiles += 1
+            if( verbose ): 
+                pos = numValid
+                neg = 2*nums - pos
+                print " - - - Snap %d : new" % (snap)
+                print " - - - - pos %d, expected %d, neg %d" % (pos, nums, neg)
+                print " - - - - Targets %d, Valid %d" % (numTargets, numValid)
+        
+        num_pos += pos
+        num_neg += neg
+        num_val += numValid
+        num_tar += numTargets
+        count += 1
+        if( verbose and not debug ): pbar.update(count)
 
-                # } for BH
+    # snap
 
-            # } for index,tid
-                
-            if( debug ): print "%d Matching, %d Missing" % (pos, neg)
-            num_pos += pos
-            num_neg += neg
-
-        # } if nums
-
-        if( not debug ): pbar.update(snapNum)
-
-    # } for snap
-
-    if( not debug ): pbar.finish()
+    if( verbose and not debug ): pbar.finish()
     end = datetime.now()
+    if( verbose ): 
+        print " - - - Done after %s" % (str(end-beg))
+        print " - - - - %d new, %d old.  Pos %d, Neg %d" % (newFiles, oldFiles, num_pos, num_neg)
+        print " - - - - Targets %d, Valid %d" % (num_tar, num_val)
+        numValid = np.count_nonzero(allData[SNAP.VALID])
+        print " - - - - %d/%d = %.4f valid" % (numValid, 2*numMergers, 0.5*numValid/numMergers)
 
-    if( verbose ): print " - - - - %d Good, %d Bad - after %s" % (num_pos, num_neg, str(end-beg))
 
-    # Add Meta-Data
-    data[SNAP.VERSION] = _VERSION
-    data[SNAP.RUN]     = run
-    data[SNAP.CREATED] = str(datetime.now())
-    data[SNAP.DIR_SRC] = dir_illustris
+    return allData
+
+# _mergeBHSnapshotFiles()
+
+
+
+def _initStorage(numMergers):
+    data = {}
+    for key,typ in zip(SNAPSHOT_FIELDS, SNAPSHOT_DTYPES):
+        data[key] = np.zeros([numMergers, 2], dtype=np.dtype(typ))
+
+    data[SNAP.VALID]  = np.zeros([numMergers,2], dtype=bool)
+    data[SNAP.TARGET] = np.zeros([numMergers,2], dtype=DTYPE.ID)
 
     return data
-    
-# _importBHSnapshotData()
-
 
 
 def _parseArguments():
