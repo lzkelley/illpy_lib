@@ -14,7 +14,7 @@ Classes
               effectively dissappears.
     BH_TIME : enum-type class for the three stored, details times {``FIRST``,``BEFORE``,``AFTER``}.
     BH_TREE : enum-type class for BH merger tree dictionary keys.
-
+    BH_SNAP : enum class for BHSnapshotData dictionary keys.
 
 Functions
 ---------
@@ -26,7 +26,7 @@ Functions
 import numpy as np
 from glob import glob
 
-from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR
+from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR, DTYPE
 
 
 ## Illustris Parameters
@@ -143,6 +143,24 @@ class BH_TREE():
     CREATED      = 'created'
     RUN          = 'run'
     VERSION      = 'version'
+
+
+
+
+class BH_SNAP():
+    RUN     = 'run'
+    SNAP    = 'snap'
+    VERSION = 'version'
+    CREATED = 'created'
+    DIR_SRC = 'directory'
+    VALID   = 'valid'
+    TARGET  = 'target'
+
+SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
+SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
+
+
+
 
 
 
