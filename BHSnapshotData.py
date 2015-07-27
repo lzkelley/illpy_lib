@@ -3,22 +3,22 @@ Collect snapshot/particle data for merger BHs.
 
 Objects
 -------
-    BH_SNAP
-    TAGS
+    BH_SNAP                   : enum class for keys to BH Snapshot data dictionary.
+    TAGS                      : enum class for mediating MPI communication of processor status.
 
 Functions
 ---------
-    main
-    loadBHSnapshotData
+    main                      : Create master and many slave processes to extract BH snapshot data.
+    loadBHSnapshotData        : Load existing BH Snapshot data save file, or recreate it (slow).
 
-    _runMaster
-    _runSlave
-    _loadSingleSnapshotBHs
-    _mergeBHSnapshotFiles
-    _initStorage
-    _parseArguments
-    _mpiError
-    _loadLogger
+    _runMaster                : Distribute snapshots to individual slave tasks for loading.
+    _runSlave                 : Receive tasks from master process, and load BH Snapshot data.
+    _loadSingleSnapshotBHs    : Load the data for BHs in a single snapshot, save to npz file.
+    _mergeBHSnapshotFiles     : Combine BH data from individual Snapshot save files.
+    _initStorage              : Initialize dictionary for BH Snapshot data.
+    _parseArguments           : Prepare argument parser and load command line arguments.
+    _mpiError                 : Raise an error through MPI and exit all processes.
+    _loadLogger               : Initialize a ``logging`` module logger for output.
 
 """
 
@@ -90,6 +90,9 @@ class TAGS():
 
 
 def main():
+    """
+    Create master and many slave processes to extract BH snapshot data.
+    """
 
     ## Initialize MPI Parameters
     #  -------------------------
@@ -99,6 +102,8 @@ def main():
     size = comm.size
     name = MPI.Get_processor_name()
     stat = MPI.Status()
+
+    if( size <= 1 ): raise RuntimeError("Not setup for serial runs!")
 
     if( rank == 0 ):
         NAME = sys.argv[0]
@@ -130,7 +135,7 @@ def main():
 
         try:
             logger.critical("Running Master")
-            _runMaster(run, comm, logger, verbose=verbose)
+            _runMaster(run, comm, logger)
         except Exception as err:
             _mpiError(comm, logger, err)
 
@@ -159,24 +164,45 @@ def main():
 
 def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=None):
     """
+    Load an existing BH Snapshot data save file, or attempt to recreate it (slow!).
+
+    If the data is recreated (using ``_mergeBHSnapshotFiles``), it will be saved to an npz file.
+    
+    Arguments
+    ---------
+        run      <int>  : 
+
+        version  <flt>  :
+        loadsave <bool> :
+        verbose  <bool> :
+        logger   <obj>  : 
+
+    Returns
+    -------
+        data     <dict> : dictionary of BH Snapshot data
 
     """
-
+    
+    ## Create default logger if needed
+    #  -------------------------------
     if( logger is None ): 
+        # Set default logging level
         if( verbose ): level = logging.INFO
         else:          level = logging.WARNING
         logger = zio.getLogger(None, strLevel=level, tostr=True)
-        logger.propagate = False
 
     logger.critical("BHSnapshotData.loadBHSnapshotData()")
     if( version is None ): version = _VERSION
 
     oldVers = False
+    # Warn if attempting to use an old version number
     if( version != _VERSION ):
         oldVers = True
         logger.warning("WARNING: loading v%.2f behind current v%.2f" % (version, _VERSION))
 
+    # Get save filename
     fname = GET_BH_SNAPSHOT_FILENAME(run, version=version)
+
 
     ## Load Existing File
     #  ------------------
@@ -187,6 +213,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=No
         else:
             logger.warning("WARNING: '%s' does not exist!  Recreating!" % ( fname ))
             loadsave = False
+
 
     ## Recreate data (Merge individual snapshot files)
     #  -----------------------------------------------
@@ -214,12 +241,19 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=No
 # loadBHSnapshotData()
 
 
-def _runMaster(run, comm, logger, verbose=False):
+def _runMaster(run, comm, logger):
     """
-    Run master process which manages all of the secondary ``slave`` processes.
+    Distribute snapshots and associated mergers to individual slave tasks for loading.
 
-    Details
-    -------
+    Loads ``BHMergers`` and distributes them, based on snapshot, to slave processes run by the
+    ``_runSlave`` method.  A status file is created to track progress.  Once all snapshots are
+    distributed, this method directs the termination of all of the slave processes.
+
+    Arguments
+    ---------
+        run     <int>  : illustris simulation number {1,3}
+        comm    <obj>  : MPI intracommunicator object
+        logger  <obj>  : ``logging`` logger object
 
     """
 
@@ -230,14 +264,13 @@ def _runMaster(run, comm, logger, verbose=False):
     logger.critical("BHSnapshotData._runMaster()")
     logger.debug("Rank %d/%d" % (rank, size))
 
-    # Create output directory
-    #    don't let slave processes create it - makes conflicts
+    # Make sure output directory exists
     fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, 0)
     zio.checkPath(fname)
 
     ## Load BH Mergers
     logger.info("Loading BH Mergers")
-    mergers = BHMergers.loadFixedMergers(run, loadsave=True, verbose=verbose)
+    mergers = BHMergers.loadFixedMergers(run, loadsave=True, verbose=False)
     numMergers = mergers[MERGERS.NUM]
     logger.info("- Loaded %d mergers" % (numMergers))
 
@@ -255,13 +288,14 @@ def _runMaster(run, comm, logger, verbose=False):
     count = 0
     times = np.zeros(NUM_SNAPS-1)
 
-    # Go over snapshots in random order to get a better estimate of ETA/duration
+    ## Iterate Over Snapshots
+    #  ======================
+    #     Go over snapshots in random order to get a better estimate of ETA/duration
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
     logger.critical("Iterating over snapshots")
     pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snapNum in snapList:
-
         logger.debug("- Snap %d, count %d, done %d" % (snapNum, count, countDone))
 
         # Get Mergers occuring just after Snapshot `snapNum`
@@ -287,13 +321,12 @@ def _runMaster(run, comm, logger, verbose=False):
             num_new += new
             countDone += 1
 
-
         # Distribute tasks
         logger.debug("- Sending new task to %d" % (src))
         comm.send([snapNum, mrgs, targetIDs, numMergers], dest=src, tag=TAGS.START)
         logger.debug("- New task sent")
 
-        # Write status to file
+        # Write status to file and log
         dur = (datetime.now()-beg)
         fracDone = 1.0*countDone/(NUM_SNAPS-1)
         statStr = 'Snap %3d (rank %03d)   %8d/%8d = %.4f  in %s  %8d pos  %8d neg  %3d new\n' % \
@@ -304,7 +337,7 @@ def _runMaster(run, comm, logger, verbose=False):
         count += 1
         pbar.update(count)
 
-    # snapNum
+    # } snapNum
 
     statFile.write('\n\nDone after %s' % (str(datetime.now()-beg)))
     statFile.close()
@@ -312,7 +345,6 @@ def _runMaster(run, comm, logger, verbose=False):
 
     ## Close out all Processes
     #  =======================
-
     numActive = size-1
     logger.critical("Exiting %d active processes" % (numActive))
     while( numActive > 0 ):
@@ -357,18 +389,23 @@ def _runMaster(run, comm, logger, verbose=False):
 
 def _runSlave(run, comm, logger, loadsave=True):
     """
+    Receive snapshots and associatd mergers from the master process.  Loads BH Snapshot data.
+
+    This method receives task parameters from the ``_runMaster`` process, and uses the
+    ``_loadSingleSnapshotBHs`` method to load and save individual snapshot data.  Once this method
+    receives the exit signal, it terminates.
 
     Arguments
     ---------
-       run      <int>       : illustris simulation run number {1,3}
-       comm     <...>       : MPI intracommunicator object (e.g. ``MPI.COMM_WORLD``)
+       run      <int>  : illustris simulation run number {1,3}
+       comm     <obj>  : MPI intracommunicator object (e.g. ``MPI.COMM_WORLD``)
+       logger   <obj>  : ``logging`` logger object
 
-       loadsave <bool>      : optional, load data for this subhalo if it already exists
+       loadsave <bool> : load data for this subhalo if it already exists
 
     Details
     -------
      - Waits for ``master`` process to send subhalo numbers
-
      - Returns status to ``master``
 
     """
@@ -400,6 +437,7 @@ def _runSlave(run, comm, logger, loadsave=True):
             logger.debug("- Starting snapshot %d" % (snap))
             beg = datetime.now()
 
+            # Load and save snapshot
             data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, idxs, bhids, 
                                                          logger, rank=rank, loadsave=loadsave)
 
@@ -433,6 +471,25 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
     If no indices (``idxs``) or BH IDs (``bhids``) are given, or this is a 'bad' snapshot,
     then it isn't actually loaded and processed.  An NPZ file with all zero entries is still
     produced.
+
+    Arguments
+    ---------
+        run        <int>      : illustris simulation number {1,3}
+        snapNum    <int>      : illustris snapshot number   {1,135}
+        numMergers <int>      : total number of mergers
+        idxs       <int>[N]   : merger indices for this snapshot with ``N`` mergers
+        bhids      <int>[N,2] : BH ID numbers, ``IN`` and ``OUT`` BH for each merger
+        logger     <obj>      : ``logging`` logger object
+
+        rank       <int>      : rank of this processor (used for logging)
+        loadsave   <bool>     : load existing save if it exists
+
+    Returns
+    -------
+        data       <dict>     : dictionary of data for this snapshot
+        pos        <int>      : number of BHs successfully found
+        neg        <int>      : number of BHs failed to be found
+        new        <int>      : `+1` if a new file was created, otherwise `0`
 
     """
     
@@ -543,13 +600,29 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
 
 def _mergeBHSnapshotFiles(run, logger):
     """
+    Combine valid BH data from individual BH Snapshot save files into a single dictionary.
+
+    Individual snapshot files are loaded using ``_loadSingleSnapshotBHs``.  If a file is missing,
+    it will be created.  If this is happenening on a single processor, it will be very slow.
+
+    Arguments
+    ---------
+        run    <int> : illustris run number {1,3}
+        logger <obj> : ``logging`` logger object
+
+    Returns
+    -------
+        allData <obj> : dictionary of all BH Snapshot data
 
     """
 
     logger.critical("BHSnapshotData._mergeBHSnapshotFiles()")
 
+    # Randomize order of snapshots
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
+
+    # Initialize variables
     count = 0
     newFiles = 0
     oldFiles = 0
@@ -560,12 +633,15 @@ def _mergeBHSnapshotFiles(run, logger):
 
 
     ## Load BH Mergers
+    #  ---------------
     logger.info("Loading BH Mergers")
     mergers = BHMergers.loadFixedMergers(run, loadsave=True)
     numMergers = mergers[MERGERS.NUM]
     logger.debug("Loaded %d mergers" % (numMergers))
 
+    # Initialize storage
     allData = _initStorage(numMergers)
+
 
     ## Load each snapshot file
     #  -----------------------
@@ -574,6 +650,7 @@ def _mergeBHSnapshotFiles(run, logger):
     pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snap in snapList:
 
+        # Get mergers for just after this snapshot (hence '+1')
         mrgs = mergers[MERGERS.MAP_STOM][snap+1]
         nums = len(mrgs)
         targetIDs = mergers[MERGERS.IDS][mrgs]
@@ -585,7 +662,7 @@ def _mergeBHSnapshotFiles(run, logger):
                                                      loadsave=True)
         logger.debug("- - pos %d, neg %d, new %d" % (pos, neg, new))
 
-        ## Store to global dictionary
+        ## Store to dictionary
         valids     = data[BH_SNAP.VALID]
         numValid   = np.count_nonzero(valids)
         numTargets = np.count_nonzero(data[BH_SNAP.TARGET] > 0)
@@ -596,6 +673,8 @@ def _mergeBHSnapshotFiles(run, logger):
         for key in SNAPSHOT_FIELDS:
             allData[key][valids] = data[key][valids]
 
+
+        ## Collect and log data
         if( new == 1 ):
             newFiles += 1
             logger.debug("- - New")
@@ -609,6 +688,7 @@ def _mergeBHSnapshotFiles(run, logger):
             logger.debug("- - - pos %d, expected %d, neg %d" % (pos, nums, neg))
             logger.debug("- - - Targets %d, Valid %d" % (numTargets, numValid))
 
+        # Increment tracking data
         num_pos += pos
         num_neg += neg
         num_val += numValid
@@ -634,6 +714,9 @@ def _mergeBHSnapshotFiles(run, logger):
 
 
 def _initStorage(numMergers):
+    """
+    Initialize dictionary for BH Snapshot data.
+    """
     data = {}
     for key,typ in zip(SNAPSHOT_FIELDS, SNAPSHOT_DTYPES):
         data[key] = np.zeros([numMergers, 2], dtype=np.dtype(typ))
@@ -643,12 +726,13 @@ def _initStorage(numMergers):
 
     return data
 
+# _initStorage()
+
 
 def _parseArguments():
     """
     Prepare argument parser and load command line arguments.
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='%s %.2f' % (sys.argv[0], _VERSION))
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -660,7 +744,6 @@ def _parseArguments():
     return args
 
 # _parseArguments()
-
 
 
 def _mpiError(comm, logger, err="ERROR"):
@@ -684,20 +767,22 @@ def _mpiError(comm, logger, err="ERROR"):
 
 
 def _loadLogger(rank, verbose):
+    """
+    Initialize a ``logging`` module logger for output.
+    """
 
-    ## Init Logger
+    # Get logger and log-file names
     name = "logger_%03d" % (rank)
     logFile = _GET_LOG_NAME(rank)
 
-    if( verbose ): strLevel = logging.INFO
-    else:          strLevel = logging.WARNING
+    # Determine verbosity level
+    if( verbose ): strLvl = logging.INFO
+    else:          strLvl = logging.WARNING
+    fileLvl = logging.DEBUG
 
-    fileLevel = logging.DEBUG
-
-    if( rank == 0 ):
-        logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLevel, strLevel=strLevel)
-    else:
-        logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLevel, tostr=False)
+    # Create logger
+    if(rank == 0): logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLvl, strLevel=strLvl)
+    else:          logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLvl, tostr=False)
 
     return logger
 
