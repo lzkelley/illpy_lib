@@ -1,9 +1,10 @@
 """
 Collect snapshot/particle data for merger BHs.
 
+Run with something like `mpirun -n 4 python -m illpy.illbh.BHSnapshotData --verbose`
+
 Objects
 -------
-    BH_SNAP                   : enum class for keys to BH Snapshot data dictionary.
     TAGS                      : enum class for mediating MPI communication of processor status.
 
 Functions
@@ -30,18 +31,17 @@ import os, sys, logging, argparse
 
 from mpi4py import MPI
 
-from illpy.Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, DTYPE, \
-    GET_BAD_SNAPS
-from illpy.illbh import BHMergers
-from illpy.illbh.BHConstants import MERGERS, BH_TYPE
+from ..Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, DTYPE, GET_BAD_SNAPS
+import BHMergers
+from BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
-import Settings
 import illustris_python as ill
 
 import zcode.InOut as zio
 
-
+DEF_RUN = 1
 _VERSION = 0.4
+
 
 
 def _GET_BH_SNAPSHOT_DIR(run):
@@ -67,19 +67,6 @@ _STATUS_FILENAME = 'stat_BHSnapshotData_ill%d_v%.2f.txt'
 def _GET_STATUS_FILENAME(run):
     return _LOG_DIR + _STATUS_FILENAME % (run, _VERSION)
 
-
-
-class BH_SNAP():
-    RUN     = 'run'
-    SNAP    = 'snap'
-    VERSION = 'version'
-    CREATED = 'created'
-    DIR_SRC = 'directory'
-    VALID   = 'valid'
-    TARGET  = 'target'
-
-SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
-SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
 
 class TAGS():
@@ -108,7 +95,10 @@ def main():
     if( rank == 0 ):
         NAME = sys.argv[0]
         print "\n%s\n%s\n%s" % (NAME, '='*len(NAME), str(datetime.now()))
+        zio.checkPath(_LOG_DIR)
 
+    # Make sure log-path is setup before continuing
+    comm.Barrier()
 
     ## Parse Arguments
     #  ---------------
@@ -187,7 +177,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=No
     #  -------------------------------
     if( logger is None ): 
         # Set default logging level
-        if( verbose ): level = logging.INFO
+        if( verbose ): level = logging.DEBUG
         else:          level = logging.WARNING
         logger = zio.getLogger(None, strLevel=level, tostr=True)
 
@@ -736,9 +726,9 @@ def _parseArguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='%s %.2f' % (sys.argv[0], _VERSION))
     parser.add_argument('-v', '--verbose', action='store_true',
-                        help='Verbose output', default=Settings.VERBOSE)
+                        help='Verbose output', default=False)
     parser.add_argument("run", type=int, nargs='?', choices=[1, 2, 3],
-                        help="illustris simulation number", default=Settings.RUN_NUM)
+                        help="illustris simulation number", default=DEF_RUN)
     args = parser.parse_args()
 
     return args
@@ -774,6 +764,8 @@ def _loadLogger(rank, verbose):
     # Get logger and log-file names
     name = "logger_%03d" % (rank)
     logFile = _GET_LOG_NAME(rank)
+    # Make sure directory exists
+    zio.checkPath(logFile)
 
     # Determine verbosity level
     if( verbose ): strLvl = logging.INFO
