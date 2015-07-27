@@ -3,9 +3,9 @@ Collect snapshot/particle data for merger BHs.
 
 Objects
 -------
-    SNAP
+    BH_SNAP
     TAGS
-    
+
 Functions
 ---------
     main
@@ -18,6 +18,7 @@ Functions
     _initStorage
     _parseArguments
     _mpiError
+    _loadLogger
 
 """
 
@@ -25,8 +26,7 @@ import numpy as np
 import scipy as sp
 from datetime import datetime
 from enum import Enum
-import os, sys
-import argparse
+import os, sys, logging, argparse
 
 from mpi4py import MPI
 
@@ -36,15 +36,12 @@ from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 
 import Settings
-
 import illustris_python as ill
 
-import zcode
 import zcode.InOut as zio
 
 
 _VERSION = 0.4
-DEBUG = False
 
 
 def _GET_BH_SNAPSHOT_DIR(run):
@@ -59,13 +56,20 @@ def GET_BH_SNAPSHOT_FILENAME(run, version=_VERSION):
     return _GET_BH_SNAPSHOT_DIR(run) + _BH_SNAPSHOT_FILENAME.format(run,version)
 
 
+_LOG_DIR = "./logs/"
+def _GET_LOG_NAME(rank=0, version=_VERSION):
+    if( rank == 0 ): name = _LOG_DIR + "BHSnapshotData_v%.2f.log" % (version)
+    else:            name = _LOG_DIR + "BHSnapshotData_%03d_v%.2f.log" % (rank, version)
+    return name
+
+
 _STATUS_FILENAME = 'stat_BHSnapshotData_ill%d_v%.2f.txt'
 def _GET_STATUS_FILENAME(run):
-    return _STATUS_FILENAME % (run, _VERSION)
+    return _LOG_DIR + _STATUS_FILENAME % (run, _VERSION)
 
 
 
-class SNAP():
+class BH_SNAP():
     RUN     = 'run'
     SNAP    = 'snap'
     VERSION = 'version'
@@ -77,13 +81,12 @@ class SNAP():
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
+
 class TAGS():
     READY = 0
     START = 1
     DONE  = 2
     EXIT  = 3
-
-
 
 
 def main():
@@ -107,84 +110,111 @@ def main():
     args    = _parseArguments()
     run     = args.run
     verbose = args.verbose
-    debug   = args.debug
+
+    # Load logger
+    logger = _loadLogger(rank, verbose)
+
+    logger.info("run           = %d  " % (run)     )
+    logger.info("version       = %.2f" % (_VERSION))
+    logger.info("MPI comm size = %d  " % (size)    )
+    logger.info("Rank          = %d  " % (rank)    )
+    logger.info("")
+    logger.info("verbose       = %s  " % (str(verbose)))
+    logger.info("")
+
 
     ## Master Process
     #  --------------
     if( rank == 0 ):
-        print "run           = %d  " % (run)
-        print "version       = %.2f" % (_VERSION)
-        print "MPI comm size = %d  " % (size)
-        print ""
-        print "verbose       = %s  " % (str(verbose))
-        print "debug         = %s  " % (str(verbose))
-        print ""
         beg_all = datetime.now()
 
-        try: 
-            _runMaster(run, comm, debug=debug)
+        try:
+            logger.critical("Running Master")
+            _runMaster(run, comm, logger, verbose=verbose)
         except Exception as err:
-            _mpiError(comm, err)
+            _mpiError(comm, logger, err)
 
         end_all = datetime.now()
-        print " - - Total Duration '%s'" % (str(end_all-beg_all))
+        logger.warning("Done after '%s'" % (str(end_all-beg_all)))
 
-        if( verbose ): print " - - - Merging Files"
-        # allData = _mergeBHSnapshotFiles(run, verbose=verbose)
-        allData = loadBHSnapshotData(run, loadsave=False, verbose=verbose, debug=debug)
+        logger.critical("Merging snapshots")
+        allData = loadBHSnapshotData(run, logger=logger, loadsave=False)
 
     ## Slave Processes
     #  ---------------
     else:
 
-        try:    
-            _runSlave(run, comm, debug=debug)
+        try:
+            logger.critical("Running slave")
+            _runSlave(run, comm, logger)
         except Exception as err:
-            _mpiError(comm, err)
+            _mpiError(comm, logger, err)
 
-            
-    return 
+        logger.critical("Done.")
+
+    return
 
 # main()
 
 
-def loadBHSnapshotData(run, loadsave=True, verbose=True, debug=False):
+def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=None):
+    """
 
-    if( verbose ): print " - - BHSnapshotData.loadBHSnapshotData()"
+    """
 
-    fname = GET_BH_SNAPSHOT_FILENAME(run)
+    if( logger is None ): 
+        if( verbose ): level = logging.INFO
+        else:          level = logging.WARNING
+        logger = zio.getLogger(None, strLevel=level, tostr=True)
+        logger.propagate = False
+
+    logger.critical("BHSnapshotData.loadBHSnapshotData()")
+    if( version is None ): version = _VERSION
+
+    oldVers = False
+    if( version != _VERSION ):
+        oldVers = True
+        logger.warning("WARNING: loading v%.2f behind current v%.2f" % (version, _VERSION))
+
+    fname = GET_BH_SNAPSHOT_FILENAME(run, version=version)
 
     ## Load Existing File
     #  ------------------
-    if( loadsave ): 
-        if( verbose ): print " - - - Loading from '%s'" % (fname)
+    if( loadsave ):
+        logger.info("Loading from '%s'" % (fname))
         if( os.path.exists(fname) ):
             data = zio.npzToDict(fname)
         else:
-            print "WARNING: '%s' does not exist!  Recreating!" % ( fname )
+            logger.warning("WARNING: '%s' does not exist!  Recreating!" % ( fname ))
             loadsave = False
 
     ## Recreate data (Merge individual snapshot files)
     #  -----------------------------------------------
-    else:
-        if( verbose ): print " - - - Recreating '%s'" % (fname)
-        data = _mergeBHSnapshotFiles(run, verbose=verbose, debug=debug)
-        
+    if( not loadsave ):
+        logger.info("Recreating '%s'" % (fname))
+
+        # Dont allow old versions to be recreated
+        if( oldVers ): raise RuntimeError("Cannot recreate outdated version %.2f!!" % (version))
+
+        data = _mergeBHSnapshotFiles(run, logger)
+
         # Add Metadata
-        data[SNAP.RUN] = run
-        data[SNAP.VERSION] = _VERSION
-        data[SNAP.CREATED] = datetime.now().ctime()
+        logger.debug("Adding metadata")
+        data[BH_SNAP.RUN] = run
+        data[BH_SNAP.VERSION] = _VERSION
+        data[BH_SNAP.CREATED] = datetime.now().ctime()
 
         # Save
-        zio.dictToNPZ(data, fname, verbose=verbose)
-
+        logger.debug("Saving")
+        zio.dictToNPZ(data, fname)
+        logger.info("Saved to '%s'" % (fname))
 
     return data
 
 # loadBHSnapshotData()
 
 
-def _runMaster(run, comm, verbose=True, debug=False):
+def _runMaster(run, comm, logger, verbose=False):
     """
     Run master process which manages all of the secondary ``slave`` processes.
 
@@ -197,7 +227,8 @@ def _runMaster(run, comm, verbose=True, debug=False):
     rank = comm.rank
     size = comm.size
 
-    if( verbose ): print " - Initializing"
+    logger.critical("BHSnapshotData._runMaster()")
+    logger.debug("Rank %d/%d" % (rank, size))
 
     # Create output directory
     #    don't let slave processes create it - makes conflicts
@@ -205,15 +236,15 @@ def _runMaster(run, comm, verbose=True, debug=False):
     zio.checkPath(fname)
 
     ## Load BH Mergers
-    if( verbose ): print " - - - Loading BH Mergers"
-    mergers = BHMergers.loadFixedMergers(run, verbose=verbose, loadsave=True)
+    logger.info("Loading BH Mergers")
+    mergers = BHMergers.loadFixedMergers(run, loadsave=True, verbose=verbose)
     numMergers = mergers[MERGERS.NUM]
-    if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
+    logger.info("- Loaded %d mergers" % (numMergers))
 
     ## Init status file
     statFileName = _GET_STATUS_FILENAME(run)
     statFile = open(statFileName, 'w')
-    print " - - - Opened status file '%s'" % (statFileName)
+    logger.info("Opened status file '%s'" % (statFileName))
     statFile.write('%s\n' % (str(datetime.now())))
     beg = datetime.now()
 
@@ -227,25 +258,28 @@ def _runMaster(run, comm, verbose=True, debug=False):
     # Go over snapshots in random order to get a better estimate of ETA/duration
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
-    if( verbose ): print " - - - Iterating over snapshots"
-    if( verbose and not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
+    logger.critical("Iterating over snapshots")
+    pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snapNum in snapList:
-        
+
+        logger.debug("- Snap %d, count %d, done %d" % (snapNum, count, countDone))
+
         # Get Mergers occuring just after Snapshot `snapNum`
         mrgs = mergers[MERGERS.MAP_STOM][snapNum+1]
         nums = len(mrgs)
         targetIDs = mergers[MERGERS.IDS][mrgs]
-
-        # if( len(subs) <= 0 ): continue
+        logger.debug("- %d Mergers from snapshot %d" % (nums, snapNum+1))
 
         # Look for available slave process
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
         src = stat.Get_source()
         tag = stat.Get_tag()
+        logger.debug("- Received signal from %d" % (src))
 
         # Track number of completed profiles
-        if( tag == TAGS.DONE ): 
+        if( tag == TAGS.DONE ):
             durat, pos, neg, new = data
+            logger.debug("- - Done after %s, pos %d, neg %d, new %d" % (durat, pos, neg, new))
 
             times[countDone] = durat
             num_pos += pos
@@ -255,7 +289,9 @@ def _runMaster(run, comm, verbose=True, debug=False):
 
 
         # Distribute tasks
+        logger.debug("- Sending new task to %d" % (src))
         comm.send([snapNum, mrgs, targetIDs, numMergers], dest=src, tag=TAGS.START)
+        logger.debug("- New task sent")
 
         # Write status to file
         dur = (datetime.now()-beg)
@@ -264,33 +300,37 @@ def _runMaster(run, comm, verbose=True, debug=False):
             (snapNum, src, countDone, NUM_SNAPS-1, fracDone, str(dur), num_pos, num_neg, num_new)
         statFile.write(statStr)
         statFile.flush()
+        logger.debug(statStr)
         count += 1
-        if( verbose and not debug ): pbar.update(count)
+        pbar.update(count)
 
     # snapNum
 
     statFile.write('\n\nDone after %s' % (str(datetime.now()-beg)))
     statFile.close()
-    if( verbose and not debug ): pbar.finish()
+    pbar.finish()
 
     ## Close out all Processes
     #  =======================
 
     numActive = size-1
-    print " - Exiting %d active processes" % (numActive)
+    logger.critical("Exiting %d active processes" % (numActive))
     while( numActive > 0 ):
-        
+
         # Find available slave process
         data = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=stat)
         src = stat.Get_source()
         tag = stat.Get_tag()
+        logger.debug("- Received signal from %d" % (src))
 
         # If we're recieving exit confirmation, count it
         if( tag == TAGS.EXIT ): numActive -= 1
         else:
             # If a process just completed, count it
-            if( tag == TAGS.DONE ): 
+            if( tag == TAGS.DONE ):
                 durat, pos, neg, new = data
+                logger.debug("- - %d Done after %s, pos %d, neg %d, new %d" % 
+                             (src, durat, pos, neg, new))
                 times[countDone] = durat
                 countDone += 1
                 num_pos += pos
@@ -298,23 +338,24 @@ def _runMaster(run, comm, verbose=True, debug=False):
                 num_new += new
 
             # Send exit command
+            logger.debug("Sending exit to %d.  %d Active." % (src, numActive))
             comm.send(None, dest=src, tag=TAGS.EXIT)
 
     # } while
 
     fracDone = 1.0*countDone/(NUM_SNAPS-1)
-    print " - - %d/%d = %.4f Completed tasks!" % (countDone, NUM_SNAPS-1, fracDone)
-    print " - - Average time %.4f +- %.4f" % (np.average(times), np.std(times))
-    print " - - Totals: pos = %5d   neg = %5d   new = %3d" % (num_pos, num_neg, num_new)
+    logger.info("%d/%d = %.4f Completed tasks!" % (countDone, NUM_SNAPS-1, fracDone))
+    logger.info("Average time %.4f +- %.4f" % (np.average(times), np.std(times)))
+    logger.warning("Totals: pos = %5d   neg = %5d   new = %3d" % (num_pos, num_neg, num_new))
 
     return
-    
+
 # _runMaster()
 
 
 
 
-def _runSlave(run, comm, loadsave=True, debug=False):
+def _runSlave(run, comm, logger, loadsave=True):
     """
 
     Arguments
@@ -335,54 +376,57 @@ def _runSlave(run, comm, loadsave=True, debug=False):
     stat = MPI.Status()
     rank = comm.rank
     size = comm.size
+    numReady = 0
 
     data = {}
     first = True
 
-    if( debug ): print "%d : BHSnapshotData._runSlave()" % (rank)
+    logger.warning("BHSnapshotData._runSlave()")
+    logger.info("Rank %d/%d" % (rank, size))
 
     # Keep looking for tasks until told to exit
     while True:
         # Tell Master this process is ready
-        if( debug ): print "%d : sending ready" % (rank)
+        logger.debug("Sending ready %d" % (numReady))
         comm.send(None, dest=0, tag=TAGS.READY)
         # Receive ``task`` ([snap,idxs,bhids,numMergers])
         task = comm.recv(source=0, tag=MPI.ANY_TAG, status=stat)
         tag = stat.Get_tag()
-        if( debug ): print "%d : received tag %d" % (rank, tag)
+        logger.debug("- Received tag %d" % (tag))
 
         if( tag == TAGS.START ):
             # Extract parameters
             snap, idxs, bhids, numMergers = task
-            if( debug ): print "%d : starting snapshot %d" % (rank, snap)
+            logger.debug("- Starting snapshot %d" % (snap))
             beg = datetime.now()
 
             data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, idxs, bhids, 
-                                                   rank=rank, loadsave=loadsave, debug=debug)
-
-
+                                                         logger, rank=rank, loadsave=loadsave)
 
             end = datetime.now()
             durat = (end-beg).total_seconds()
-            if( debug ): print "%d : sending done after %f" % (rank, durat)
+            logger.debug("- Done after %f,  pos %d, neg %d, new %d" % (durat, pos, neg, new))
             comm.send([durat,pos,neg,new], dest=0, tag=TAGS.DONE)
         elif( tag == TAGS.EXIT  ):
-            if( debug ): print "%d : received exit" % (rank)
+            logger.debug("- Received Exit.")
             break
 
+        numReady += 1
+
+    # } while True
 
     # Finish, return done
-    if( debug ): print "%d : sending exit" % (rank)
+    logger.warning("Sending Exit.")
     comm.send(None, dest=0, tag=TAGS.EXIT)
 
     return
-    
+
 # _runSlave()
 
 
 
-def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids, 
-                           rank=0, loadsave=True, debug=False):
+def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
+                           logger, rank=0, loadsave=True):
     """
     Load the data for BHs in a single snapshot, save to npz file.
 
@@ -391,9 +435,12 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
     produced.
 
     """
+    
+    logger.warning("BHSnapshotData._loadSingleSnapshotBHs()")
+
     illdir = GET_ILLUSTRIS_OUTPUT_DIR(run)
     fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snapNum)
-    if( debug ): print "%d : snap %d - filename '%s'" % (rank, snapNum, fname)
+    logger.warning("Snap %d, filename '%s'" % (snapNum, fname))
 
     pos = 0
     neg = 0
@@ -402,66 +449,67 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
     ## Load and Return existing save if desired
     #  ----------------------------------------
     if( loadsave and os.path.exists(fname) ):
-        if( debug ): print "%d : file exists for snap %d" % (rank, snapNum)
+        logger.warning("Loading existing file")
         data = zio.npzToDict(fname)
         return data, pos, neg, new
 
 
     ## Initialize dictionary of results
     #  --------------------------------
-    if( debug ): print "%d : initializing storage" % (rank)
+    logger.info("Initializing storage")
     data = _initStorage(numMergers)
     for index,tid in zip(idxs,bhids):
         for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
-            data[SNAP.TARGET][index,BH] = tid[BH]
+            data[BH_SNAP.TARGET][index,BH] = tid[BH]
 
 
     ## Decide if this is a valid Snapshot
     #  ----------------------------------
     process_snapshot = True
     # Some illustris-1 snapshots are bad
-    if( snapNum in GET_BAD_SNAPS(run) ): 
-        if( debug ): print "%d : skipping bad snapshot %d" % (rank, snapNum)
+    if( snapNum in GET_BAD_SNAPS(run) ):
+        logger.warning("Skipping bad snapshot.")
         process_snapshot = False
 
     # Make sure there are mergers in this snapshot
     if( len(idxs) <= 0 or len(bhids) <= 0 ):
-        if( debug ): print "%d : skipping snap %d with no valid BHs" % (rank, snapNum)
+        logger.warning("Skipping snap %d with no valid BHs" % (snapNum))
         process_snapshot = False
 
 
     ## Load And Process Snapshot if its good
     #  =====================================
     if( process_snapshot ):
+        logger.info("Processing Snapshot")
 
         ## Load Snapshot
         #  -------------
-        if( debug ): print "%d : loading snapshot %d" % (rank, snapNum)
+        logger.debug("- Loading snapshot %d" % (snapNum))
         with zio.StreamCapture() as output:
             snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
 
         snap_keys = snapshot.keys()
-        if( 'count' in snap_keys ): 
+        if( 'count' in snap_keys ):
             snap_keys.remove('count')
-            if( debug ): print "%d : Loaded %d particles" % (rank, snapshot['count'])
+            logger.debug("- - Loaded %d particles" % (snapshot['count']))
 
         # Make sure all target keys are present
         union = list(set(snap_keys) & set(SNAPSHOT_FIELDS))
         if( len(union) != len(SNAPSHOT_FIELDS) ):
-            print ""
-            print "%d: snap_keys       = " % (rank), snap_keys
-            print "%d: SNAPSHOT_FIELDS = " % (rank), SNAPSHOT_FIELDS
-            raise RuntimeError("Rank %d, Snap %d : fields mismatch!" % (rank, snapNum))
+            logger.error("snap_keys       = '%s'" % (str(snap_keys)))
+            logger.error("SNAPSHOT_FIELDS = '%s'" % (str(SNAPSHOT_FIELDS)))
+            _mpiError(comm, logger, err="Field mismatch at Rank %d, Snap %d!" % (rank, snapNum))
+
 
         ## Match target BHs
         #  ----------------
-        if( debug ): print "%d : matching %d BH Mergers" % (rank, len(bhids))
+        logger.debug("- Matching %d BH Mergers" % (len(bhids)))
         for index,tid in zip(idxs,bhids):
             for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
                 ind = np.where( snapshot['ParticleIDs'] == tid[BH] )[0]
                 if( len(ind) == 1 ):
                     pos += 1
-                    data[SNAP.VALID][index,BH] = True
+                    data[BH_SNAP.VALID][index,BH] = True
                     for key in SNAPSHOT_FIELDS: data[key][index,BH] = snapshot[key][ind[0]]
                 else:
                     neg += 1
@@ -469,22 +517,22 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
             # BH
         # index, tid
 
-        if( debug ): print "%d : pos %d, neg %d" % (rank, pos, neg)
+        logger.debug("- Processed, pos %d, neg %d" % (pos, neg))
 
     # } if( process_snapshot )
 
 
     ## Add Metadata and Save File
     #  ==========================
-    data[SNAP.RUN]     = run
-    data[SNAP.SNAP]    = snapNum
-    #data[SNAP.VALID]   = valid
-    #data[SNAP.TARGET]  = targets
-    data[SNAP.VERSION] = _VERSION
-    data[SNAP.CREATED] = datetime.now().ctime()
-    data[SNAP.DIR_SRC] = illdir
+    logger.debug("Adding metadata to dictionary")
+    data[BH_SNAP.RUN]     = run
+    data[BH_SNAP.SNAP]    = snapNum
+    data[BH_SNAP.VERSION] = _VERSION
+    data[BH_SNAP.CREATED] = datetime.now().ctime()
+    data[BH_SNAP.DIR_SRC] = illdir
 
-    zio.dictToNPZ(data, fname, verbose=debug)
+    logger.info("Saving data to '%s'" % (fname))
+    zio.dictToNPZ(data, fname)
     new = 1
 
     return data, pos, neg, new
@@ -493,9 +541,12 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
 
 
 
-def _mergeBHSnapshotFiles(run, verbose=True, debug=False):
+def _mergeBHSnapshotFiles(run, logger):
+    """
 
-    if( verbose ): print " - - BHSnapshotData._mergeBHSnapshotFiles()"
+    """
+
+    logger.critical("BHSnapshotData._mergeBHSnapshotFiles()")
 
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
@@ -509,73 +560,72 @@ def _mergeBHSnapshotFiles(run, verbose=True, debug=False):
 
 
     ## Load BH Mergers
-    if( verbose ): print " - - - Loading BH Mergers"
-    mergers = BHMergers.loadFixedMergers(run, verbose=verbose, loadsave=True)
+    logger.info("Loading BH Mergers")
+    mergers = BHMergers.loadFixedMergers(run, loadsave=True)
     numMergers = mergers[MERGERS.NUM]
-    if( verbose ): print " - - - - Loaded %d mergers" % (numMergers)
+    logger.debug("Loaded %d mergers" % (numMergers))
 
-    allData = _initStorage(numMergers)    
+    allData = _initStorage(numMergers)
 
     ## Load each snapshot file
     #  -----------------------
-    if( verbose ): print " - - - Iterating over snapshots"
+    logger.warning("Iterating over snapshots")
     beg = datetime.now()
-    if( verbose and not debug ): pbar = zio.getProgressBar(NUM_SNAPS-1)
+    pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snap in snapList:
 
         mrgs = mergers[MERGERS.MAP_STOM][snap+1]
         nums = len(mrgs)
         targetIDs = mergers[MERGERS.IDS][mrgs]
+        logger.debug("- Snap %d, Count %d.  %d Mergers" % (snap, count, nums))
 
         ## Load Snapshot Data
-        data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, mrgs, targetIDs,
-                                                     loadsave=True, debug=debug)
-        
+        logger.debug("- Loading single snapshot")
+        data, pos, neg, new = _loadSingleSnapshotBHs(run, snap, numMergers, mrgs, targetIDs, logger,
+                                                     loadsave=True)
+        logger.debug("- - pos %d, neg %d, new %d" % (pos, neg, new))
+
         ## Store to global dictionary
-        valids = data[SNAP.VALID]
+        valids     = data[BH_SNAP.VALID]
         numValid   = np.count_nonzero(valids)
-        numTargets = np.count_nonzero(data[SNAP.TARGET] > 0)
-        
+        numTargets = np.count_nonzero(data[BH_SNAP.TARGET] > 0)
+
         # Copy valid elements
-        allData[SNAP.TARGET][valids] = data[SNAP.TARGET][valids]
-        allData[SNAP.VALID][valids] = data[SNAP.VALID][valids]
+        allData[BH_SNAP.TARGET][valids] = data[BH_SNAP.TARGET][valids]
+        allData[BH_SNAP.VALID][valids] = data[BH_SNAP.VALID][valids]
         for key in SNAPSHOT_FIELDS:
             allData[key][valids] = data[key][valids]
 
-
-        if( new == 1 ): 
+        if( new == 1 ):
             newFiles += 1
-            if( verbose ): 
-                print " - - - Snap %d : new" % (snap)
-                print " - - - - pos %d, neg %d, (sum %d) expected %d" % (pos, neg, nums)
-                print " - - - - Targets %d, Valid %d" % (numTargets, numValid)
+            logger.debug("- - New")
+            logger.debug("- - - pos %d, neg %d, expected %d" % (pos, neg, pos+neg, nums))
+            logger.debug("- - - Targets %d, Valid %d" % (numTargets, numValid))
         else:
             oldFiles += 1
-            if( verbose ): 
-                pos = numValid
-                neg = 2*nums - pos
-                print " - - - Snap %d : new" % (snap)
-                print " - - - - pos %d, expected %d, neg %d" % (pos, nums, neg)
-                print " - - - - Targets %d, Valid %d" % (numTargets, numValid)
-        
+            pos = numValid
+            neg = 2*nums - pos
+            logger.debug("- - Old")
+            logger.debug("- - - pos %d, expected %d, neg %d" % (pos, nums, neg))
+            logger.debug("- - - Targets %d, Valid %d" % (numTargets, numValid))
+
         num_pos += pos
         num_neg += neg
         num_val += numValid
         num_tar += numTargets
         count += 1
-        if( verbose and not debug ): pbar.update(count)
+        pbar.update(count)
 
     # snap
 
-    if( verbose and not debug ): pbar.finish()
+    pbar.finish()
     end = datetime.now()
-    if( verbose ): 
-        print " - - - Done after %s" % (str(end-beg))
-        print " - - - - %d new, %d old.  Pos %d, Neg %d" % (newFiles, oldFiles, num_pos, num_neg)
-        print " - - - - Targets %d, Valid %d" % (num_tar, num_val)
-        numValid = np.count_nonzero(allData[SNAP.VALID])
-        print " - - - - %d/%d = %.4f valid" % (numValid, 2*numMergers, 0.5*numValid/numMergers)
 
+    logger.info("Done after %s" % (str(end-beg)))
+    logger.info("%d new, %d old.  Pos %d, Neg %d" % (newFiles, oldFiles, num_pos, num_neg))
+    logger.info("Targets %d, Valid %d" % (num_tar, num_val))
+    numValid = np.count_nonzero(allData[BH_SNAP.VALID])
+    logger.info("%d/%d = %.4f valid" % (numValid, 2*numMergers, 0.5*numValid/numMergers))
 
     return allData
 
@@ -588,8 +638,8 @@ def _initStorage(numMergers):
     for key,typ in zip(SNAPSHOT_FIELDS, SNAPSHOT_DTYPES):
         data[key] = np.zeros([numMergers, 2], dtype=np.dtype(typ))
 
-    data[SNAP.VALID]  = np.zeros([numMergers,2], dtype=bool)
-    data[SNAP.TARGET] = np.zeros([numMergers,2], dtype=DTYPE.ID)
+    data[BH_SNAP.VALID]  = np.zeros([numMergers,2], dtype=bool)
+    data[BH_SNAP.TARGET] = np.zeros([numMergers,2], dtype=DTYPE.ID)
 
     return data
 
@@ -601,28 +651,19 @@ def _parseArguments():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--version', action='version', version='%s %.2f' % (sys.argv[0], _VERSION))
-    parser.add_argument('-v', '--verbose', action='store_true', 
+    parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output', default=Settings.VERBOSE)
-    parser.add_argument('--debug', action='store_true', 
-                        help='Very verbose output', default=DEBUG)
-
-
-    '''
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--check",    dest='check',   action="store_true", default=CHECK_EXISTS)
-    group.add_argument("--no-check", dest='nocheck', action="store_true", default=(not CHECK_EXISTS))
-    '''
     parser.add_argument("run", type=int, nargs='?', choices=[1, 2, 3],
                         help="illustris simulation number", default=Settings.RUN_NUM)
     args = parser.parse_args()
-    
+
     return args
 
 # _parseArguments()
 
 
 
-def _mpiError(comm, err="ERROR"):
+def _mpiError(comm, logger, err="ERROR"):
     """
     Raise an error through MPI and exit all processes.
 
@@ -632,23 +673,35 @@ def _mpiError(comm, err="ERROR"):
        err  <str> : optional, extra error-string to print
 
     """
-
-    import traceback
     rank = comm.rank
-
-    print "\nERROR: rank %d\n%s\n" % (rank, str(datetime.now()))
-    print sys.exc_info()[0]
-    print err.message
-    print err.__doc__
-    print "\n"
-    print(traceback.format_exc())
-    print "\n\n"
-
+    errStr =  "\nERROR: rank %d\n%s\n%s\n" % (rank, str(datetime.now()), err)
+    logger.exception(errStr) #, exc_info=True)
     comm.Abort(rank)
     return
 
 # _mpiError()
 
+
+
+def _loadLogger(rank, verbose):
+
+    ## Init Logger
+    name = "logger_%03d" % (rank)
+    logFile = _GET_LOG_NAME(rank)
+
+    if( verbose ): strLevel = logging.INFO
+    else:          strLevel = logging.WARNING
+
+    fileLevel = logging.DEBUG
+
+    if( rank == 0 ):
+        logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLevel, strLevel=strLevel)
+    else:
+        logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLevel, tostr=False)
+
+    return logger
+
+# _loadLogger()
 
 
 if( __name__ == "__main__" ): main()
