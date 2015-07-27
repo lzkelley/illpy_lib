@@ -9,8 +9,8 @@ from scipy import interpolate
 import sys
 import os
 
-from ..Constants import BOX_LENGTH, HPAR, H0, SPLC, KPC
-
+from ..Constants import BOX_LENGTH
+from zcode.Constants import HPAR, H0, SPLC, KPC
 
 _DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))                                # Get local path, and data directory
 _TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"                                     # Contains cosmological values for each snapshot

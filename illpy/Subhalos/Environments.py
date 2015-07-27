@@ -50,7 +50,7 @@ import zcode.Math  as zmath
 from zcode.Constants import PC
 
 from illpy.illbh import BHMergers
-from illpy.illbh.BHConstants import MERGERS_NUM, MERGERS_MAP_MTOS, MERGERS_MAP_STOM, MERGERS_IDS, BH_OUT
+from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 from illpy.Subhalos.Constants import SUBHALO
 from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS
 
@@ -175,15 +175,15 @@ def getMergerAndSubhaloIndices(run, verbose=True):
 
     if( verbose ): print " - - - Loading Mergers"
     mergers = BHMergers.loadFixedMergers(run, verbose=verbose)
-    if( verbose ): print " - - - - Loaded %d mergers" % (mergers[MERGERS_NUM])
+    if( verbose ): print " - - - - Loaded %d mergers" % (mergers[MERGERS.NUM])
 
     if( verbose ): print " - - - Loading BH Hosts Catalog"
     bhHosts = ParticleHosts.loadBHHosts(run, loadsave=True, verbose=True, bar=True)
 
     # Snapshot for each merger
-    mergSnap = mergers[MERGERS_MAP_MTOS]
+    mergSnap = mergers[MERGERS.MAP_MTOS]
     # Mergers for each snapshot
-    snapMerg = mergers[MERGERS_MAP_STOM]
+    snapMerg = mergers[MERGERS.MAP_STOM]
 
     # Initialize merger-subhalos array to invalid `-1`
     mergSubh = -1*np.ones(len(mergSnap), dtype=DTYPE.INDEX)
@@ -196,7 +196,7 @@ def getMergerAndSubhaloIndices(run, verbose=True):
         if( len(mergs) <= 0 ): continue
 
         # Get the 'out' BH ID numbers for mergers in this snapshot
-        outIDs = mergers[MERGERS_IDS][mergs, BH_OUT]
+        outIDs = mergers[MERGERS.IDS][mergs, BH_TYPE.OUT]
         # Select BH-Hosts dict for this snapshot
         #   Individual snapshot dictionaries have string keys
         snapStr = OFFTAB.snapDictKey(snap)

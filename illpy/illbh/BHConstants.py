@@ -1,9 +1,27 @@
 """
 Constants for Blackhole related functions and submodules.
 
+Classes
+-------
+    MERGERS : enum-type class for BH-Merger dictionary keys.
+              The list ``MERGERS_PHYSICAL_KEYS`` contains the keys which pertain to values taken
+              from the BH Merger files themselves
+    DETAILS : enum-type class for BH-Details entries dictionary keys.
+              The list ``DETAILS_PHYSICAL_KEYS`` contains the keys corresponding to values taken
+              from the BH Details files themselves
+    BH_TYPE : enum-type class for tracking the two types {``IN``,``OUT``} of Merger BHs.
+              The ``OUT`` BH is the one which persists after the merger, while the ``IN`` BH
+              effectively dissappears.
+    BH_TIME : enum-type class for the three stored, details times {``FIRST``,``BEFORE``,``AFTER``}.
+    BH_TREE : enum-type class for BH merger tree dictionary keys.
+
+
+Functions
+---------
+
+
 
 """
-
 
 import numpy as np
 from glob import glob
@@ -11,7 +29,9 @@ from glob import glob
 from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR
 
 
-### Illustris Parameters ###
+## Illustris Parameters
+#  ====================
+
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
@@ -36,7 +56,8 @@ _ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/b
                             }
 
 
-### Post-Processing Parameters ###
+## Post-Processing Parameters
+#  ==========================
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
@@ -53,87 +74,81 @@ _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
 
 
-# Key Names for Mergers Dictionary
-MERGERS_RUN       = 'run'
-MERGERS_CREATED   = 'created'
-MERGERS_NUM       = 'num'
-MERGERS_VERSION   = 'version'
-MERGERS_FILE      = 'filename'
+class MERGERS():
+    # Meta Data
+    RUN       = 'run'
+    CREATED   = 'created'
+    NUM       = 'num'
+    VERSION   = 'version'
+    FILE      = 'filename'
 
-MERGERS_IDS       = 'ids'
-MERGERS_SCALES    = 'scales'
-MERGERS_MASSES    = 'masses'
+    # Physical Parameters
+    IDS       = 'ids'
+    SCALES    = 'scales'
+    MASSES    = 'masses'
 
-MERGERS_MAP_STOM  = 's2m'
-MERGERS_MAP_MTOS  = 'm2s'
-MERGERS_MAP_ONTOP = 'ontop'
+    # Maps
+    MAP_STOM  = 's2m'
+    MAP_MTOS  = 'm2s'
+    MAP_ONTOP = 'ontop'
 
-MERGERS_PHYSICAL_KEYS = [ MERGERS_IDS, MERGERS_SCALES, MERGERS_MASSES ]
+# } MERGERS
 
-
-
-NUM_BH_TYPES = 2                                                                                    # There are 2 BHs, {BH_IN, BH_OUT}
-NUM_BH_TIMES = 3                                                                                    # There are 3 times, {BH_BEFORE, BH_AFTER, BH_FIRST}
-
-
-
-# Index of [N,2] arrays corresponding to each BH
-BH_IN  = 0
-BH_OUT = 1
-
-assert BH_IN == 0 and BH_OUT == 1, \
-    "``BH_{IN/OUT}`` MUST be in the proper order!"
+MERGERS_PHYSICAL_KEYS = [ MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES ]
 
 
-# Types of matches between mergers and details
-BH_BEFORE  = 0                                                                                 # Before merger time (MUST = 0!)
-BH_AFTER   = 1                                                                                 # After (or equal) merger time (MUST = 1!)
-BH_FIRST   = 2                                                                                 # First matching details entry (MUST = 2!)
+class DETAILS():
+    RUN     = 'run'
+    CREATED = 'created'
+    VERSION = 'version'
+    NUM     = 'num'
+    SNAP    = 'snap'
+    FILE    = 'filename'
+
+    IDS     = 'id'
+    SCALES  = 'scales'
+    MASSES  = 'masses'
+    MDOTS   = 'mdots'
+    RHOS    = 'rhos'
+    CS      = 'cs'
+
+# } DETAILS
+
+DETAILS_PHYSICAL_KEYS = [ DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,  
+                          DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS ]
 
 
-assert BH_BEFORE == 0 and BH_AFTER == 1 and BH_FIRST == 2, \
-    "``BH_{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
+class BH_TYPE():
+    IN  = 0
+    OUT = 1
 
+NUM_BH_TYPES = 2
 
-### Dictionary Keys for Details Parameters ###
-DETAILS_RUN     = 'run'
-DETAILS_CREATED = 'created'
-DETAILS_VERSION = 'version'
-DETAILS_NUM     = 'num'
-DETAILS_SNAP    = 'snap'
-DETAILS_FILE    = 'filename'
+class BH_TIME():
+    BEFORE  = 0                                   # Before merger time (MUST = 0!)
+    AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
+    FIRST   = 2                                   # First matching details entry (MUST = 2!)
 
-DETAILS_IDS     = 'id'
-DETAILS_SCALES  = 'scales'
-DETAILS_MASSES  = 'masses'
-DETAILS_MDOTS   = 'mdots'
-DETAILS_RHOS    = 'rhos'
-DETAILS_CS      = 'cs'
+NUM_BH_TIMES = 3
 
-DETAILS_PHYSICAL_KEYS = [ DETAILS_IDS, DETAILS_SCALES, DETAILS_MASSES,
-                          DETAILS_MDOTS, DETAILS_RHOS, DETAILS_CS ]
+class BH_TREE():
+    LAST         = 'last'
+    NEXT         = 'next'
+    LAST_TIME    = 'lastTime'
+    NEXT_TIME    = 'nextTime'
+    NUM_FUTURE   = 'numFuture'
+    NUM_PAST     = 'numPast'
+    TIME_BETWEEN = 'timeBetween'
 
+    CREATED      = 'created'
+    RUN          = 'run'
+    VERSION      = 'version'
 
-### BH Merger Tree ###
-
-TREE_LAST         = 'last'
-TREE_NEXT         = 'next'
-TREE_LAST_TIME    = 'lastTime'
-TREE_NEXT_TIME    = 'nextTime'
-TREE_NUM_FUTURE   = 'numFuture'
-TREE_NUM_PAST     = 'numPast'
-TREE_TIME_BETWEEN = 'timeBetween'
-
-TREE_CREATED      = 'created'
-TREE_RUN          = 'run'
-TREE_VERSION      = 'version'
 
 
 
 def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
-
     if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
-
     filesDir = _ILLUSTRIS_MERGERS_DIRS[run]
     files = []
     if( type(filesDir) != list ): filesDir = [ filesDir ]
@@ -209,3 +224,12 @@ def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _BLACKHOLE_TREE_FILENAME % (run, version)
     return fname
+
+
+assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
+    "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
+
+
+assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
+    "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
+
