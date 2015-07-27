@@ -25,6 +25,8 @@ Functions
    loadMergerEnvironments               : primary API - load all subhalo environments as dict
    loadMergerEnv                        : load a single merger-subhalo environment and save
 
+   main                                 :
+
    _runMaster                           : process manages all secondary ``slave`` processes
    _runSlave                            : secondary process loads and saves data for each subhalo
    _collectMergerEnvironments           : merge all subhalo environment files into single dict
