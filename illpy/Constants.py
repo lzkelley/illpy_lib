@@ -5,6 +5,7 @@ Numerical constants pertaining to the Illustris Simulations and their data.
 
 import numpy as np
 from zcode.Constants import MSOL, KPC, HPAR
+from enum import Enum
 
 ## Physical Constants
 MASS_CONV        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
@@ -12,6 +13,19 @@ MDOT_CONV        = 10.22                          # Multiply by this to get [Mso
 DENS_CONV        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
 DIST_CONV        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
 CS_CONV          = 1.0                            # ??????? FIX
+
+def CONV_PHY(Enum):
+    MASS        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
+    MDOT        = 10.22                          # Multiply by this to get [Msol/yr]
+    DENS        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
+    DIST        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
+    CS          = 1.0                            # ??????? FIX
+
+
+def CONV_STD(Enum):
+    MASS        = CONV_PHYS.MASS/MSOL
+    DENS        = CONV_PHYS.DENS*np.power(PC, 3.0)/MSOL
+    DIST        = CONV_PHYS.DIST/PC
 
 
 BOX_LENGTH       = 75000                          # [ckpc/h]
