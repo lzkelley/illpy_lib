@@ -152,7 +152,7 @@ def main():
 # main()
 
 
-def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=None):
+def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=None):
     """
     Load an existing BH Snapshot data save file, or attempt to recreate it (slow!).
 
@@ -175,13 +175,10 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=True, logger=No
     
     ## Create default logger if needed
     #  -------------------------------
-    if( logger is None ): 
-        # Set default logging level
-        if( verbose ): level = logging.DEBUG
-        else:          level = logging.WARNING
-        logger = zio.getLogger(None, strLevel=level, tostr=True)
+    if( not isinstance(logger, logging.Logger) ): 
+        logger = zio.defaultLogger(logger, verbose=verbose)
 
-    logger.critical("BHSnapshotData.loadBHSnapshotData()")
+    logger.info("BHSnapshotData.loadBHSnapshotData()")
     if( version is None ): version = _VERSION
 
     oldVers = False
@@ -251,7 +248,7 @@ def _runMaster(run, comm, logger):
     rank = comm.rank
     size = comm.size
 
-    logger.critical("BHSnapshotData._runMaster()")
+    logger.info("BHSnapshotData._runMaster()")
     logger.debug("Rank %d/%d" % (rank, size))
 
     # Make sure output directory exists
@@ -283,7 +280,7 @@ def _runMaster(run, comm, logger):
     #     Go over snapshots in random order to get a better estimate of ETA/duration
     snapList = np.arange(NUM_SNAPS-1)
     np.random.shuffle(snapList)
-    logger.critical("Iterating over snapshots")
+    logger.info("Iterating over snapshots")
     pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snapNum in snapList:
         logger.debug("- Snap %d, count %d, done %d" % (snapNum, count, countDone))
@@ -336,7 +333,7 @@ def _runMaster(run, comm, logger):
     ## Close out all Processes
     #  =======================
     numActive = size-1
-    logger.critical("Exiting %d active processes" % (numActive))
+    logger.info("Exiting %d active processes" % (numActive))
     while( numActive > 0 ):
 
         # Find available slave process
@@ -606,7 +603,7 @@ def _mergeBHSnapshotFiles(run, logger):
 
     """
 
-    logger.critical("BHSnapshotData._mergeBHSnapshotFiles()")
+    logger.info("BHSnapshotData._mergeBHSnapshotFiles()")
 
     # Randomize order of snapshots
     snapList = np.arange(NUM_SNAPS-1)
