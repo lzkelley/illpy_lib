@@ -40,10 +40,7 @@ Functions
 
 import numpy as np
 from datetime import datetime
-import sys
-import os
-import argparse
-import warnings
+import sys, os, argparse, warnings
 
 from mpi4py import MPI
 
@@ -54,10 +51,8 @@ from zcode.Constants import PC
 from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 from illpy.Subhalos.Constants import SUBHALO
-from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS
+from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR
 
-
-from Settings import DIR_DATA, DIR_PLOTS
 import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
 
@@ -72,8 +67,6 @@ RUN          = 3
 RAD_BINS     = 100
 RAD_EXTREMA  = [1.0, 1.0e7]     # PC (converted to simulation units)
 
-
-PLOT_DIR = DIR_PLOTS + "merger-subhalos/"
 
 
 class ENVIRON():
@@ -124,32 +117,33 @@ class ENVSTAT():
 # } class ENVSTAT
 
 
+## Post-Processed Files
+#  --------------------
 
-_MERGER_SUBHALO_FILENAME_BASE = ( DIR_DATA + "merger_subhalos/Illustris-%d/snap%03d/" + 
-                                  "ill%d_snap%03d_subhalo%06d_v%.2f.npz" )
-
+_MERGER_SUBHALO_FILENAME_BASE = "snap{1:03d}/ill{0:d}_snap{1:03d}_subhalo{2:06d}_v{3:.2f}%.2f.npz"
 def GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=_VERSION):
-    return _MERGER_SUBHALO_FILENAME_BASE % (run, snap, run, snap, subhalo, version)
+    pDir = GET_PROCESSED_DIR(run) + "/subhalos/"
+    fname = pDir + _MERGER_SUBHALO_FILENAME_BASE.format(run, snap, subhalo, version)
+    return fname
+
+_MERGER_ENVIRONMENT_FILENAME = "ill%d_merger-environments_v%.2f.npz"
+def GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
+    pDir = GET_PROCESSED_DIR(run)
+    fname = pDir + _MERGER_ENVIRONMENT_FILENAME % (run, version)
+    return fname
 
 
-_MISSING_LIST_FILENAME = ( DIR_DATA + "merger_subhalos/" + 
-                           "ill%d_missing_merger-subhalos_v%.2f.txt" )
+## Temporary Files
+#  ---------------
 
+_MISSING_LIST_FILENAME = "ill%d_missing_merger-subhalos_v%.2f.txt"
 def GET_MISSING_LIST_FILENAME(run, version=_VERSION):
     return _MISSING_LIST_FILENAME % (run, version)
 
 
-_FAILED_LIST_FILENAME = ( DIR_DATA + "merger_subhalos/" + 
-                           "ill%d_failed_merger-subhalos_v%.2f.txt" )
-
+_FAILED_LIST_FILENAME =  "ill%d_failed_merger-subhalos_v%.2f.txt"
 def GET_FAILED_LIST_FILENAME(run, version=_VERSION):
     return _FAILED_LIST_FILENAME % (run, version)
-
-
-
-_MERGER_ENVIRONMENT_FILENAME = ( DIR_DATA + "ill%d_merger-environments_v%.2f.npz" )
-def GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
-    return _MERGER_ENVIRONMENT_FILENAME % (run, version)
 
 
 _ENVIRONMENTS_STATUS_FILENAME = 'stat_Environments_ill%d_v%.2f.txt'
