@@ -120,9 +120,9 @@ class ENVSTAT():
 ## Post-Processed Files
 #  --------------------
 
-_MERGER_SUBHALO_FILENAME_BASE = "snap{1:03d}/ill{0:d}_snap{1:03d}_subhalo{2:06d}_v{3:.2f}%.2f.npz"
+_MERGER_SUBHALO_FILENAME_BASE = "snap{1:03d}/ill{0:d}_snap{1:03d}_subhalo{2:06d}_v{3:.2f}.npz"
 def GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=_VERSION):
-    pDir = GET_PROCESSED_DIR(run) + "/subhalos/"
+    pDir = GET_PROCESSED_DIR(run) + "subhalos/"
     fname = pDir + _MERGER_SUBHALO_FILENAME_BASE.format(run, snap, subhalo, version)
     return fname
 
