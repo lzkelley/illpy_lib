@@ -635,7 +635,7 @@ def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
         if( verbose ): print " - - - Attempting to load saved file from '%s'" % (fname)
         if( os.path.exists(fname) ):
             env = zio.npzToDict(fname)
-            if( verbose ): print " - - - Loaded.  Creation date: %s" % (env[ENVIRON.DATE])
+            if( verbose ): print " - - - Loaded."
         else:
             print " - - - File '%s' does not exist!" % (fname)
             loadsave = False
