@@ -1,21 +1,7 @@
 
 from __future__ import division
 import numpy as np
-import warnings
 import os
-import sys
-import types
-import matplotlib                  as mpl
-from matplotlib import pyplot      as plt
-
-from glob import glob
-import datetime
-
-from Constants import *
-
-DT_THRESH = 1.0e-5                                                                                  # Frac diff b/t times to accept as equal
-
-
 
 
 ###  ======================================  ###
@@ -105,32 +91,6 @@ def isApprox(v1, v2, TOL=1.0e-6):
     return retval
 
 
-
-def groupIndices(arr, bins, right=True):
-    selects = []
-    nums = len(bins)
-    # Iterate over each bin and find the members of array which belong inside
-    for ii in range(nums):
-
-        # If bins give *right* edges
-        if( right ):
-            if( ii > 0 ): inds = np.where((arr > bins[ii-1]) & (arr <= bins[ii]))[0]
-            else:         inds = np.where(arr <= bins[ii])[0]
-
-        # If bins give *left* edges
-        else:
-            if( ii < nums-1 ): inds = np.where((arr >= bins[ii]) & (arr < bins[ii+1]))[0]
-            else:              inds = np.where(arr > bins[ii])[0]
-
-        selects.append(inds)
-
-    return selects
-
-
-
-
-
-
 def stringArray(arr, format='%.2f'):
     out = [ format % elem for elem in arr ]
     out = "[ " + " ".join(out) + " ]"
@@ -201,6 +161,8 @@ def iterableNotString(args):
     """
     Check if the arguments is iterable and not a string.
     """
+    import types
+
     # if NOT iterable, return false
     if( not np.iterable(args) ): return False
     # if string, return False
