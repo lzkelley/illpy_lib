@@ -1,7 +1,10 @@
 """
 Load Subhalo and environmental data corresponding to Merger BHs.
 
-To load all environments (i.e. for all Subhalos) into individual files, run with:
+To load all merger environments
+    `env = illpy.Subhalos.Environments.loadMergerEnvironments(1)`
+
+To process all environments (i.e. for all Subhalos) into individual files, run with:
     `mpirun -n NP python -m illpy.Subhalos.Environments RUN`
     arguments:
         NP  <int> : num processors
@@ -10,29 +13,30 @@ To load all environments (i.e. for all Subhalos) into individual files, run with
 
 Classes
 -------
-   ENVIRON : enumerator-like object for managing subhalo (environment) parameters dictionaries
-   TAGS    : enumerator-like object for managing MPI communication
-   ENVSTAT : enumerator-like object for status of single subhalo environment import
+   ENVIRON  : enumerator-like object for managing subhalo (environment) parameters dictionaries
+   _TAGS    : enumerator-like object for managing MPI communication
+   _ENVSTAT : enumerator-like object for status of single subhalo environment import
 
 
 Functions
 ---------
-   GET_MERGER_SUBHALO_FILENAME          : get filename for individual subhalo file
-   GET_MISSING_LIST_FILENAME  : get filename for list of missing subhalos
-   GET_MERGER_ENVIRONMENT_FILENAME      : get filename for dictionary of all subhalos
-
    getMergerAndSubhaloIndices           : get merger, snapshot and subhalo index numbers
    loadMergerEnvironments               : primary API - load all subhalo environments as dict
-   loadMergerEnv                        : load a single merger-subhalo environment and save
-
-   main                                 :
+   main                                 : Process all merger subhalos from scratch.
 
    _runMaster                           : process manages all secondary ``slave`` processes
    _runSlave                            : secondary process loads and saves data for each subhalo
    _collectMergerEnvironments           : merge all subhalo environment files into single dict
+   _loadSingleMergerEnv                 : load a single merger-subhalo environment and save.
    _initStorage                         : initializes dict to store data for all subhalos
    _parseArguments                      : parse commant line arguments
    _mpiError                            : raise an error through MPI and exit all processes   
+
+   _GET_MERGER_SUBHALO_FILENAME          : get filename for individual subhalo file
+   _GET_MISSING_LIST_FILENAME            : get filename for list of missing subhalos
+   _GET_FAILED_LIST_FILENAME             : get filename for list of failed  subhalos
+   _GET_ENVIRONMENTS_STATUS_FILENAME     : get filename for status of ``main`` execution.
+   _GET_MERGER_ENVIRONMENT_FILENAME      : get filename for dictionary of all subhalos
 
 
 """
@@ -100,34 +104,34 @@ class ENVIRON():
 # } class ENVIRON
 
 
-class TAGS():
+class _TAGS():
     READY = 0
     START = 1
     DONE  = 2
     EXIT  = 3
 
-# } class TAGS
+# } class _TAGS
 
 
-class ENVSTAT():
+class _ENVSTAT():
     FAIL = -1
     EXST =  0
     NEWF =  1
 
-# } class ENVSTAT
+# } class _ENVSTAT
 
 
 ## Post-Processed Files
 #  --------------------
 
 _MERGER_SUBHALO_FILENAME_BASE = "snap{1:03d}/ill{0:d}_snap{1:03d}_subhalo{2:06d}_v{3:.2f}.npz"
-def GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=_VERSION):
+def _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=_VERSION):
     pDir = GET_PROCESSED_DIR(run) + "subhalos/"
     fname = pDir + _MERGER_SUBHALO_FILENAME_BASE.format(run, snap, subhalo, version)
     return fname
 
 _MERGER_ENVIRONMENT_FILENAME = "ill%d_merger-environments_v%.2f.npz"
-def GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
+def _GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
     pDir = GET_PROCESSED_DIR(run)
     fname = pDir + _MERGER_ENVIRONMENT_FILENAME % (run, version)
     return fname
@@ -137,17 +141,17 @@ def GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
 #  ---------------
 
 _MISSING_LIST_FILENAME = "ill%d_missing_merger-subhalos_v%.2f.txt"
-def GET_MISSING_LIST_FILENAME(run, version=_VERSION):
+def _GET_MISSING_LIST_FILENAME(run, version=_VERSION):
     return _MISSING_LIST_FILENAME % (run, version)
 
 
 _FAILED_LIST_FILENAME =  "ill%d_failed_merger-subhalos_v%.2f.txt"
-def GET_FAILED_LIST_FILENAME(run, version=_VERSION):
+def _GET_FAILED_LIST_FILENAME(run, version=_VERSION):
     return _FAILED_LIST_FILENAME % (run, version)
 
 
 _ENVIRONMENTS_STATUS_FILENAME = 'stat_Environments_ill%d_v%.2f.txt'
-def GET_ENVIRONMENTS_STATUS_FILENAME(run):
+def _GET_ENVIRONMENTS_STATUS_FILENAME(run):
     return _ENVIRONMENTS_STATUS_FILENAME % (run, _VERSION)
 
 
@@ -276,7 +280,7 @@ def _runMaster(run, comm):
     fail  = 0
     times = np.zeros(numUniTot)
 
-    statFileName = GET_ENVIRONMENTS_STATUS_FILENAME(run)
+    statFileName = _GET_ENVIRONMENTS_STATUS_FILENAME(run)
     statFile = open(statFileName, 'w')
     print " - - Opened status file '%s'" % (statFileName)
     statFile.write('%s\n' % (str(datetime.now())))
@@ -288,7 +292,7 @@ def _runMaster(run, comm):
 
         # Create output directory (subhalo doesn't matter since only creating dir)
         #    don't let slave processes create it - makes conflicts
-        fname = GET_MERGER_SUBHALO_FILENAME(run, snap, 0)
+        fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, 0)
         zio.checkPath(fname)
 
         # Get most bound particles for each subhalo in this snapshot
@@ -311,18 +315,18 @@ def _runMaster(run, comm):
             tag = stat.Get_tag()
 
             # Track number of completed profiles
-            if( tag == TAGS.DONE ): 
+            if( tag == _TAGS.DONE ): 
                 retStat, durat = data
 
                 times[count] = durat
                 count += 1
-                if(   retStat == ENVSTAT.NEWF ): new   += 1
-                elif( retStat == ENVSTAT.EXST ): exist += 1
+                if(   retStat == _ENVSTAT.NEWF ): new   += 1
+                elif( retStat == _ENVSTAT.EXST ): exist += 1
                 else:                            fail  += 1
 
 
             # Distribute tasks
-            comm.send([snap, subhalo, boundID], dest=source, tag=TAGS.START)
+            comm.send([snap, subhalo, boundID], dest=source, tag=_TAGS.START)
 
         # } for boundID, subhalo 
 
@@ -344,16 +348,16 @@ def _runMaster(run, comm):
         tag = stat.Get_tag()
 
         # If we're recieving exit confirmation, count it
-        if( tag == TAGS.EXIT ): numActive -= 1
+        if( tag == _TAGS.EXIT ): numActive -= 1
         else:
             # If a process just completed, count it
-            if( tag == TAGS.DONE ): 
+            if( tag == _TAGS.DONE ): 
                 times[count] = data[1]
                 count += 1
                 if( data[0] ): new += 1
 
             # Send exit command
-            comm.send(None, dest=source, tag=TAGS.EXIT)
+            comm.send(None, dest=source, tag=_TAGS.EXIT)
 
 
 
@@ -395,27 +399,27 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
     # Keep looking for tasks until told to exit
     while True:
         # Tell Master this process is ready
-        comm.send(None, dest=0, tag=TAGS.READY)
+        comm.send(None, dest=0, tag=_TAGS.READY)
         # Receive ``task`` ([snap,boundID,subhalo])
         task = comm.recv(source=0, tag=MPI.ANY_TAG, status=stat)
         tag = stat.Get_tag()
 
-        if( tag == TAGS.START ):
+        if( tag == _TAGS.START ):
             # Extract parameters of environment
             snap, subhalo, boundID = task
             beg = datetime.now()
             # Load and save Merger Environment
-            retEnv, retStat = loadMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
+            retEnv, retStat = _loadSingleMergerEnv(run, snap, subhalo, boundID, radBins=radBins, 
                                             loadsave=True, verbose=verbose)
             end = datetime.now()
             durat = (end-beg).total_seconds()
-            comm.send([retStat,durat], dest=0, tag=TAGS.DONE)
-        elif( tag == TAGS.EXIT  ):
+            comm.send([retStat,durat], dest=0, tag=_TAGS.DONE)
+        elif( tag == _TAGS.EXIT  ):
             break
 
 
     # Finish, return done
-    comm.send(None, dest=0, tag=TAGS.EXIT)
+    comm.send(None, dest=0, tag=_TAGS.EXIT)
 
     return
     
@@ -423,7 +427,7 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
 
 
 
-def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True, verbose=False):
+def _loadSingleMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True, verbose=False):
     """
     Import and save merger-subhalo environment data.
 
@@ -440,14 +444,14 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
     Returns
     -------
         env      <dict>   : loaded dictionary of environment data        
-        retStat  <int>    : ``ENVSTAT`` value for status of this environment
+        retStat  <int>    : ``_ENVSTAT`` value for status of this environment
         
 
     """
 
-    if( verbose ): print " - - Environments.loadMergerEnv()"
+    if( verbose ): print " - - Environments._loadSingleMergerEnv()"
 
-    fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo)
+    fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo)
     if( verbose ): print " - - - Filename '%s'" % (fname)
 
     # If we shouldnt or cant load existing save, reload profiles
@@ -464,7 +468,7 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
                 % (run, snap, subhalo, str(boundID))
             warnings.warn(warnStr, RuntimeWarning)
             # Set return status to failure
-            retStat = ENVSTAT.FAIL
+            retStat = _ENVSTAT.FAIL
             env = None
             
         # Valid profiles
@@ -503,7 +507,7 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
             # Save Data as NPZ file
             zio.dictToNPZ(env, fname, verbose=verbose)
             # Set return status to new file created
-            retStat = ENVSTAT.NEWF
+            retStat = _ENVSTAT.NEWF
 
         # } if radProfs
 
@@ -518,13 +522,13 @@ def loadMergerEnv(run, snap, subhalo, boundID=None, radBins=None, loadsave=True,
                 (run, snap, subhalo)
 
         # Set return status to file already exists
-        retStat = ENVSTAT.EXST
+        retStat = _ENVSTAT.EXST
 
     # } if 
 
     return env, retStat
 
-# loadMergerEnv()
+# _loadSingleMergerEnv()
 
 
 
@@ -623,7 +627,7 @@ def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
 
     if( verbose ): print " - - Environments.loadMergerEnvironments()"
 
-    fname = GET_MERGER_ENVIRONMENT_FILENAME(run, version=version)
+    fname = _GET_MERGER_ENVIRONMENT_FILENAME(run, version=version)
 
     ## Try to Load Existing Save File
     #  ------------------------------
@@ -709,8 +713,8 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
     env = _initStorage(run, sampleSnap, snapSubh[sampleSnap], numMergers, 
                        verbose=verbose, version=version)
 
-    miss_fname = GET_MISSING_LIST_FILENAME(run, version=version)
-    fail_fname = GET_FAILED_LIST_FILENAME(run, version=version)
+    miss_fname = _GET_MISSING_LIST_FILENAME(run, version=version)
+    fail_fname = _GET_FAILED_LIST_FILENAME(run, version=version)
     formatStr = '{5} {0:3}  {1:8}  {2:4}  {3:8}  {4}\n'
 
     radBins = env[ENVIRON.RADS]
@@ -766,7 +770,7 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
                 subhalo = subh[ind_subh]
                 thisStr = "Run %d Merger %d : Snap %d, Subhalo %d" % (run, merger, snap, subhalo)
 
-                fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=version)
+                fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=version)
                 # Skip if file doesn't exist
                 if( not os.path.exists(fname) ): 
                     warnStr = "File missing at %s" % (thisStr)
@@ -797,11 +801,11 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
                         if( verbose ): print " - - - - '%s' Failed. Trying to fix." % (fname)
 
                         # Recreate data file
-                        dat, retStat = loadMergerEnv(run, snap, subhalo, radBins=radBins,
-                                                     loadsave=False, verbose=verbose)
+                        dat, retStat = _loadSingleMergerEnv(run, snap, subhalo, radBins=radBins,
+                                                            loadsave=False, verbose=verbose)
 
                         # If recreation failed, skip
-                        if( retStat == ENVSTAT.FAIL ):
+                        if( retStat == _ENVSTAT.FAIL ):
                             warnStr  = "Recreate failed at %s" % (thisStr)
                             warnStr += "Filename '%s'" % (fname)
                             warnings.warn(warnStr, RuntimeWarning)
@@ -917,7 +921,7 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     ## Radial Profiles for Sample Halo
     #  ------------------------------------
     if( verbose ): print " - - - Loading Profiles for Sample: Snap %d, Subhalo %d" % (snap, sample)
-    fname = GET_MERGER_SUBHALO_FILENAME(run, snap, subhalos[sample], version=version)
+    fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalos[sample], version=version)
     subh = np.load(fname)
 
     # Find shape of arrays for each Subhalo
