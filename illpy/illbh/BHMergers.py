@@ -31,6 +31,10 @@ loadFixedMergers              : load dictionary of merger events with mappings, 
                                 entry corrected (based on inference from ``BHDetails`` entries).
                                 
 
+_findBoundingBins
+
+
+
 Mergers Dictionary
 ------------------
    { MERGERS_RUN       : <int>, illustris simulation number in {1,3}
@@ -90,12 +94,13 @@ import numpy as np
 
 import BHDetails
 import BHConstants
-from BHConstants import *
+from BHConstants import MERGERS, BH_TYPE
 import BHMatcher
 
+from .. Constants import DTYPE
 from .. import Cosmology
-from .. import AuxFuncs as aux
 
+import zcode.InOut as zio
 
 # VERSION = 0.21
 
@@ -103,7 +108,7 @@ VERSION_MAP = 0.21
 VERSION_FIX = 0.31
 
 
-def processMergers(run, verbose=VERBOSE):
+def processMergers(run, verbose=True):
 
     if( verbose ): print " - - BHMergers.processMergers()"
 
@@ -114,21 +119,21 @@ def processMergers(run, verbose=VERBOSE):
     ### Load Fixed Mergers ###
     mergersFixed = loadFixedMergers(run, verbose=verbose)
 
+    return
+
 # processMergers()
 
 
 
 
-def loadRawMergers(run, verbose=VERBOSE, recombine=False):
+def loadRawMergers(run, verbose=True, recombine=False):
     """
     Load raw merger events into dictionary.
 
     Raw mergers are the data directly from illustris without modification.
-
     """
 
     if( verbose ): print " - - BHMergers.loadRawMergers()"
-
 
     ### Concatenate Raw Illustris Files into a Single Combined File ###
 
@@ -137,7 +142,7 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
         if( verbose ): print " - - Combining Illustris Merger files into '%s'" % (combinedFilename)
         mergerFilenames = BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
         if( verbose ): print " - - - Found %d merger Files" % (len(mergerFilenames))
-        aux.combineFiles(mergerFilenames, combinedFilename, verbose=verbose)
+        zio.combineFiles(mergerFilenames, combinedFilename, verbose=verbose)
 
 
     if( verbose ): print " - - - Merger file '%s'" % (combinedFilename)
@@ -147,16 +152,15 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
     if( verbose ): print " - - - Importing Merger Data"
     scales, ids, masses = _importRawMergers(combinedFilename, verbose=verbose)
 
-
     ### Sort Data by Time ###
     if( verbose ): print " - - - Sorting Data"
 
     # Find indices which sort by time
     inds = np.argsort(scales)
     # Use indices to reorder arrays
-    scales[:] = scales[inds]
-    ids[:]    = ids[inds]
-    masses[:] = masses[inds]
+    scales = scales[inds]
+    ids    = ids[inds]
+    masses = masses[inds]
 
     return scales, ids, masses, combinedFilename
 
@@ -164,7 +168,7 @@ def loadRawMergers(run, verbose=VERBOSE, recombine=False):
 
 
 
-def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
+def loadMappedMergers(run, verbose=True, loadsave=True ):
     """
     Load or create Mapped Mergers Dictionary as needed.
     """
@@ -173,30 +177,22 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
     mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
 
-    ### Try to Load Existing Mapped Mergers ###
+    ## Load Existing Mapped Mergers
+    #  ----------------------------
     if( loadsave ):
         if( verbose ): print " - - - Loading saved data from '%s'" % (mappedFilename)
-
         # If file exists, load data
         if( os.path.exists(mappedFilename) ):
-            mergersMapped = aux.npzToDict(mappedFilename)
-            if( verbose ): print " - - - Dictionary Loaded"
-            loadVers = mergersMapped[MERGERS_VERSION]
-            # Make sure version matches, otherwise re-create mappings
-            if( loadVers != VERSION_MAP ):
-                loadTime = mergersMapped[MERGERS_CREATED]
-                print "BHMergers.loadMappedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-                print "BHMergers.loadMappedMergers() : VERSION %f, recreating new version!" % (VERSION_MAP)
-                loadsave = False
-
+            mergersMapped = zio.npzToDict(mappedFilename)
         else:
-            print " - - - Mapped file '%s' does not exist" % (mappedFilename)
+            print " - - - - '%s' does not exist.  Recreating" % (mappedFilename)
             loadsave = False
 
 
-
-    ### Recreate Mappings ###
+    ## Recreate Mappings
+    #  -----------------
     if( not loadsave ):
+        if( verbose ): print " - - - Recreating mapped mergers"
 
         # Load Raw Mergers
         scales, ids, masses, filename = loadRawMergers(run, verbose=verbose)
@@ -205,22 +201,22 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
         mapM2S, mapS2M, ontop = _mapToSnapshots(scales)
 
         # Store in dictionary
-        mergersMapped = { MERGERS_FILE      : mappedFilename,
-                          MERGERS_RUN       : run,
-                          MERGERS_NUM       : len(scales),
-                          MERGERS_CREATED   : datetime.now().ctime(),
-                          MERGERS_VERSION   : VERSION_MAP,
+        mergersMapped = { MERGERS.FILE      : mappedFilename,
+                          MERGERS.RUN       : run,
+                          MERGERS.NUM       : len(scales),
+                          MERGERS.CREATED   : datetime.now().ctime(),
+                          MERGERS.VERSION   : VERSION_MAP,
 
-                          MERGERS_SCALES    : scales,
-                          MERGERS_IDS       : ids,
-                          MERGERS_MASSES    : masses,
+                          MERGERS.SCALES    : scales,
+                          MERGERS.IDS       : ids,
+                          MERGERS.MASSES    : masses,
 
-                          MERGERS_MAP_MTOS  : mapM2S,
-                          MERGERS_MAP_STOM  : mapS2M,
-                          MERGERS_MAP_ONTOP : ontop,
+                          MERGERS.MAP_MTOS  : mapM2S,
+                          MERGERS.MAP_STOM  : mapS2M,
+                          MERGERS.MAP_ONTOP : ontop,
                           }
 
-        aux.dictToNPZ(mergersMapped, mappedFilename, verbose)
+        zio.dictToNPZ(mergersMapped, mappedFilename, verbose=verbose)
 
 
     return mergersMapped
@@ -229,7 +225,7 @@ def loadMappedMergers(run, verbose=VERBOSE, loadsave=True ):
 
 
 
-def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
+def loadFixedMergers(run, verbose=True, loadsave=True ):
     """
     Load BH Merger data with duplicats removes, and masses corrected.
 
@@ -242,7 +238,7 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
     Returns
     -------
        mergersFixed <dict> : dictionary of 'fixed' mergers, most entries shaped [N,2] for `N`
-                             mergers, and an entry for each {``BH_IN``, ``BH_OUT``}
+                             mergers, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
 
     """
     
@@ -254,29 +250,21 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
     if( loadsave ):
         if( verbose ): print " - - - Loading from save '%s'" % (fixedFilename)
         if( os.path.exists(fixedFilename) ):
-            mergersFixed = aux.npzToDict(fixedFilename)
-            if( verbose ): print " - - - Loaded from '%s'" % (fixedFilename)
-            loadVers = mergersFixed[MERGERS_VERSION]
-            # Make sure version matches, otherwise re-create mappings
-            if( loadVers != VERSION_FIX ):
-                loadTime = mergersFixed[MERGERS_CREATED]
-                print "BHMergers.loadFixedMergers() : loaded version %f, from %s" % (loadVers, loadTime)
-                print "BHMergers.loadFixedMergers() : VERSION %f, recreating!" % (VERSION_FIX)
-                loadsave = False
-                
+            mergersFixed = zio.npzToDict(fixedFilename) 
         else:
-            print " - - - '%s' does not exist.  Recreating." % (fixedFilename)
+            print " - - - - '%s' does not exist.  Recreating." % (fixedFilename)
             loadsave = False
 
 
     ## Recreate Fixed Mergers
     if( not loadsave ):
+        if( verbose ): print " - - - Creating Fixed Mergers"
         # Load Mapped Mergers
         mergersMapped = loadMappedMergers(run, verbose=verbose)
         # Fix Mergers
         mergersFixed = _fixMergers(run, mergersMapped, verbose=verbose)
         # Save
-        aux.dictToNPZ(mergersFixed, fixedFilename, verbose)
+        zio.dictToNPZ(mergersFixed, fixedFilename, verbose=verbose)
 
 
     return mergersFixed
@@ -285,7 +273,7 @@ def loadFixedMergers(run, verbose=VERBOSE, loadsave=True ):
 
 
 
-def _fixMergers(run, mergers, verbose=VERBOSE):
+def _fixMergers(run, mergers, verbose=True):
     """
     Filter and 'fix' input merger catalog.
 
@@ -318,16 +306,15 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     # Make copy to modify
     fixedMergers = dict(mergers)
 
-
     ##  Remove Repeated Entries
     #   =======================
     #      Remove entries where IDs match a second time (IS THIS ENOUGH?!)
 
-    ids    = fixedMergers[MERGERS_IDS]
-    scales = fixedMergers[MERGERS_SCALES]
+    ids    = fixedMergers[MERGERS.IDS]
+    scales = fixedMergers[MERGERS.SCALES]
 
-    # First sort by ``BH_IN`` then ``BH_OUT`` (reverse of given order)
-    sort = np.lexsort( (ids[:,BH_OUT], ids[:,BH_IN]) )
+    # First sort by ``BH_TYPE.IN`` then ``BH_TYPE.OUT`` (reverse of given order)
+    sort = np.lexsort( (ids[:,BH_TYPE.OUT], ids[:,BH_TYPE.IN]) )
 
     badInds = []
     numMismatch = 0
@@ -335,16 +322,15 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     if( verbose ): print " - - - Examining %d merger entries" % (len(sort))
 
     ## Iterate over all entries
-
     for ii in xrange(len(sort)-1):
         
         this = ids[sort[ii]]
         jj = ii+1
 
-        # Look through all examples of same BH_IN
-        while( ids[sort[jj],BH_IN] == this[BH_IN] ):
-            # If BH_OUT also matches, this is a duplicate -- store first entry as bad |NOTE-1|
-            if( ids[sort[jj],BH_OUT] == this[BH_OUT] ):
+        # Look through all examples of same BH_TYPE.IN
+        while( ids[sort[jj],BH_TYPE.IN] == this[BH_TYPE.IN] ):
+            # If BH_TYPE.OUT also matches, this is a duplicate -- store first entry as bad |NOTE-1|
+            if( ids[sort[jj],BH_TYPE.OUT] == this[BH_TYPE.OUT] ):
 
                 # Double check that time also matches
                 if( scales[sort[ii]] != scales[sort[jj]] ): numMismatch += 1
@@ -354,9 +340,7 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
             jj += 1
 
         # } while
-
-    # } ii
-
+    # ii
             
     if( verbose ): print " - - - Total number of duplicates = %d" % (len(badInds))
     if( verbose ): print " - - - Number with mismatched times = %d" % (numMismatch)
@@ -365,31 +349,30 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
     for key in MERGERS_PHYSICAL_KEYS:
         fixedMergers[key] = np.delete(fixedMergers[key], badInds, axis=0)
 
-
     # Recalculate maps
-    mapM2S, mapS2M, ontop = _mapToSnapshots(fixedMergers[MERGERS_SCALES])
-    fixedMergers[MERGERS_MAP_MTOS ] = mapM2S
-    fixedMergers[MERGERS_MAP_STOM ] = mapS2M
-    fixedMergers[MERGERS_MAP_ONTOP] = ontop
+    mapM2S, mapS2M, ontop = _mapToSnapshots(fixedMergers[MERGERS.SCALES])
+    fixedMergers[MERGERS.MAP_MTOS ] = mapM2S
+    fixedMergers[MERGERS.MAP_STOM ] = mapS2M
+    fixedMergers[MERGERS.MAP_ONTOP] = ontop
 
     # Change number, creation date, and version
-    oldNum = len(mergers[MERGERS_SCALES])
-    newNum = len(fixedMergers[MERGERS_SCALES])
-    fixedMergers[MERGERS_NUM] = newNum
-    fixedMergers[MERGERS_CREATED] = datetime.now().ctime()
-    fixedMergers[MERGERS_VERSION] = VERSION_FIX
+    oldNum = len(mergers[MERGERS.SCALES])
+    newNum = len(fixedMergers[MERGERS.SCALES])
+    fixedMergers[MERGERS.NUM] = newNum
+    fixedMergers[MERGERS.CREATED] = datetime.now().ctime()
+    fixedMergers[MERGERS.VERSION] = VERSION_FIX
 
     if( verbose ): print " - - - Number of Mergers %d ==> %d" % (oldNum, newNum)
 
 
-    ### Fix Merger 'Out' Masses
-    #   =======================
+    ## Fix Merger 'Out' Masses
+    #  =======================
     if( verbose ): print " - - - Loading reconstructed 'out' BH masses"
-    masses = fixedMergers[MERGERS_MASSES]
-    aveBef = np.average( masses[:,BH_OUT] )
+    masses = fixedMergers[MERGERS.MASSES]
+    aveBef = np.average( masses[:,BH_TYPE.OUT] )
     massOut = BHMatcher.inferMergerOutMasses(run, mergers=fixedMergers, verbose=verbose)
-    masses[:,BH_OUT] = massOut
-    aveAft = np.average( masses[:,BH_OUT] )
+    masses[:,BH_TYPE.OUT] = massOut
+    aveAft = np.average( masses[:,BH_TYPE.OUT] )
     if( verbose ): print " - - - - Ave mass:  %.4e ===> %.4e" % (aveBef, aveAft)
 
     return fixedMergers
@@ -397,15 +380,14 @@ def _fixMergers(run, mergers, verbose=VERBOSE):
 # _fixMergers()
 
 
-def _importRawMergers(files, verbose=VERBOSE):
+def _importRawMergers(files, verbose=True):
     """
     Fill the given arrays with merger data from the given target files.
 
     Arrays ``ids`` and ``masses`` are shaped [N, 2], for ``N`` total mergers.
     By convention the
-        'in'  (accreted) BH is index ``BH_IN`` (0?)
-        'out' (accretor) BH is index ``BH_OUT`` (1?)
-
+        'in'  (accreted) BH is index ``BH_TYPE.IN`` (0?)
+        'out' (accretor) BH is index ``BH_TYPE.OUT`` (1?)
 
     Arguments
     ---------
@@ -415,21 +397,21 @@ def _importRawMergers(files, verbose=VERBOSE):
     if( verbose ): print " - - BHMergers._importRawMergers()"
 
     # Make sure argument is a list
-    if( not aux.iterableNotString(files) ): files = [ files ]
+    # if( not aux.iterableNotString(files) ): files = [ files ]
 
-    ### Count Mergers and Prepare Storage for Data ###
-    numLines = aux.countLines(files)
+    ## Count Mergers and Prepare Storage for Data
+    #  ------------------------------------------
+    numLines = zio.countLines(files)
     if( verbose ): print " - - - Lines : %d" % (numLines)
 
     # Initialize Storage
-    scales = np.zeros( numLines,               dtype=DBL)
-    ids    = np.zeros([numLines,NUM_BH_TYPES], dtype=TYPE_ID)
-    masses = np.zeros([numLines,NUM_BH_TYPES], dtype=DBL)
+    scales = np.zeros( numLines,               dtype=DTYPE.SCALAR)
+    ids    = np.zeros([numLines,NUM_BH_TYPES], dtype=DTYPE.ID)
+    masses = np.zeros([numLines,NUM_BH_TYPES], dtype=DTYPE.SCALAR)
 
-    nums = numLines-1
-    if( nums <= 100 ): interval = nums
-    else:              interval = np.int( np.floor(nums/100.0) )
-
+    ## Load Lines from Files
+    #  ---------------------
+    if( verbose ): pbar = zio.getProgressBar(numLines)
     count = 0
     for fil in files:
         for line in open(fil):
@@ -437,21 +419,20 @@ def _importRawMergers(files, verbose=VERBOSE):
             time, out_id, out_mass, in_id, in_mass = _parseMergerLine(line)
             # Store values
             scales[count] = time
-            ids[count,BH_IN ] = in_id
-            ids[count,BH_OUT] = out_id
-            masses[count,BH_IN ] = in_mass
-            masses[count,BH_OUT] = out_mass
+            ids[count,BH_TYPE.IN ] = in_id
+            ids[count,BH_TYPE.OUT] = out_id
+            masses[count,BH_TYPE.IN ] = in_mass
+            masses[count,BH_TYPE.OUT] = out_mass
             # Increment Counter
             count += 1
 
             # Print Progress
-            if( verbose ):
-                if( count % interval == 0 or count == nums):
-                    sys.stdout.write('\r - - - %.2f%% Complete' % (100.0*count/nums))
+            if( verbose ): pbar.update(count)
 
-                if( count == nums ): sys.stdout.write('\n')
-                sys.stdout.flush()
+        # line
+    # fil
 
+    if( verbose ): pbar.finish()
 
     return scales, ids, masses
 
@@ -486,18 +467,18 @@ def _parseMergerLine(line):
 
     strs     = line.split()
     # Convert to proper types
-    time     = DBL(strs[1])
-    out_id   = TYPE_ID(strs[2])
-    out_mass = DBL(strs[3])
-    in_id    = TYPE_ID(strs[4])
-    in_mass  = DBL(strs[5])
+    time     = DTYPE.SCALAR(strs[1])
+    out_id   = DTYPE.ID(strs[2])
+    out_mass = DTYPE.SCALAR(strs[3])
+    in_id    = DTYPE.ID(strs[4])
+    in_mass  = DTYPE.SCALAR(strs[5])
 
     return time, out_id, out_mass, in_id, in_mass
 
 # _parseMergerLine()
 
 
-def _mapToSnapshots(scales, verbose=VERBOSE):
+def _mapToSnapshots(scales, verbose=True):
     """
     Find the snapshot during which, or following each merger
 
@@ -509,10 +490,10 @@ def _mapToSnapshots(scales, verbose=VERBOSE):
 
     # Load Cosmology
     cosmo      = Cosmology()
-    snapScales = cosmo.snapshotTimes()
+    snapScales = cosmo.scales()
 
     # Map Mergers-2-Snapshots: snapshot before (or ontop) of each merger
-    mapM2S = np.zeros(numMergers, dtype=INT)
+    mapM2S = np.zeros(numMergers, dtype=DTYPE.INDEX)
     # Map Snapshots-2-Mergers: list of mergers just-after (or ontop) of each snapshot
     mapS2M = [ [] for ii in range(cosmo.num) ]
     # Flags if merger happens exactly on a snapshot (init to False=0)
@@ -523,15 +504,16 @@ def _mapToSnapshots(scales, verbose=VERBOSE):
     # Find the snapshot just below and above each merger.
     #     each entry (returned) is [ low, high, dist-low, dist-high ]
     #     low==high if the times match (within function's default uncertainty)
-    snapBins = [ aux.findBins(sc, snapScales) for sc in scales ]
+    snapBins = [ _findBoundingBins(sc, snapScales) for sc in scales ]
 
-    nums = numMergers-1
-    if( nums < 100 ): interval = nums
-    else:             interval = np.int( np.floor(nums/100.0) )
 
-    ### Create Mappings ###
+    ## Create Mappings
+    #  ---------------    
 
-    if( verbose ): print " - - - Creating mappings"
+    if( verbose ): 
+        print " - - - Creating mappings"
+        pbar = zio.getProgressBar(numMergers)
+
     for ii, bins in enumerate(snapBins):
         tsnap = bins[1]                                                                             # Set snapshot to upper bin
         mapM2S[ii] = tsnap                                                                          # Set snapshot for this merger
@@ -540,14 +522,11 @@ def _mapToSnapshots(scales, verbose=VERBOSE):
         if( bins[0] == bins[1] ): ontop[ii] = True
 
         # Print Progress
-        if( verbose ):
-            if( ii % interval == 0 or ii == nums):
-                sys.stdout.write('\r - - - %.2f%% Complete' % (100.0*ii/nums))
+        if( verbose ): pbar.update(ii)
 
-            if( ii == nums ): sys.stdout.write('\n')
-            sys.stdout.flush()
+    # ii
 
-
+    if( verbose ): pbar.finish()
 
     # Find the most mergers in a snapshot
     numPerSnap = np.array([len(s2m) for s2m in mapS2M ])
@@ -561,6 +540,66 @@ def _mapToSnapshots(scales, verbose=VERBOSE):
     return mapM2S, mapS2M, ontop
 
 # _mapToSnapshots()
+
+
+def _findBoundingBins(target, bins, thresh=1.0e-5):
+    """
+    Find the array indices (of "bins") bounding the "target"
+
+    If target is outside bins, the missing bound will be 'None'
+    low and high will be the same, if the target is almost exactly[*1] equal to a bin
+
+    [*1] : How close counds as effectively the same is set by 'DEL_TIME_THRESH' below
+
+    arguments
+    ---------
+        target  : [ ] value to be compared
+        bins    : [ ] list of values to compare to the 'target'
+
+    output
+    ------
+        low  : [int] index below target (or None if none)
+        high : [int] index above target (or None if none)
+
+    """
+
+    # deltat  : test whether the fractional difference between two values is less than threshold
+    #           This function allows the later conditions to accomodate smaller numerical
+    #           differences, between effectively the same value  (e.g.   1.0 vs. 0.9999999999989)
+    #
+    if( thresh == 0.0 ): deltat = lambda x,y : False
+    else               : deltat = lambda x,y : np.abs(x-y)/np.abs(x) <= thresh
+
+    nums   = len(bins)
+    # Find bin above (or equal to) target
+    high = np.where( (target <= bins) | deltat(target,bins) )[0]
+    if( len(high) == 0 ): high = None
+    # Select first bin above target
+    else:
+        high = high[0]                            
+        dhi  = bins[high] - target
+
+
+    # Find bin below (or equal to) target
+    low  = np.where( (target >= bins) | deltat(target,bins) )[0]
+    if( len(low)  == 0 ): low  = None
+    # Select  last bin below target
+    else:
+        low  = low[-1]
+        dlo  = bins[low] - target
+
+    # Print warning on error
+    if( low == None or high == None ):
+        print "BHMergers._findBoundingBins: target = %e, bins = {%e,%e}; low,high = %s,%s !" % \
+            ( target, bins[0], bins[-1], str(low), str(high) )
+        raise RuntimeError("Could not find bins!")
+
+
+    return [low,high,dlo,dhi]
+
+# _findBoundingBins()
+
+
 
 
 
