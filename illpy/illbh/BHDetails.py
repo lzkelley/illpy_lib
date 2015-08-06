@@ -8,9 +8,18 @@ details can then be accessed by snapshot and blackhole ID number.
 
 Functions
 ---------
-   main() : returns None, assures that intermediate files exist -- creating them if necessary.
-   detailsForBH() : returns dict, dict; retrieves the details entries for a given BH ID number.
+    processDetails
+    organizeDetails
+    formatDetails
 
+    _reorganizeBHDetailsFiles
+    _convertDetailsASCIItoNPZ
+    _convertDetailsASCIItoNPZ_snapshot 
+    _loadBHDetails_ASCII
+    _parseIllustrisBHDetailsLine
+
+    loadBHDetails
+    _getPrecision
 
 Details Dictionary
 ------------------
