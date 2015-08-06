@@ -4,6 +4,11 @@ Routines to match BH Mergers with BH Details entries based on times and IDs.
 
 Functions
 ---------
+    main
+    loadMergerDetails
+    detailsForMergers
+    checkMatches
+    inferMergerOutMasses
 
 
 MergerDetails Dictionary
