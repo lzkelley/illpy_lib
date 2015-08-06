@@ -9,8 +9,8 @@ __status__ = "Development"
 
 
 import Constants
-import illcosmo
+#import illcosmo
 from illcosmo.Cosmology import Cosmology
-import AuxFuncs
-import illbh
-import Subhalos
+#import AuxFuncs
+#import illbh
+#import Subhalos
