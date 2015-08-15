@@ -52,13 +52,16 @@ import zcode.InOut as zio
 import zcode.Math  as zmath
 from zcode.Constants import PC
 
-from illpy.illbh import BHMergers
-from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 from illpy.Subhalos.Constants import SUBHALO
 from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR
 
 import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
+
+import illpy.illbh
+from illpy.illbh import BHMergers, BHConstants
+from illpy.illbh.BHConstants import MERGERS, BH_TYPE
+
 
 # Hard Settings
 _VERSION      = 1.4
