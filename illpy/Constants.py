@@ -8,13 +8,18 @@ from zcode.Constants import MSOL, PC, KPC, HPAR
 from enum import Enum
 
 ## Physical Constants
+'''
 MASS_CONV        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
 MDOT_CONV        = 10.22                          # Multiply by this to get [Msol/yr]
 DENS_CONV        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
 DIST_CONV        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
 CS_CONV          = 1.0                            # ??????? FIX
+'''
 
-class CONV_PHY(Enum):
+class CONV_ILL_TO_CGS(Enum):
+    """
+    Convert from illustris units to physical [cgs] units (multiply).
+    """
     MASS        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
     MDOT        = 10.22                          # Multiply by this to get [Msol/yr]
     DENS        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
@@ -22,10 +27,25 @@ class CONV_PHY(Enum):
     CS          = 1.0                            # ??????? FIX
 
 
-class CONV_STD(Enum):
-    MASS        = CONV_PHY.MASS.value/MSOL
-    DENS        = CONV_PHY.DENS.value*np.power(PC, 3.0)/MSOL
-    DIST        = CONV_PHY.DIST.value/PC
+class CONV_CGS_TO_SOL(Enum):
+    """
+    Convert from cgs units to (standard) solar units, e.g. Msol, PC, etc, by multiplication
+    """
+    MASS        = 1.0/MSOL                       # [g] ==> Msol
+    MDOT        = YR/MSOL                        # [g/s] ==> [Msol/yr]
+    DENS        = np.power(PC,3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
+    DIST        = 1.0/PC                         # [cm] ==> [pc]
+    VEL         = 1.0e-5                         # [cm/s] ==> [km/s]
+
+
+class CONV_ILL_TO_SOL(Enum):
+    """
+    Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
+    """
+    MASS        = CONV_ILL_TO_CGS.MASS.value*CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
+    MDOT        = CONV_ILL_TO_CGS.MDOT.value*CONV_CGS_TO_SOL.MDOT.value  #  to [Msol/yr]
+    DENS        = CONV_ILL_TO_CGS.DENS.value*CONV_CGS_TO_SOL.DENS.value  #  to [Msol/pc^3]
+    DIST        = CONV_ILL_TO_CGS.DIST.value*CONV_CGS_TO_SOL.DIST.value  #  to comoving-pc
 
 
 BOX_LENGTH       = 75000                          # [ckpc/h]
