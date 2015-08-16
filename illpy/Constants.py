@@ -4,7 +4,7 @@ Numerical constants pertaining to the Illustris Simulations and their data.
 """
 
 import numpy as np
-from zcode.Constants import MSOL, PC, KPC, HPAR
+from zcode.Constants import MSOL, PC, KPC, HPAR, YR
 from enum import Enum
 
 ## Physical Constants
@@ -96,6 +96,7 @@ def GET_ILLUSTRIS_OUTPUT_DIR(run):
 
 
 # Indices for Different Types of Particles
+'''
 PARTICLE_GAS     = 0
 PARTICLE_DM      = 1
 PARTICLE_TRAC    = 3
@@ -104,7 +105,7 @@ PARTICLE_BH      = 5
 PARTICLE_TYPES   = [ PARTICLE_GAS,  PARTICLE_DM, PARTICLE_TRAC, PARTICLE_STAR, PARTICLE_BH ]
 PARTICLE_NAMES   = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
 PARTICLE_NUM     = 6
-
+'''
 
 class PARTICLE():
     GAS  = 0
@@ -113,8 +114,10 @@ class PARTICLE():
     STAR = 4
     BH   = 5
 
-    _PARTICLE_NAMES   = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
+    _NAMES   = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
+    _NUM     = 6
     
+    '''
     @staticmethod
     def PROPERTIES(): 
         return [getattr(PARTICLE,it) for it in vars(PARTICLE) 
@@ -123,6 +126,7 @@ class PARTICLE():
     @classmethod
     def NAMES(cls, it):
         return cls._PARTICLE_NAMES[it]
+    '''
 
 # } class PARTICLE
 
