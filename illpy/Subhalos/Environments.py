@@ -53,7 +53,7 @@ import zcode.Math  as zmath
 from zcode.Constants import PC
 
 from illpy.Subhalos.Constants import SUBHALO
-from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR
+from illpy.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
 
 import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
@@ -1051,8 +1051,8 @@ def main():
     if(   args.check   ): CHECK_EXISTS = True
     elif( args.nocheck ): CHECK_EXISTS = False
 
-    # Create Radial Bins
-    radExtrema = np.array(RAD_EXTREMA)*PC/DIST_CONV
+    # Create Radial Bins (in simulation units)
+    radExtrema = np.array(RAD_EXTREMA)/CONV_ILL_TO_SOL.DIST.value   # [pc] ==> [ill]
     radBins = zmath.spacing(radExtrema, num=RAD_BINS)
 
     ## Master Process
