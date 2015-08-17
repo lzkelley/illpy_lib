@@ -75,7 +75,7 @@ from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
 from Constants import SNAPSHOT
 
 import zcode.InOut      as zio
-import illustris_python as ill
+# import illustris_python as ill
 
 
 
@@ -533,6 +533,8 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
        offsets <int>[N,6] : particle offsets for each offset entry
 
     """
+
+    import illustris_python as ill
 
     if( verbose ): print " - - ParticleHosts._constructOffsetTable()"
 

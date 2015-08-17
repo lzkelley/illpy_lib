@@ -46,7 +46,7 @@ import numpy as np
 from datetime import datetime
 import sys, os, argparse, warnings
 
-from mpi4py import MPI
+# from mpi4py import MPI
 
 import zcode.InOut as zio
 import zcode.Math  as zmath
@@ -251,6 +251,7 @@ def _runMaster(run, comm):
        - Tracks how-many and which process (and subhalos) finish successfully
 
     """
+    from mpi4py import MPI
 
     stat = MPI.Status()
     rank = comm.rank
@@ -392,6 +393,8 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
      - Returns status to ``master``
 
     """
+
+    from mpi4py import MPI
 
     stat = MPI.Status()
     rank = comm.rank
@@ -1032,6 +1035,8 @@ def main():
     ## Initialize MPI Parameters
     #  -------------------------
 
+    from mpi4py import MPI
+    
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
