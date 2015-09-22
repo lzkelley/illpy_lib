@@ -34,8 +34,10 @@ class CONV_CGS_TO_SOL(Enum):
     MASS        = 1.0/MSOL                       # [g] ==> Msol
     MDOT        = YR/MSOL                        # [g/s] ==> [Msol/yr]
     DENS        = np.power(PC,3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
+    NDENS       = np.power(PC,3.0)               # [1/cm^3] ==> [1/pc^3]
     DIST        = 1.0/PC                         # [cm] ==> [pc]
     VEL         = 1.0e-5                         # [cm/s] ==> [km/s]
+    ENER        = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
 
 
 class CONV_ILL_TO_SOL(Enum):
