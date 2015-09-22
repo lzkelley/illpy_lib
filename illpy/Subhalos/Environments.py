@@ -46,14 +46,14 @@ import numpy as np
 from datetime import datetime
 import sys, os, argparse, warnings
 
-from mpi4py import MPI
+# from mpi4py import MPI
 
 import zcode.InOut as zio
 import zcode.Math  as zmath
 from zcode.Constants import PC
 
 from illpy.Subhalos.Constants import SUBHALO
-from illpy.Constants import DIST_CONV, DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR
+from illpy.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
 
 import Subhalo, Profiler, ParticleHosts
 from ParticleHosts import OFFTAB
@@ -251,6 +251,7 @@ def _runMaster(run, comm):
        - Tracks how-many and which process (and subhalos) finish successfully
 
     """
+    from mpi4py import MPI
 
     stat = MPI.Status()
     rank = comm.rank
@@ -392,6 +393,8 @@ def _runSlave(run, comm, radBins=None, loadsave=True, verbose=False):
      - Returns status to ``master``
 
     """
+
+    from mpi4py import MPI
 
     stat = MPI.Status()
     rank = comm.rank
@@ -1032,6 +1035,8 @@ def main():
     ## Initialize MPI Parameters
     #  -------------------------
 
+    from mpi4py import MPI
+    
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -1051,8 +1056,8 @@ def main():
     if(   args.check   ): CHECK_EXISTS = True
     elif( args.nocheck ): CHECK_EXISTS = False
 
-    # Create Radial Bins
-    radExtrema = np.array(RAD_EXTREMA)*PC/DIST_CONV
+    # Create Radial Bins (in simulation units)
+    radExtrema = np.array(RAD_EXTREMA)/CONV_ILL_TO_SOL.DIST.value   # [pc] ==> [ill]
     radBins = zmath.spacing(radExtrema, num=RAD_BINS)
 
     ## Master Process

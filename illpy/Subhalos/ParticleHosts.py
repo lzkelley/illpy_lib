@@ -70,12 +70,12 @@ import numpy as np
 from datetime import datetime
 
 
-from .. Constants import DTYPE, NUM_SNAPS, PARTICLE_NUM, PARTICLE, \
+from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
                          GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
 from Constants import SNAPSHOT
 
 import zcode.InOut      as zio
-import illustris_python as ill
+# import illustris_python as ill
 
 
 
@@ -534,6 +534,8 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
     """
 
+    import illustris_python as ill
+
     if( verbose ): print " - - ParticleHosts._constructOffsetTable()"
 
     if( bar is None ): bar = bool(verbose)
@@ -563,12 +565,12 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     haloNum = np.zeros( tableSize,               dtype=DTYPE.INDEX)
     subhNum = np.zeros( tableSize,               dtype=DTYPE.INDEX)
     # Offsets approach total number of particles, must be uint64
-    offsets = np.zeros([tableSize,PARTICLE_NUM], dtype=DTYPE.ID)
+    offsets = np.zeros([tableSize,PARTICLE._NUM], dtype=DTYPE.ID)
 
     subh = 0
     offs = 0
-    cumHaloParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
-    cumSubhParts = np.zeros(PARTICLE_NUM, dtype=DTYPE.ID)
+    cumHaloParts = np.zeros(PARTICLE._NUM, dtype=DTYPE.ID)
+    cumSubhParts = np.zeros(PARTICLE._NUM, dtype=DTYPE.ID)
 
     pbar = zio.getProgressBar(tableSize)
     if( bar ): pbar.start()

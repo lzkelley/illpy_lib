@@ -15,7 +15,7 @@ import illpy
 from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
 from Constants import SUBHALO
 
-import illustris_python as ill
+# import illustris_python as ill
 
 VERBOSE = True
 
@@ -54,6 +54,8 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
        LOAD_PARTICLES <int>[N] : Default list of particle types to load if ``partType == None``.
 
     """
+
+    import illustris_python as ill
 
     if( verbose ): print " - - Subhalos._importSubhaloParticles()"
 
@@ -123,6 +125,7 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
 
     """
 
+    import illustris_python as ill
 
     if( verbose ): print " - - Subhalo.importGroupCatalogData()"
 
