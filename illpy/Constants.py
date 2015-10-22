@@ -24,6 +24,7 @@ class CONV_ILL_TO_CGS(Enum):
     MDOT        = 10.22                          # Multiply by this to get [Msol/yr]
     DENS        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
     DIST        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
+    VEL         = 1.0e5                          # [km/s] to [cm/s]
     CS          = 1.0                            # ??????? FIX
 
 
