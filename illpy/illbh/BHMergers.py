@@ -100,7 +100,7 @@ import BHMatcher
 from .. Constants import DTYPE
 from .. import Cosmology
 
-import zcode.InOut as zio
+import zcode.inout as zio
 
 # VERSION = 0.21
 

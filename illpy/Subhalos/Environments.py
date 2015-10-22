@@ -48,9 +48,9 @@ import sys, os, argparse, warnings
 
 # from mpi4py import MPI
 
-import zcode.InOut as zio
-import zcode.Math  as zmath
-from zcode.Constants import PC
+import zcode.inout as zio
+import zcode.math  as zmath
+from zcode.constants import PC
 
 from illpy.Subhalos.Constants import SUBHALO
 from illpy.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL

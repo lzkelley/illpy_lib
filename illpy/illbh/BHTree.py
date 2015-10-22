@@ -23,7 +23,7 @@ from BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
 import BHMergers
 import BuildTree
 
-import zcode.InOut as zio
+import zcode.inout as zio
 
 VERSION = 0.21
 

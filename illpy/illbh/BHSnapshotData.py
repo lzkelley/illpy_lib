@@ -37,7 +37,7 @@ from BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTY
 
 import illustris_python as ill
 
-import zcode.InOut as zio
+import zcode.inout as zio
 
 DEF_RUN = 1
 _VERSION = 0.4

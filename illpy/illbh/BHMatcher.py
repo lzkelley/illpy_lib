@@ -52,7 +52,7 @@ from BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, NUM_BH
 from MatchDetails import getDetailIndicesForMergers
 from ..Constants import DTYPE, NUM_SNAPS
 
-import zcode.InOut as zio
+import zcode.inout as zio
 
 VERSION = 0.22
 

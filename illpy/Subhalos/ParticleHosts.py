@@ -74,7 +74,7 @@ from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
                          GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
 from Constants import SNAPSHOT
 
-import zcode.InOut      as zio
+import zcode.inout      as zio
 # import illustris_python as ill
 
 

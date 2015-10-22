@@ -19,8 +19,8 @@ import Subhalo
 import Constants
 from Constants import SNAPSHOT, SUBHALO
 
-import zcode.Math     as zmath
-import zcode.InOut    as zio
+import zcode.math     as zmath
+import zcode.inout    as zio
 
 
 NUM_RAD_BINS = 100

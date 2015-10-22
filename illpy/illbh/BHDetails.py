@@ -72,7 +72,7 @@ from illpy.Constants import DTYPE
 import BHConstants
 from BHConstants import DETAILS
 
-import zcode.InOut as zio
+import zcode.inout as zio
 
 VERSION = 0.23                                    # Version of BHDetails
 
