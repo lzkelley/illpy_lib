@@ -19,7 +19,6 @@ Functions
 ---------
 
 
-
 """
 
 from glob import glob
@@ -149,9 +148,13 @@ class BH_SNAP():
     DIR_SRC = 'directory'
     VALID   = 'valid'
     TARGET  = 'target'
+    FIELDS  = 'snapshot_fields'
+    DTYPES  = 'snapshot_dtypes'
 
-SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
-SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
+SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses',
+                   'SubfindHsml', 'BH_Mdot', 'BH_Density']
+SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR,
+                   DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
 
 def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
@@ -188,7 +191,6 @@ def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
     if(verbose): print " - - - %d Total Files" % (len(files))
 
     return files
-
 
 
 def GET_MERGERS_RAW_COMBINED_FILENAME(run):
@@ -232,10 +234,8 @@ def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname += _BLACKHOLE_TREE_FILENAME % (run, version)
     return fname
 
-
 assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
     "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
-
 
 assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
     "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
