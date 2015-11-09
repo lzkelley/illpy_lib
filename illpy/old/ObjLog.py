@@ -14,8 +14,8 @@ class Log(object):
         self.__log = None                                                                           # Default to no log-file
 
         # If non-zero filename is provided, open log file
-        if( type(filename) == str ):
-            if( len(filename) > 0 ):
+        if(type(filename) == str):
+            if(len(filename) > 0):
                 self.__initFile(filename, clean, binary)
                 
 
@@ -24,16 +24,16 @@ class Log(object):
         """ Initialize a log file """
 
         # Determine File Mode
-        if( cln ): mode  = 'w'                                                                      # Clear file when opening ('w'rite)
+        if(cln): mode  = 'w'                                                                      # Clear file when opening ('w'rite)
         else:      mode  = 'a'                                                                      # Append to file ('a'ppend)
 
-        if( bin ): mode += 'b'                                                                      # Open as binary
+        if(bin): mode += 'b'                                                                      # Open as binary
 
         # Open File
         self.__log = open(fname, mode)
 
         # Setup File
-        if( not cln ): self.__log.write("\n\n\n\n\n\n")                                             # Add some whitespace
+        if(not cln): self.__log.write("\n\n\n\n\n\n")                                             # Add some whitespace
 
         # Add the date and time
         border = "="*100
@@ -50,19 +50,19 @@ class Log(object):
     def log(self, arg, add=0):
         """ Write a log entry to stdout, and to log file if it exists. """
 
-        if( self.verbose == False and self.__log == None ): return
+        if(self.verbose == False and self.__log == None): return
 
         #usenum = self.num + add
         tbLen = len(tb.extract_stack()) - 1                                                         # Subtract one to discount this function
         #usenum = tbLen-self.num                                                                     # Get length of stack traceback
         usenum = tbLen-self.num+add                                                                 # Get length of stack traceback
         prep = " -"*usenum
-        if( usenum > 0 ): prep += " "
+        if(usenum > 0): prep += " "
 
-        if( self.verbose ): print prep + arg
+        if(self.verbose): print prep + arg
             
-        if( type(self.__log) == file ):
-            if( not self.__log.closed ): 
+        if(type(self.__log) == file):
+            if(not self.__log.closed): 
                 self.__log.write(prep + arg + "\n")
                 self.__log.flush()
 
@@ -70,7 +70,7 @@ class Log(object):
     def mark(self, num=0):
         """ Add a decorated timestamp to the logfile """
         timeStr = str(datetime.now())
-        if( num > 0 ): timeStr = "  " + timeStr + "  "
+        if(num > 0): timeStr = "  " + timeStr + "  "
         timeStr = timeStr.center(2*num + len(timeStr), '=')
         self.__log.write(timeStr + "\n")
 
@@ -78,6 +78,6 @@ class Log(object):
     def __del__(self):
         """ Make sure log file is closed """
 
-        if( type(self.__log) == file ):
-            if( not self.__log.closed ): self.__log.flush()
+        if(type(self.__log) == file):
+            if(not self.__log.closed): self.__log.flush()
             self.__log.close()

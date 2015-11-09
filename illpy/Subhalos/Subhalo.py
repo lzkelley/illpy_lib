@@ -33,8 +33,8 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
 
     Arguments
     ---------
-       run       <int>      : Illustris simulation number {1,3}
-       snapNum   <int>      : Illustris snapshot number {1,135}
+       run       <int>      : Illustris simulation number {1, 3}
+       snapNum   <int>      : Illustris snapshot number {1, 135}
        subhalo   <int>      : Subhalo index for this snapshot
        partTypes <int>([N]) : optional, Target particle types; if `None`, all are loaded
        verbose   <bool>     : optional, print verbose output
@@ -57,19 +57,19 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
 
     import illustris_python as ill
 
-    if( verbose ): print " - - Subhalos._importSubhaloParticles()"
+    if(verbose): print " - - Subhalos._importSubhaloParticles()"
 
     ## Prepare Particle Types to Import
     #  --------------------------------
 
     # Set particle types to Default
-    if( partTypes is None ): partTypes = LOAD_PARTICLES
+    if(partTypes is None): partTypes = LOAD_PARTICLES
 
     # Make sure ``partTypes`` is iterable
-    if( not np.iterable(partTypes) ): partTypes = [ partTypes ]
+    if(not np.iterable(partTypes)): partTypes = [partTypes]
 
     # Get names of particle types
-    partNames = [ PARTICLE.NAMES(ptype) for ptype in partTypes ]
+    partNames = [PARTICLE.NAMES(ptype) for ptype in partTypes]
 
     # Get snapshot file path and filename
     outputPath = GET_ILLUSTRIS_OUTPUT_DIR(run)
@@ -78,27 +78,27 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
     ## Load Snapshot data for target Particles
     #  ---------------------------------------
 
-    if( verbose ): print " - - - Loading snapshot data"
+    if(verbose): print " - - - Loading snapshot data"
     data = []
-    if( verbose ): start_all = datetime.now()
+    if(verbose): start_all = datetime.now()
     # Iterate over particle types
-    for ptype,pname in zip(partTypes,partNames):
-        if( verbose ): start = datetime.now()
-        partData = ill.snapshot.loadSubhalo(outputPath, snapNum, subhalo, ptype )
+    for ptype, pname in zip(partTypes, partNames):
+        if(verbose): start = datetime.now()
+        partData = ill.snapshot.loadSubhalo(outputPath, snapNum, subhalo, ptype)
         data.append(partData)
-        if( verbose ): stop = datetime.now()
+        if(verbose): stop = datetime.now()
         numParts = partData['count']
         numParams = len(partData.keys())-1
-        if( verbose ): 
+        if(verbose): 
             print "         %8d %6s, %2d pars, after %s" % \
                 (numParts, pname, numParams, str(stop-start))
 
 
-    if( verbose ): stop_all = datetime.now()
-    if( verbose ): print " - - - - All After %s" % (str(stop_all-start_all))
+    if(verbose): stop_all = datetime.now()
+    if(verbose): print " - - - - All After %s" % (str(stop_all-start_all))
 
     # If single particle, don't both with list
-    if( len(data) == 1 ): data = data[0]
+    if(len(data) == 1): data = data[0]
 
     return data, partTypes
 
@@ -113,8 +113,8 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
 
     Arguments
     ---------
-       run      <int>      : illustris simulation run number {1,3}
-       snapNum  <int>      : illustris snapshot number {1,135}
+       run      <int>      : illustris simulation run number {1, 3}
+       snapNum  <int>      : illustris snapshot number {1, 135}
        subhalos <int>([N]) : target subhalo numbers
        fields   <str>([M]) : target catalog parameters
        verbose  <bool>     : print verbose output
@@ -127,32 +127,32 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
 
     import illustris_python as ill
 
-    if( verbose ): print " - - Subhalo.importGroupCatalogData()"
+    if(verbose): print " - - Subhalo.importGroupCatalogData()"
 
     # If no group-catalog fields given, use all of them (available)
-    if( fields is None ): fields = SUBHALO.PROPERTIES()
+    if(fields is None): fields = SUBHALO.PROPERTIES()
 
     ## Load Group Catalog
     #  ------------------
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
-    if( verbose ): print " - - - Loading group catalog from '%s'" % (path_output)
+    if(verbose): print " - - - Loading group catalog from '%s'" % (path_output)
     gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
     
-    if( isinstance(gcat, dict) ): numSubhalos = gcat['count']
+    if(isinstance(gcat, dict)): numSubhalos = gcat['count']
     else:                         numSubhalos = len(gcat)
-    if( verbose ): print " - - - - Loaded %d subhalos" % (numSubhalos)
+    if(verbose): print " - - - - Loaded %d subhalos" % (numSubhalos)
 
     # If no subhalos selected, return full catalog
-    if( subhalos is None ): return gcat
+    if(subhalos is None): return gcat
     
 
     ## Extract Target Subhalos
     #  -----------------------
 
-    if( isinstance(gcat, dict) ): 
+    if(isinstance(gcat, dict)): 
         subcat = {}
         for key in gcat.keys():
-            if( key is not 'count' ): subcat[key] = gcat[key][subhalos]
+            if(key is not 'count'): subcat[key] = gcat[key][subhalos]
     else:
         subcat = gcat[subhalos]
 

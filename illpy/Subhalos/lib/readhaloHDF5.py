@@ -14,7 +14,7 @@ import numpy as np
 import os
 import sys
 
-FlagRead, cat,GroupOffset, HaloOffset, multiple, filename, Parttype, FileTypeNumbers, FileNum = False, None, None, None, None, None, [], None, None
+FlagRead, cat, GroupOffset, HaloOffset, multiple, filename, Parttype, FileTypeNumbers, FileNum = False, None, None, None, None, None, [], None, None
 
 def reset():
         global FlagRead, cat, GroupOffset, HaloOffset, multiple, filename, Parttype, FileTypeNumbers, FileNum
@@ -37,7 +37,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 			print "READHALO: Parttype = ", Parttype
 
 		#read in catalog
-		cat = readsubfHDF5.subfind_catalog(base, num, long_ids=long_ids, double_output=double_output, keysel=["GroupLenType","GroupNsubs","GroupFirstSub","SubhaloLenType","SubhaloMassType"])
+		cat = readsubfHDF5.subfind_catalog(base, num, long_ids=long_ids, double_output=double_output, keysel=["GroupLenType", "GroupNsubs", "GroupFirstSub", "SubhaloLenType", "SubhaloMassType"])
 
 		if (cat.ngroups==0):
 			if (verbose):

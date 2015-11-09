@@ -1,20 +1,11 @@
-"""
-Numerical constants pertaining to the Illustris Simulations and their data.
-
+"""Numerical constants pertaining to the Illustris Simulations and their data.
 """
 
 import numpy as np
 from zcode.constants import MSOL, PC, KPC, HPAR, YR
 from enum import Enum
 
-## Physical Constants
-'''
-MASS_CONV        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
-MDOT_CONV        = 10.22                          # Multiply by this to get [Msol/yr]
-DENS_CONV        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
-DIST_CONV        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
-CS_CONV          = 1.0                            # ??????? FIX
-'''
+# Physical Constants
 
 class CONV_ILL_TO_CGS(Enum):
     """
@@ -34,8 +25,8 @@ class CONV_CGS_TO_SOL(Enum):
     """
     MASS        = 1.0/MSOL                       # [g] ==> Msol
     MDOT        = YR/MSOL                        # [g/s] ==> [Msol/yr]
-    DENS        = np.power(PC,3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
-    NDENS       = np.power(PC,3.0)               # [1/cm^3] ==> [1/pc^3]
+    DENS        = np.power(PC, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
+    NDENS       = np.power(PC, 3.0)               # [1/cm^3] ==> [1/pc^3]
     DIST        = 1.0/PC                         # [cm] ==> [pc]
     VEL         = 1.0e-5                         # [cm/s] ==> [km/s]
     ENER        = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
@@ -96,20 +87,7 @@ def GET_ILLUSTRIS_OUTPUT_DIR(run):
     return _ILLUSTRIS_OUTPUT_DIR_BASE % (_ILLUSTRIS_RUN_NAMES[run])
 
 
-
-
 # Indices for Different Types of Particles
-'''
-PARTICLE_GAS     = 0
-PARTICLE_DM      = 1
-PARTICLE_TRAC    = 3
-PARTICLE_STAR    = 4
-PARTICLE_BH      = 5
-PARTICLE_TYPES   = [ PARTICLE_GAS,  PARTICLE_DM, PARTICLE_TRAC, PARTICLE_STAR, PARTICLE_BH ]
-PARTICLE_NAMES   = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
-PARTICLE_NUM     = 6
-'''
-
 class PARTICLE():
     GAS  = 0
     DM   = 1
@@ -117,36 +95,9 @@ class PARTICLE():
     STAR = 4
     BH   = 5
 
-    _NAMES   = [ "Gas" , "DM" , "-", "Tracer", "Star", "BH" ]
+    _NAMES   = ["Gas" , "DM" , "-", "Tracer", "Star", "BH"]
     _NUM     = 6
     
-    '''
-    @staticmethod
-    def PROPERTIES(): 
-        return [getattr(PARTICLE,it) for it in vars(PARTICLE) 
-                if not it.startswith('_') and not callable(getattr(PARTICLE,it)) ]
-
-    @classmethod
-    def NAMES(cls, it):
-        return cls._PARTICLE_NAMES[it]
-    '''
-
-# } class PARTICLE
-
-
-
-# Indices for Different Photometric Bands
-'''
-PHOTO_U               = 0
-PHOTO_B               = 1
-PHOTO_V               = 2
-PHOTO_K               = 3
-PHOTO_g               = 4
-PHOTO_r               = 5
-PHOTO_i               = 6
-PHOTO_z               = 7
-'''
-
 
 _PROCESSED_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
 

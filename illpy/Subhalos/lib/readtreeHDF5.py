@@ -5,7 +5,7 @@ import os
 
 """
 Simple Python script for reading merger tree HDF5 files
-in "database mode," which is optimized for extracting
+in "database mode, " which is optimized for extracting
 quantities along the main branch of a subhalo.
 
 For convenience, there are some built-in functions to do

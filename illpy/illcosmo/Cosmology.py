@@ -127,10 +127,10 @@ class Cosmology(object):
         nsnap = np.array(snap)
 
         # If this is not an integer, false
-        if( not np.issubdtype(nsnap.dtype, int) ):
+        if(not np.issubdtype(nsnap.dtype, int)):
             return False
         # If this is within number of snapshots, true
-        elif( nsnap >= 0 and nsnap <= self.num ):
+        elif(nsnap >= 0 and nsnap <= self.num):
             return True
         # outside range, false
         else:
@@ -139,13 +139,13 @@ class Cosmology(object):
     '''
     def snapshotTimes(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
-        if( num == None ): return self.__cosmo[self.__SCALEFACT]
+        if(num == None): return self.__cosmo[self.__SCALEFACT]
         else:              return self.__cosmo[self.__SCALEFACT][num]
     '''
 
     def scales(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
-        if( num is None ): return self.__cosmo[self.__SCALEFACT]
+        if(num is None): return self.__cosmo[self.__SCALEFACT]
         else:              return self.__cosmo[self.__SCALEFACT][num]
 
     def redshift(self, sf):
@@ -188,7 +188,7 @@ class Cosmology(object):
         """
 
         # If this is a snapshot number, return value from that snapshot
-        if( self.__validSnap(sf) ):
+        if(self.__validSnap(sf)):
             return self.__cosmo[key][sf]
         # Otherwise, interpolate to given scale-factor
         else:
@@ -196,7 +196,7 @@ class Cosmology(object):
             #     initialized, initialize it now.
             #     Use uppercase attributes
             attrKey = "__" + key.upper()
-            if( not hasattr(self, attrKey) ):
+            if(not hasattr(self, attrKey)):
                 setattr(self, attrKey, self.__initInterp(key))
 
             # Return interpolated value
@@ -259,7 +259,7 @@ class Cosmology(object):
         """
 
         # Generalize argument to always be iterable
-        if( not np.iterable(sf) ): sf = np.array([sf])
+        if(not np.iterable(sf)): sf = np.array([sf])
 
         ### Get Cosmological Parameters ###
         nums = len(sf)
@@ -268,7 +268,7 @@ class Cosmology(object):
         hfunc   = np.zeros(nums, dtype=FLT_TYPE)
 
         # For each input scale factor
-        for ii,scale in enumerate(sf):
+        for ii, scale in enumerate(sf):
             # Get Comoving Distances
             comDist[ii] = self.comDist(scale)
             # Get redshifts

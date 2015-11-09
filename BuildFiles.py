@@ -26,9 +26,9 @@ def main(run=RUN, verbose=VERBOSE):
 
 
     # Check each test value
-    for ii, tval in enumerate([t1,t2,t3]):
+    for ii, tval in enumerate([t1, t2, t3]):
 
-        if( tval <= 0.0 or tval >= 1.0 ):
+        if(tval <= 0.0 or tval >= 1.0):
             raise RuntimeError("ERROR: illpy.illcosmo.Cosmology - Test %d" % ii)
 
     print "\n\nCosmology looks good.\n"
@@ -53,13 +53,13 @@ def main(run=RUN, verbose=VERBOSE):
         raise ex
 
 
-    if( t1 <= 0 ):
+    if(t1 <= 0):
         raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 1 = %d!" % t1)
 
-    if( t2 <= 0 ):
+    if(t2 <= 0):
         raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 2 = %d!" % t2)
 
-    if( t3 < cosmo[-2] or t3 > cosmo[-1] ):
+    if(t3 < cosmo[-2] or t3 > cosmo[-1]):
         raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 3 = %f!" % t3)
 
 
@@ -75,7 +75,7 @@ def main(run=RUN, verbose=VERBOSE):
     try:
         mrg = BHMergers.loadMergers(run, verbose)
         t1 = mrg[BHMergers.MERGERS_NUM]
-        t2 = np.count_nonzero( mrg[BHMergers.MERGERS_MAP_ONTOP] == True )
+        t2 = np.count_nonzero(mrg[BHMergers.MERGERS_MAP_ONTOP] == True)
         t3 = np.average(dets[BHMergers.MERGERS_TIMES])
 
     except Exception as ex:
@@ -84,8 +84,8 @@ def main(run=RUN, verbose=VERBOSE):
 
 
     # Check each test value
-    for ii, tval in enumerate([t1,t2,t3]):
-        if( tval <= 0 ):
+    for ii, tval in enumerate([t1, t2, t3]):
+        if(tval <= 0):
             raise RuntimeError("ERROR: illpy.illbh.BHMergers - Test %d" % ii)
 
 

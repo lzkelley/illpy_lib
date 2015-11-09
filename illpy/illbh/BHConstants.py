@@ -1,5 +1,4 @@
-"""
-Constants for Blackhole related functions and submodules.
+"""Constants for Blackhole related functions and submodules.
 
 Classes
 -------
@@ -9,10 +8,10 @@ Classes
     DETAILS : enum-type class for BH-Details entries dictionary keys.
               The list ``DETAILS_PHYSICAL_KEYS`` contains the keys corresponding to values taken
               from the BH Details files themselves
-    BH_TYPE : enum-type class for tracking the two types {``IN``,``OUT``} of Merger BHs.
+    BH_TYPE : enum-type class for tracking the two types {``IN``, ``OUT``} of Merger BHs.
               The ``OUT`` BH is the one which persists after the merger, while the ``IN`` BH
               effectively dissappears.
-    BH_TIME : enum-type class for the three stored, details times {``FIRST``,``BEFORE``,``AFTER``}.
+    BH_TIME : enum-type class for the three stored, details times {``FIRST``, ``BEFORE``, ``AFTER``}.
     BH_TREE : enum-type class for BH merger tree dictionary keys.
     BH_SNAP : enum class for BHSnapshotData dictionary keys.
 
@@ -23,27 +22,26 @@ Functions
 
 """
 
-import numpy as np
 from glob import glob
 
-from .. Constants import NUM_SNAPS, GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, GET_PROCESSED_DIR, DTYPE
+from .. Constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE
 
 
-## Illustris Parameters
-#  ====================
+# Illustris Parameters
+# ====================
 
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
-_ILLUSTRIS_MERGERS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
-                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
-                            1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/" ]
-                            }
+_ILLUSTRIS_MERGERS_DIRS = {3: "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_mergers/",
+                           2: "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_mergers/",
+                           1: ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_mergers/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_mergers/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_mergers/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_mergers/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_mergers/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/"]
+                           }
 
 _ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
                             2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
@@ -52,12 +50,12 @@ _ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/b
                                  "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
                                  "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
                                  "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/" ]
+                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/"]
                             }
 
 
-## Post-Processing Parameters
-#  ==========================
+# Post-Processing Parameters
+# ==========================
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
@@ -71,7 +69,6 @@ _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.n
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
-
 
 
 class MERGERS():
@@ -92,9 +89,7 @@ class MERGERS():
     MAP_MTOS  = 'm2s'
     MAP_ONTOP = 'ontop'
 
-# } MERGERS
-
-MERGERS_PHYSICAL_KEYS = [ MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES ]
+MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
 
 
 class DETAILS():
@@ -112,10 +107,9 @@ class DETAILS():
     RHOS    = 'rhos'
     CS      = 'cs'
 
-# } DETAILS
 
-DETAILS_PHYSICAL_KEYS = [ DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,  
-                          DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS ]
+DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
+                         DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 
 class BH_TYPE():
@@ -124,12 +118,14 @@ class BH_TYPE():
 
 NUM_BH_TYPES = 2
 
+
 class BH_TIME():
     BEFORE  = 0                                   # Before merger time (MUST = 0!)
     AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
     FIRST   = 2                                   # First matching details entry (MUST = 2!)
 
 NUM_BH_TIMES = 3
+
 
 class BH_TREE():
     LAST         = 'last'
@@ -145,8 +141,6 @@ class BH_TREE():
     VERSION      = 'version'
 
 
-
-
 class BH_SNAP():
     RUN     = 'run'
     SNAP    = 'snap'
@@ -160,43 +154,38 @@ SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses', 'SubfindHsml']
 SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
 
-
-
-
-
-
 def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
-    if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
+    if(verbose): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
     filesDir = _ILLUSTRIS_MERGERS_DIRS[run]
     files = []
-    if( type(filesDir) != list ): filesDir = [ filesDir ]
+    if(type(filesDir) != list): filesDir = [filesDir]
 
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_MERGERS_FILENAME_REGEX
-        someFiles = sorted( glob(filesNames) )
-        if( verbose ): print " - - - '%s' : %d files" % (fdir, len(someFiles))
+        someFiles = sorted(glob(filesNames))
+        if(verbose): print " - - - '%s' : %d files" % (fdir, len(someFiles))
         files += someFiles
 
-    if( verbose ): print " - - - %d Total Files" % (len(files))
+    if(verbose): print " - - - %d Total Files" % (len(files))
 
     return files
 
 
 def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
 
-    if( verbose ): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
+    if(verbose): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
 
     filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
     files = []
-    if( type(filesDir) != list ): filesDir = [ filesDir ]
+    if(type(filesDir) != list): filesDir = [filesDir]
 
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_DETAILS_FILENAME_REGEX
-        someFiles = sorted( glob(filesNames) )
-        if( verbose ): print " - - - '%s' : %d files" % (fdir, len(someFiles))
+        someFiles = sorted(glob(filesNames))
+        if(verbose): print " - - - '%s' : %d files" % (fdir, len(someFiles))
         files += someFiles
 
-    if( verbose ): print " - - - %d Total Files" % (len(files))
+    if(verbose): print " - - - %d Total Files" % (len(files))
 
     return files
 
@@ -250,4 +239,3 @@ assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
 
 assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
     "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
-
