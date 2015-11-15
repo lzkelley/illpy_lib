@@ -1,5 +1,4 @@
-"""
-Module to handle Illustris BH Merger Files.
+"""Module to handle Illustris BH Merger Files.
 
 This module is an interface to the 'blackhole_mergers_<#>.txt' files produced
 by Illustris.  Raw Illustris files are only used to initially load data, then
@@ -11,28 +10,25 @@ if the intermediate file hasn't already been loaded.
 The `mergers` are represented as a dictionary object with keys given by the
 variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mergers.
 
-
 Internal Parameters
 -------------------
 VERSION_MAP <flt> : version number for 'mapped' mergers, and associated save files
 VERSION_FIX <flt> : version number for 'fixed'  mergers, and associated save files
 
-
 Functions
 ---------
-processMergers                : perform all processing methods, assures that save files are all 
+processMergers                : perform all processing methods, assures that save files are all
                                 constructed.
-loadRawMergers                : load all merger entries, sorted by scalefactor, directly from 
+loadRawMergers                : load all merger entries, sorted by scalefactor, directly from
                                 illustris merger files - without any processing/filtering.
 loadMappedMergers             : load dictionary of merger events with associated mappings to and
                                 from snapshots.
 loadFixedMergers              : load dictionary of merger events with mappings, which have been
                                 processed and filtered.  These mergers also have the 'out' mass
                                 entry corrected (based on inference from ``BHDetails`` entries).
-                                
+
 
 _findBoundingBins
-
 
 
 Mergers Dictionary
@@ -40,18 +36,17 @@ Mergers Dictionary
    { MERGERS_RUN       : <int>, illustris simulation number in {1, 3}
      MERGERS_NUM       : <int>, total number of mergers `N`
      MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
-     MERGERS_CREATED   : <str>, 
+     MERGERS_CREATED   : <str>,
      MERGERS_VERSION   : <float>,
-   
+
      MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
      MERGERS_IDS       : <ulong>[N, 2],
-     MERGERS_MASSES    : <double>[N, 2], 
+     MERGERS_MASSES    : <double>[N, 2],
 
-     MERGERS_MAP_MTOS  : <int>[N], 
-     MERGERS_MAP_STOM  : <int>[136, list], 
-     MERGERS_MAP_ONTOP : <int>[136, list], 
+     MERGERS_MAP_MTOS  : <int>[N],
+     MERGERS_MAP_STOM  : <int>[136, list],
+     MERGERS_MAP_ONTOP : <int>[136, list],
    }
-
 
 Examples
 --------
@@ -88,17 +83,19 @@ Notes
 
 """
 
-import os, sys
+import os
+import sys
 from datetime import datetime
 import numpy as np
 
-import BHDetails
-import BHConstants
-from BHConstants import MERGERS, BH_TYPE
-import BHMatcher
+from illpy.illbh import BHDetails
+import illpy.illbh.BHConstants
+from illpy.illbh.BHConstants import MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, \
+    GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
+from illpy.illbh import BHMatcher
 
-from .. Constants import DTYPE
-from .. import Cosmology
+from illpy.Constants import DTYPE
+from illpy import Cosmology
 
 import zcode.inout as zio
 
@@ -137,10 +134,10 @@ def loadRawMergers(run, verbose=True, recombine=False):
 
     ### Concatenate Raw Illustris Files into a Single Combined File ###
 
-    combinedFilename = BHConstants.GET_MERGERS_RAW_COMBINED_FILENAME(run)
+    combinedFilename = GET_MERGERS_RAW_COMBINED_FILENAME(run)
     if(recombine or not os.path.exists(combinedFilename)):
         if(verbose): print " - - Combining Illustris Merger files into '%s'" % (combinedFilename)
-        mergerFilenames = BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
+        mergerFilenames = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
         if(verbose): print " - - - Found %d merger Files" % (len(mergerFilenames))
         zio.combineFiles(mergerFilenames, combinedFilename, verbose=verbose)
 
@@ -175,7 +172,7 @@ def loadMappedMergers(run, verbose=True, loadsave=True):
 
     if(verbose): print " - - BHMergers.loadMappedMergers()"
 
-    mappedFilename = BHConstants.GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
+    mappedFilename = GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
 
     ## Load Existing Mapped Mergers
     #  ----------------------------
@@ -241,16 +238,16 @@ def loadFixedMergers(run, verbose=True, loadsave=True):
                              mergers, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
 
     """
-    
+
     if(verbose): print " - - BHMergers.loadFixedMergers()"
 
-    fixedFilename = BHConstants.GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
+    fixedFilename = GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
 
     ## Try to Load Existing Mapped Mergers
     if(loadsave):
         if(verbose): print " - - - Loading from save '%s'" % (fixedFilename)
         if(os.path.exists(fixedFilename)):
-            mergersFixed = zio.npzToDict(fixedFilename) 
+            mergersFixed = zio.npzToDict(fixedFilename)
         else:
             print " - - - - '%s' does not exist.  Recreating." % (fixedFilename)
             loadsave = False
@@ -323,7 +320,7 @@ def _fixMergers(run, mergers, verbose=True):
 
     ## Iterate over all entries
     for ii in xrange(len(sort)-1):
-        
+
         this = ids[sort[ii]]
         jj = ii+1
 
@@ -341,7 +338,7 @@ def _fixMergers(run, mergers, verbose=True):
 
         # } while
     # ii
-            
+
     if(verbose): print " - - - Total number of duplicates = %d" % (len(badInds))
     if(verbose): print " - - - Number with mismatched times = %d" % (numMismatch)
 
@@ -508,9 +505,9 @@ def _mapToSnapshots(scales, verbose=True):
 
 
     ## Create Mappings
-    #  ---------------    
+    #  ---------------
 
-    if(verbose): 
+    if(verbose):
         print " - - - Creating mappings"
         pbar = zio.getProgressBar(numMergers)
 
@@ -576,7 +573,7 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
     if(len(high) == 0): high = None
     # Select first bin above target
     else:
-        high = high[0]                            
+        high = high[0]
         dhi  = bins[high] - target
 
 
