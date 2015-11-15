@@ -37,8 +37,7 @@ MergerDetails Dictionary
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
-import warnings
+# import os
 import numpy as np
 from datetime import datetime
 
@@ -47,8 +46,9 @@ from mpi4py import MPI
 import illpy.illbh.BHDetails
 import illpy.illbh.BHMergers
 import illpy.illbh.BHConstants
-from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, \
-    NUM_BH_TIMES, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, DETAILS_PHYSICAL_KEYS
+from illpy.illbh.BHConstants import MERGERS, DETAILS, _LOG_DIR, GET_MERGER_DETAILS_FILENAME
+# from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, \
+#     NUM_BH_TIMES, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, DETAILS_PHYSICAL_KEYS
 # from illpy.illbh.MatchDetails import getDetailIndicesForMergers
 import illpy.Constants
 from illpy.Constants import DTYPE, NUM_SNAPS
@@ -81,15 +81,11 @@ def main(run=1, verbose=True, debug=True):
     # Initialize log
     log = illpy.illbh.BHConstants._loadLogger(
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
-
     log.debug(header)
 
     bhIDsUnique = None
     if(rank == 0):
-        try:
-            print("Log filename = ", log.filename)
-        except:
-            pass
+        print("Log filename = ", log.filename)
 
         # Load Mergers
         log.debug("Loading Mergers")
@@ -97,20 +93,21 @@ def main(run=1, verbose=True, debug=True):
         numMergers = mergers[MERGERS.NUM]
         mergerIDs = mergers[MERGERS.IDS]
 
-        # These are now 1D and sorted
+        # Find unique BH IDs from set of merger BHs
+        #    these are now 1D and sorted
         bhIDsUnique, reconInds = np.unique(mergerIDs, return_inverse=True)
         numUnique = np.size(bhIDsUnique)
         numTotal = np.size(reconInds)
         frac = numUnique/numTotal
         log.debug(" - %d/%d = %.4f Unique BH IDs" % (numUnique, numTotal, frac))
 
+    # Send unique IDs to all processors
     bhIDsUnique = comm.bcast(bhIDsUnique, root=0)
 
     # Distribute snapshots to each processor
     mySnaps = np.arange(NUM_SNAPS)
     if(size > 1):
-        # mySnaps = np.array([10, 12, 13, 14, 70, 101, 105, 130])
-        # mySnaps = np.array([10, 14, 101, 130])
+        # Randomize which snapshots go to which processor for load-balancing
         mySnaps = np.random.permutation(mySnaps)
         # Make sure all ranks are synchronized on initial (randomized) list before splitting
         mySnaps = comm.bcast(mySnaps, root=0)
@@ -119,13 +116,17 @@ def main(run=1, verbose=True, debug=True):
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
 
+    # Get details entries for unique merger IDs in snapshot list
+    # ----------------------------------------------------------
     nums, scales, masses, mdots, dens, csnds, ids = \
         _detailsForMergers_snapshots(run, mySnaps, bhIDsUnique, log)
 
+    # Collect results and organize
+    # ----------------------------
     if(size > 1):
         log.debug(" - Gathering")
         beg = datetime.now()
-
+        # Gather results from each processor into ``rank=0``
         tempScales = comm.gather(scales, root=0)
         tempMasses = comm.gather(masses, root=0)
         tempMdots = comm.gather(mdots, root=0)
@@ -133,13 +134,13 @@ def main(run=1, verbose=True, debug=True):
         tempCsnds = comm.gather(csnds, root=0)
         tempIds = comm.gather(ids, root=0)
         tempNums = comm.gather(nums, root=0)
-
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
         # Gather snapshot numbers for ordering
         mySnaps = comm.gather(mySnaps, root=0)
 
+        # Organize results appropriately
         if(rank == 0):
             log.debug(" - Stacking")
             beg = datetime.now()
@@ -152,18 +153,22 @@ def main(run=1, verbose=True, debug=True):
             csnds = numUnique*[[None]]
             ids = numUnique*[[None]]
 
+            # Iterate over each black-hole and processor, collect results into single arrays
             for ii, mm in enumerate(bhIDsUnique):
                 for jj in xrange(size):
                     errStr = ""
                     if(tempIds[jj][ii][0] is not None):
                         dd = tempIds[jj][ii][0]
+                        # Make sure all of the details IDs are consistent
                         if(np.any(tempIds[jj][ii] != dd)):
                             errStr += "ii = {}, jj = {}, mm = {}; tempIds[0] = {}".format(ii, jj, mm, dd)
                             errStr += " tempIds = {}".format(str(tempIds[ii]))
 
+                        # Make sure details IDs match expected merger ID
                         if(dd != mm):
                             errStr += "\nii = {}, jj = {}, mm = {}; dd = {}".format(ii, jj, mm, dd)
 
+                        # If no entries have been stored yet, replace with first entries
                         if(ids[ii][0] is None):
                             ids[ii] = tempIds[jj][ii]
                             scales[ii] = tempScales[jj][ii]
@@ -171,7 +176,10 @@ def main(run=1, verbose=True, debug=True):
                             mdots[ii] = tempMdots[jj][ii]
                             dens[ii] = tempDens[jj][ii]
                             csnds[ii] = tempCsnds[jj][ii]
+                        # If entries already exist, append new ones
                         else:
+                            # Double check that all existing IDs are consistent with new ones
+                            #    This should be redundant, but whatevs
                             if(np.any(ids[ii] != dd)):
                                 errStr += "\nii = {}, jj = {}, mm = {}, dd = {}, ids = {}".format(ii, jj, mm, dd, str(ids))
                             ids[ii] = np.append(ids[ii], tempIds[jj][ii])
@@ -181,12 +189,14 @@ def main(run=1, verbose=True, debug=True):
                             dens[ii] = np.append(dens[ii], tempDens[jj][ii])
                             csnds[ii] = np.append(csnds[ii], tempCsnds[jj][ii])
 
+                        # Count the number of entries for each BH from each processor
                         nums[ii] += tempNums[jj][ii]
 
                     if(len(errStr) > 0):
                         log.error(errStr)
                         zio.mpiError(comm, log=log, err=errStr)
 
+            # Merge lists of snapshots, and look for any missing
             mySnaps = np.hstack(mySnaps)
             log.debug("Obtained %d Snapshots" % (mySnaps.size))
             missingSnaps = []
@@ -197,11 +207,9 @@ def main(run=1, verbose=True, debug=True):
             if(len(missingSnaps) > 0):
                 log.warning("WARNING: snaps %s not in results!" % (str(missingSnaps)))
 
-            try:
-                log.debug("Total entries stored = %d" % (np.sum([np.sum(nn) for nn in nums])))
-            except Exception, e:
-                log.debug(e.message)
+            log.debug("Total entries stored = %d" % (np.sum([np.sum(nn) for nn in nums])))
 
+    # Convert from uinique BH IDs back to full mergers list.  Sort results by time (scalefactor)
     if(rank == 0):
         log.debug(" - Reconstructing")
         beg = datetime.now()
@@ -215,11 +223,13 @@ def main(run=1, verbose=True, debug=True):
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
+        # Sort entries for each BH by scalefactor
         log.debug(" - Sorting")
         beg = datetime.now()
         for ii in xrange(numMergers):
             for jj in xrange(2):
                 if(nums[ii, jj] == 0): continue
+                # Check ID numbers yet again
                 if(not np.all(ids[ii, jj] == mergerIDs[ii, jj])):
                     errStr = "Error!  ii = {}, jj = {}.  Merger ID = {}, det ID = {}"
                     errStr = errStr.format(ii, jj, mergerIDs[ii, jj], ids[ii, jj])
@@ -250,13 +260,12 @@ def main(run=1, verbose=True, debug=True):
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
-        log.info("Saving to dictionary.")
+        log.info(" - Saving to dictionary.")
         beg = datetime.now()
         fname = 'temp.npz'
         zio.dictToNPZ(data, fname, verbose=True)
-        log.info("Saved to '%s'" % (fname))
         end = datetime.now()
-        log.debug(" - - Done after %s" % (str(end-beg)))
+        log.info(" - - Saved to '%s' after %s" % (fname, str(end-beg)))
 
         end_all = datetime.now()
         log.debug(" - Done after %s" % (str(end_all - beg_all)))
