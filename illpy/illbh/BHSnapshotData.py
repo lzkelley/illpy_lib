@@ -21,14 +21,10 @@ Functions
 -   _mergeBHSnapshotFiles    - Combine BH data from individual Snapshot save files.
 -   _initStorage             - Initialize dictionary for BH Snapshot data.
 -   _parseArguments          - Prepare argument parser and load command line arguments.
--   _mpiError                - Raise an error through MPI and exit all processes.
--   _loadLogger              - Initialize a ``logging`` module logger for output.
 
 -   _GET_BH_SNAPSHOT_DIR
 -   _GET_BH_SINGLE_SNAPSHOT_FILENAME
 -   _GET_BH_SNAPSHOT_FILENAME
--   _GET_LOG_NAME
--   _GET_STATUS_FILENAME
 
 """
 
@@ -43,6 +39,7 @@ from mpi4py import MPI
 
 from ..Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, DTYPE, GET_BAD_SNAPS
 import BHMergers
+import BHConstants
 from BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
 import illustris_python as ill
@@ -50,14 +47,11 @@ import zcode.inout as zio
 
 MPI_TAGS = zio.MPI_TAGS
 
-
 DEF_RUN = 1
 _VERSION = 0.4
 
 _BH_SINGLE_SNAPSHOT_FILENAME = "ill-{0:d}_snap{1:03d}_merger-bh_snapshot_{2:.2f}.npz"
 _BH_SNAPSHOT_FILENAME = "ill-{0:d}_merger-bh_snapshot_v{1:.2f}.npz"
-_LOG_DIR = "./logs/"
-_STATUS_FILENAME = 'stat_BHSnapshotData_ill%d_v%.2f.txt'
 
 
 def main():
@@ -75,7 +69,7 @@ def main():
     if(rank == 0):
         NAME = sys.argv[0]
         print "\n%s\n%s\n%s" % (NAME, '='*len(NAME), str(datetime.now()))
-        zio.checkPath(_LOG_DIR)
+        zio.checkPath(BHConstants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
     comm.Barrier()
@@ -87,7 +81,8 @@ def main():
     verbose = args.verbose
 
     # Load logger
-    logger = _loadLogger(rank, verbose)
+    logger = BHConstants._loadLogger(__file__, verbose=verbose, run=run,
+                                     rank=rank, version=_VERSION)
 
     logger.info("run           = %d  " % (run))
     logger.info("version       = %.2f" % (_VERSION))
@@ -105,7 +100,7 @@ def main():
             logger.debug("Running Master")
             _runMaster(run, comm, logger)
         except Exception as err:
-            _mpiError(comm, logger, err)
+            zio._mpiError(comm, log=logger, err=err)
 
         end_all = datetime.now()
         logger.debug("Done after '%s'" % (str(end_all-beg_all)))
@@ -121,7 +116,7 @@ def main():
             logger.debug("Running slave")
             _runSlave(run, comm, logger)
         except Exception as err:
-            _mpiError(comm, logger, err)
+            zio._mpiError(comm, log=logger, err=err)
 
         logger.debug("Done.")
 
@@ -244,7 +239,7 @@ def _runMaster(run, comm, logger):
     logger.debug("- Loaded %d mergers" % (numMergers))
 
     # Init status file
-    statFileName = _GET_STATUS_FILENAME(run)
+    statFileName = BHConstants._GET_STATUS_FILENAME(__file__, run=run, version=_VERSION)
     statFile = open(statFileName, 'w')
     logger.debug("Opened status file '%s'" % (statFileName))
     statFile.write('%s\n' % (str(datetime.now())))
@@ -517,7 +512,8 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         if(len(union) != len(SNAPSHOT_FIELDS)):
             logger.error("snap_keys       = '%s'" % (str(snap_keys)))
             logger.error("SNAPSHOT_FIELDS = '%s'" % (str(SNAPSHOT_FIELDS)))
-            _mpiError(comm, logger, err="Field mismatch at Rank %d, Snap %d!" % (rank, snapNum))
+            errStr = "Field mismatch at Rank %d, Snap %d!" % (rank, snapNum)
+            zio._mpiError(comm, log=logger, err=errStr)
 
         # Match target BHs
         # ----------------
@@ -593,7 +589,6 @@ def _mergeBHSnapshotFiles(run, logger):
 
     # Initialize storage
     allData = _initStorage(numMergers)
-
 
     # Load each snapshot file
     # -----------------------
@@ -684,42 +679,6 @@ def _parseArguments():
     return args
 
 
-def _mpiError(comm, logger, err="ERROR"):
-    """Raise an error through MPI and exit all processes.
-
-    Arguments
-    ---------
-       comm <...> : mpi intracommunicator object (e.g. ``MPI.COMM_WORLD``)
-       err  <str> : optional, extra error-string to print
-
-    """
-    rank = comm.rank
-    errStr = "\nERROR: rank %d\n%s\n%s\n" % (rank, str(datetime.now()), err)
-    logger.exception(errStr)   #, exc_info=True)
-    comm.Abort(rank)
-    return
-
-
-def _loadLogger(rank, verbose):
-    """Initialize a ``logging.Logger`` object for output messages.
-
-    All processes log to output files, and the root process also outputs to `stdout`.
-    """
-    # Get logger and log-file names
-    name = "logger_%03d" % (rank)
-    logFile = _GET_LOG_NAME(rank)
-    # Make sure directory exists
-    zio.checkPath(logFile)
-    # Determine verbosity level
-    if(verbose): strLvl = logging.INFO
-    else:        strLvl = logging.WARNING
-    fileLvl = logging.DEBUG
-    # Create logger
-    if(rank == 0): logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLvl, strLevel=strLvl)
-    else:          logger = zio.getLogger(name, tofile=logFile, fileLevel=fileLvl, tostr=False)
-    return logger
-
-
 def _GET_BH_SNAPSHOT_DIR(run):
     return GET_PROCESSED_DIR(run) + "blackhole_particles/"
 
@@ -730,16 +689,6 @@ def _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, snap, version=_VERSION):
 
 def _GET_BH_SNAPSHOT_FILENAME(run, version=_VERSION):
     return _GET_BH_SNAPSHOT_DIR(run) + _BH_SNAPSHOT_FILENAME.format(run, version)
-
-
-def _GET_LOG_NAME(rank=0, version=_VERSION):
-    if(rank == 0): name = _LOG_DIR + "BHSnapshotData_v%.2f.log" % (version)
-    else:          name = _LOG_DIR + "BHSnapshotData_%03d_v%.2f.log" % (rank, version)
-    return name
-
-
-def _GET_STATUS_FILENAME(run):
-    return _LOG_DIR + _STATUS_FILENAME % (run, _VERSION)
 
 
 if(__name__ == "__main__"): main()
