@@ -60,6 +60,8 @@ _ILLUSTRIS_DETAILS_DIRS = {3: "/n/ghernquist/Illustris/Runs/L75n455FP/output/bla
 
 # Post-Processing Parameters
 # ==========================
+_MAX_DETAILS_PER_SNAP           = 10   # Number of details entries to store per snapshot
+
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
@@ -70,7 +72,8 @@ _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
 _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
 _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
-_MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
+_MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
+_MERGER_DETAILS_EXT_FILENAME    = 'ill-%d_blackhole_merger-details_ext_persnap-%03d_v%s.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
@@ -220,11 +223,15 @@ def GET_DETAILS_SAVE_FILENAME(run, snap, version):
     return fname
 
 
-def GET_MERGER_DETAILS_FILENAME(run, version):
+def GET_MERGER_DETAILS_FILENAME(run, version, maxPerSnap):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGER_DETAILS_FILENAME % (run, version)
+    fname += _MERGER_DETAILS_FILENAME % (run, version, maxPerSnap)
     return fname
 
+def GET_MERGER_DETAILS_EXT_FILENAME(run, version, maxPerSnap):
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _MERGER_DETAILS_EXT_FILENAME % (run, version, maxPerSnap)
+    return fname
 
 def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
