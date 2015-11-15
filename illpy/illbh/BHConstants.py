@@ -20,8 +20,13 @@ Functions
 
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
+import logging
 from glob import glob
+
+import zcode.inout as zio
 
 from .. Constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE
 
@@ -42,15 +47,15 @@ _ILLUSTRIS_MERGERS_DIRS = {3: "/n/ghernquist/Illustris/Runs/L75n455FP/output/bla
                                "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_mergers/"]
                            }
 
-_ILLUSTRIS_DETAILS_DIRS = { 3 : "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
-                            2 : "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
-                            1 : ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
-                                 "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/"]
-                            }
+_ILLUSTRIS_DETAILS_DIRS = {3: "/n/ghernquist/Illustris/Runs/L75n455FP/output/blackhole_details/",
+                           2: "/n/ghernquist/Illustris/Runs/L75n910FP/combined_output/blackhole_details/",
+                           1: ["/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-curie/blackhole_details/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-supermuc/blackhole_details/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug8/blackhole_details/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Aug14/blackhole_details/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Oct10/blackhole_details/",
+                               "/n/ghernquist/Illustris/Runs/L75n1820FP/txt-files/txtfiles_new/txt-files-partial/Sep25/blackhole_details/"]
+                           }
 
 
 # Post-Processing Parameters
@@ -68,6 +73,8 @@ _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.n
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_v%.2f.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
+
+_LOG_DIR = "./logs/"
 
 
 class MERGERS():
@@ -157,8 +164,7 @@ SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR,
                    DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR]
 
 
-def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
-    if(verbose): print " - - BHConstants.GET_ILLUSTRIS_BH_MERGERS_FILENAMES()"
+def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run):
     filesDir = _ILLUSTRIS_MERGERS_DIRS[run]
     files = []
     if(type(filesDir) != list): filesDir = [filesDir]
@@ -166,18 +172,12 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run, verbose=True):
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_MERGERS_FILENAME_REGEX
         someFiles = sorted(glob(filesNames))
-        if(verbose): print " - - - '%s' : %d files" % (fdir, len(someFiles))
         files += someFiles
-
-    if(verbose): print " - - - %d Total Files" % (len(files))
 
     return files
 
 
-def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
-
-    if(verbose): print " - - BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES()"
-
+def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run):
     filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
     files = []
     if(type(filesDir) != list): filesDir = [filesDir]
@@ -185,10 +185,7 @@ def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose=True):
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_DETAILS_FILENAME_REGEX
         someFiles = sorted(glob(filesNames))
-        if(verbose): print " - - - '%s' : %d files" % (fdir, len(someFiles))
         files += someFiles
-
-    if(verbose): print " - - - %d Total Files" % (len(files))
 
     return files
 
@@ -233,6 +230,72 @@ def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _BLACKHOLE_TREE_FILENAME % (run, version)
     return fname
+
+
+def _GET_STATUS_FILENAME(name, run=None, version=None):
+    statFilename = os.path.splitext(os.path.basename(name)) + "_stat"
+    if(run): statFilename += "_ill%d" % (run)
+    if(version): statFilename += "_v%s" % (str(version))
+    statFilename = os.path.join(_LOG_DIR, statFilename + ".txt")
+    return statFilename
+
+
+def _GET_LOG_NAMES(name, run=None, rank=None, version=None):
+    """Construct name and output filename for a logger.
+
+    `name` should be the filename of the calling file.
+
+    Returns
+    -------
+    logName : str,
+        Name of the logging object.
+    logFilename : str,
+        Name of the logging output file.
+
+    """
+    # Setup name of `logger` object
+    #     Remove directories and file suffixes from `name`
+    logName = os.path.splitext(os.path.basename(name))[0]
+    logFilename = str(logName)
+    logName += "_log"
+    if(rank): logName += "_rank%04d"
+
+    # Setup name of `logger` output file
+    if(run): logFilename += "_ill%d" % (run)
+    if(version): logFilename += "_v%s" % (str(version))
+    if(rank): logFilename += "_%04d" % (rank)
+    logFilename += ".log"
+    logFilename = os.path.join(_LOG_DIR, logFilename)
+    logFilename = os.path.abspath(logFilename)
+    return logName, logFilename
+
+
+def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=None):
+    """Initialize a ``logging.Logger`` object for output messages.
+
+    All processes log to output files, and the root process also outputs to `stdout`.
+    """
+    # Get logger and log-file names
+    logName, logFilename = _GET_LOG_NAMES(name, run=run, rank=rank, version=version)
+    # Make sure directory exists
+    zio.checkPath(logFilename)
+    # Determine verbosity level
+    if(debug):
+        strLvl = logging.DEBUG
+    elif(verbose):
+        strLvl = logging.INFO
+    else:
+        strLvl = logging.WARNING
+
+    fileLvl = logging.DEBUG
+    # Create logger
+    if(rank == 0):
+        logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, strLevel=strLvl)
+    else:
+        logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, tostr=False)
+
+    return logger
+
 
 assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
     "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
