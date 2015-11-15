@@ -5,7 +5,6 @@ import numpy as np
 from zcode.constants import MSOL, PC, KPC, HPAR, YR
 from enum import Enum
 
-
 # Illustris Constants
 NUM_SNAPS = 136
 BOX_LENGTH = 75000                          # [ckpc/h]
