@@ -37,7 +37,7 @@ MergerDetails Dictionary
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-# import os
+import os
 import numpy as np
 from datetime import datetime
 
@@ -46,7 +46,8 @@ from mpi4py import MPI
 import illpy.illbh.BHDetails
 import illpy.illbh.BHMergers
 import illpy.illbh.BHConstants
-from illpy.illbh.BHConstants import MERGERS, DETAILS, _LOG_DIR, GET_MERGER_DETAILS_FILENAME
+from illpy.illbh.BHConstants import MERGERS, DETAILS, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, \
+    GET_MERGER_DETAILS_EXT_FILENAME, _MAX_DETAILS_PER_SNAP
 # from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, \
 #     NUM_BH_TIMES, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, DETAILS_PHYSICAL_KEYS
 # from illpy.illbh.MatchDetails import getDetailIndicesForMergers
@@ -58,7 +59,6 @@ import zcode.math as zmath
 
 __version__ = '0.23'
 _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
-_MAX_DETAILS_PER_SNAP = 10
 
 
 def main(run=1, verbose=True, debug=True):
@@ -68,25 +68,47 @@ def main(run=1, verbose=True, debug=True):
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
-
-    beg_all = datetime.now()
     name = __file__
-    header = "\n%s\n%s\n%s" % (name, '='*len(name), str(beg_all))
+    header = "\n%s\n%s\n%s" % (name, '='*len(name), str(datetime.now()))
 
     if(rank == 0):
         zio.checkPath(_LOG_DIR)
-
     comm.Barrier()
 
     # Initialize log
     log = illpy.illbh.BHConstants._loadLogger(
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
     log.debug(header)
-
-    bhIDsUnique = None
     if(rank == 0):
         print("Log filename = ", log.filename)
 
+    # Match Merger BHs to Details entries
+    # -----------------------------------
+    beg = datetime.now()
+    _matchMergerDetails(run, comm, log)
+    end = datetime.now()
+    log.debug(" - Done after %s" % (str(end - beg)))
+
+
+    # Extend merger-details to account for later mergers
+    # --------------------------------------------------
+    beg = datetime.now()
+    _extendMergerDetails(run, comm, log)
+    end = datetime.now()
+    log.debug(" - Done after %s" % (str(end - beg)))    
+
+    return
+    
+
+def _matchMergerDetails(run, comm, log):
+    """
+    """
+    log.debug("_matchMergerDetails()")
+    rank = comm.rank
+    size = comm.size
+
+    bhIDsUnique = None
+    if(rank == 0):
         # Load Mergers
         log.debug("Loading Mergers")
         mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
@@ -247,6 +269,8 @@ def main(run=1, verbose=True, debug=True):
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
+        filename = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
+
         log.debug(" - Packaging")
         beg = datetime.now()
         data = {DETAILS.IDS: ids,
@@ -255,20 +279,61 @@ def main(run=1, verbose=True, debug=True):
                 DETAILS.RHOS: dens,
                 DETAILS.MDOTS: mdots,
                 DETAILS.CS: csnds,
-                'nums': nums}
+                'nums': nums,
+                DETAILS.RUN: run,
+                DETAILS.CREATED: datetime.now().ctime(),
+                DETAILS.VERSION: __version__,
+                DETAILS.FILE: filename,
+                'detailsPerSnapshot': _MAX_DETAILS_PER_SNAP,
+                'detailsKeys': _GET_KEYS,
+                }
 
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
         log.info(" - Saving to dictionary.")
         beg = datetime.now()
-        fname = 'temp.npz'
-        zio.dictToNPZ(data, fname, verbose=True)
+        zio.dictToNPZ(data, filename, verbose=True)
         end = datetime.now()
-        log.info(" - - Saved to '%s' after %s" % (fname, str(end-beg)))
+        log.info(" - - Saved to '%s' after %s" % (filename, str(end-beg)))
 
-        end_all = datetime.now()
-        log.debug(" - Done after %s" % (str(end_all - beg_all)))
+    return
+
+
+def _extendMergerDetails(run, comm, log):
+    """
+    """
+    log.debug("_extendMergerDetails()")
+    rank = comm.rank
+    size = comm.size
+
+    # Only use root-processor (for now at least)
+    if(rank != 0):
+        return
+
+    # Load merger-details file
+    loadname = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
+    log.info(" - Loading from '%s'" % (loadname))
+    if(not os.path.exists(loadname)):
+        errStr = "ERROR: '%s' does not exist!" % (loadname)
+        log.error(errStr)
+        zio.mpiError(comm, log=log, err=errStr)
+
+    beg = datetime.now()
+    mdets = zio.npzToDict(loadname)
+    end = datetime.now()
+    nums = data['nums']
+    entries = np.sum(nums)
+    bon = np.count_nonzero(nums)
+    tot = np.size(nums)
+    frac = bon/tot
+    log.debug(" - - Loaded {} entries for {}/{} = {} BHs after {}".format(
+            entries, bon, tot, frac, str(end-beg)))
+
+
+    # 
+
+    savename = GET_MERGER_DETAILS_EXT_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
 
     return
 
