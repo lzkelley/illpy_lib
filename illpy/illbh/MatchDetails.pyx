@@ -19,7 +19,7 @@ ctypedef unsigned long long ULNG
 
 
 
-def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[ULNG,   ndim=2] mid, 
+def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[ULNG,   ndim=2] mid,
                                np.ndarray[double, ndim=1] mtime,   np.ndarray[long,   ndim=3] lind,
                                np.ndarray[double, ndim=3] ltime,   np.ndarray[long,   ndim=3] mnew,
                                np.ndarray[ULNG,   ndim=1] detid,   np.ndarray[double, ndim=1] dtime ):
@@ -32,7 +32,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     For each target merger BH the earliest entry ('first')  is searched for, as well as the entries
     closest to the given merger time 'before' and 'after'.
 
-    The INOUT 'link' arrays ``lind`` and ``ltime`` are used to track/store matches.  Anytime a 
+    The INOUT 'link' arrays ``lind`` and ``ltime`` are used to track/store matches.  Anytime a
     target BH is sucessfully matched to a detail entry, the link arrays are checked --- if there
     was no previous match, a link is made.  If a previous link was made, the new matches is
     compared to see if it is a better match (earlier for the 'first' entry, or closer to the merger
@@ -63,7 +63,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
         Array of 'link' times, i.e. the time of the detail entry matched for each BH and time,
         i.e. the time of the `lind` entry.
 
-    mnew : INOUT, <int>[M,2,3], 
+    mnew : INOUT, <int>[M,2,3],
         Array of flags to mark which entries have been successfully matched.  `1` = True (matched)
         otherwise false (not matched)
 
@@ -98,7 +98,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     cdef double t_time, d_first_time, d_before_time, d_after_time
 
     ### Iterate over Each Target Merger Binary System ###
-    
+
     ### Iterate over Each Type of BH ###
     for BH in [BH_IN, BH_OUT]:
 
@@ -121,7 +121,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
             if( s_first_match >= numDetails ): continue
             #   If IDs don't match,       no matches
             if( detid[s_det[s_first_match]] != t_id ): continue
-            
+
             ## Store first match
             d_ind_first = s_det[s_first_match]
             d_first_time = dtime[d_ind_first]
@@ -132,14 +132,14 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
                 ltime[s_ind, BH, FST] = d_first_time                                                # Set link to details time
                 numMatches += 1
                 mnew[s_ind, BH, FST] = 1
-                
+
 
             ### Find 'before' Match ###
             #   Find the *latest* detail ID match *before* the merger time
             s_before_match = s_first_match                                                          # Has to come after the 'first' match
             if( s_before_match < numDetails-2 ):
                 # Increment if the next entry is also an ID match and next time is still *before*
-                while( detid[s_det[s_before_match+1]] == t_id  and 
+                while( detid[s_det[s_before_match+1]] == t_id  and
                        dtime[s_det[s_before_match+1]] < t_time and
                        s_before_match < numDetails-2 ):
                     s_before_match += 1
@@ -150,7 +150,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
             # If this is still a match
             if( detid[d_ind_before] == t_id and d_before_time < t_time ):
 
-                ## Store Before Match 
+                ## Store Before Match
                 # if there are no previous matches or new match is *later*
                 if( lind[s_ind, BH, BEF] < 0 or d_before_time > ltime[s_ind, BH, BEF] ):
                     lind [s_ind, BH, BEF] = d_ind_before                                            # Set link to details index
@@ -167,8 +167,8 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
                 s_after_match = s_before_match                                                      # Has to come after the 'before' match
                 if( s_after_match < numDetails-2 ):
                     # Increment if the next entry is also an ID match, but this time is still *before*
-                    while( detid[s_det[s_after_match+1]] == t_id and 
-                           dtime[s_det[s_after_match]] < t_time  and 
+                    while( detid[s_det[s_after_match+1]] == t_id and
+                           dtime[s_det[s_after_match]] < t_time  and
                            s_after_match < numDetails-2 ):
                         s_after_match += 1
 
@@ -179,7 +179,7 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
                 # If this is still a match (ID matches, and this is *after* merger time)
                 if( detid[d_ind_after] == t_id and d_after_time >= t_time ):
 
-                    ## Store After Match 
+                    ## Store After Match
 
                     # if there are no previous matches or new match is *earlier*
                     if( lind[s_ind, BH, AFT] < 0 or d_after_time < ltime[s_ind, BH, AFT] ):
@@ -196,11 +196,3 @@ def getDetailIndicesForMergers(np.ndarray[long,   ndim=1] targets, np.ndarray[UL
     # } BH
 
     return numMatches
-
-# getDetailIndicesForMergers()
-
-
-
-
-
-
