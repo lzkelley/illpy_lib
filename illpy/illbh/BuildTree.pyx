@@ -2,7 +2,6 @@
 
 """
 
-
 import numpy as np
 cimport numpy as np
 
@@ -15,7 +14,7 @@ ctypedef unsigned long long ULNG
 
 
 def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
-              np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,  
+              np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,
               np.ndarray[double, ndim=2] lastTime, np.ndarray[double, ndim=1] nextTime ):
     """
     Given the complete list of merger IDs and Times, connect Mergers with the same BHs.
@@ -46,7 +45,7 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
 
     next : INOUT, <long>[N]
         Index of the next merger for the resulting 'out' BH.
-    
+
     lastTime : INOUT, <double>[N,2]
         Time *since the last* merger event, for each BH.
 
@@ -63,59 +62,46 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
     # Get indices to sort mergers by time
     cdef np.ndarray sort_inds = np.argsort(times)
 
-    ### Iterate Over Each Merger, In Order of Merger Time ###
-
+    # Iterate Over Each Merger, In Order of Merger Time
+    # -------------------------------------------------
     for ii in xrange(numMergers):
-
         if( ii > 0 and ii%hunth == 0 ): print "%5d/%d" % (ii, numMergers)
 
-        # Conver to sorted merger index
+        # Convert to sorted merger index
         last_ind = sort_inds[ii]
 
         # Get the output ID from this merger
         outid = ids[last_ind, BH_OUT]
 
-        ## Iterate over all Later Mergers ##
-        #  use a while loop so we can break out of it
+        # Iterate over all Later Mergers
+        #    use a while loop so we can break out of it
         jj = ii+1
-        while( jj < numMergers ):
+        while(jj < numMergers):
             # Convert to sorted index
             next_ind = sort_inds[jj]
 
             # If previous merger goes into this one; save relationships
             for BH in [BH_IN, BH_OUT]:
 
-                if( ids[next_ind,BH] == outid ):
+                if(ids[next_ind, BH] == outid):
 
-                    ## For the 'next' Merger
-                    # set index of previous merger
-                    last[next_ind,BH] = last_ind
-                    # set time since previous merger
-                    lastTime[next_ind,BH] = times[next_ind] - times[last_ind]
+                    # For the 'next' Merger
+                    #    set index of previous merger
+                    last[next_ind, BH] = last_ind
+                    #    set time since previous merger
+                    lastTime[next_ind, BH] = times[next_ind] - times[last_ind]
 
-                    ## For the 'previous' Merger
-                    # set index of next merger
+                    # For the 'previous' Merger
+                    #    set index of next merger
                     next[last_ind] = next_ind
-                    # set time until merger
+                    #    set time until merger
                     nextTime[next_ind] = times[next_ind] - times[last_ind]
-
 
                     # Break back to highest for-loop over all mergers (ii)
                     jj = numMergers
                     break
 
-
-
             # Increment
             jj += 1
 
-        # } jj
-
-    # } ii
-
-    return 
-
-
-
-
-
+    return
