@@ -73,7 +73,7 @@ _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
 _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
-_MERGER_DETAILS_EXT_FILENAME    = 'ill-%d_blackhole_merger-details_ext_persnap-%03d_v%s.npz'
+_REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
@@ -225,13 +225,15 @@ def GET_DETAILS_SAVE_FILENAME(run, snap, version):
 
 def GET_MERGER_DETAILS_FILENAME(run, version, maxPerSnap):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGER_DETAILS_FILENAME % (run, version, maxPerSnap)
+    fname += _MERGER_DETAILS_FILENAME % (run, maxPerSnap, version)
     return fname
 
-def GET_MERGER_DETAILS_EXT_FILENAME(run, version, maxPerSnap):
+
+def GET_REMNANT_DETAILS_FILENAME(run, version, maxPerSnap):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
-    fname += _MERGER_DETAILS_EXT_FILENAME % (run, version, maxPerSnap)
+    fname += _REMNANT_DETAILS_FILENAME % (run, maxPerSnap, version)
     return fname
+
 
 def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
@@ -277,10 +279,37 @@ def _GET_LOG_NAMES(name, run=None, rank=None, version=None):
     return logName, logFilename
 
 
-def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=None):
+def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=None, tofile=True):
     """Initialize a ``logging.Logger`` object for output messages.
 
-    All processes log to output files, and the root process also outputs to `stdout`.
+    All processes log to output files, and the root process also outputs to `stdout`.  Constructs
+    the log name based on the `name` argument, which should be the `__file__` parameter from the
+    script which calls this method.
+
+    Arguments
+    ---------
+    name : str
+        Base (file)name from which to construct the log's name, and log filename.
+    verbose : bool
+        Print 'verbose' (``logging.INFO``) output to stdout.
+        Overridden if ``debug == True``.
+    debug : bool
+        Print extremely verbose (``logging.DEBUG``) output to stdout.
+        Overrides `verbose` setting.
+    run : int or `None`
+        Illustris run number {1,3}.  Added to log filename if provided.
+    rank : int or `None`
+        Rank of the current process for MPI runs.  Added to the log filename if provided.
+    version : str or `None`
+        Current version of script being run.  Added to the log filename if provided.
+    tofile : bool
+        Whether output should also be logged to a file.
+
+    Returns
+    -------
+    logger : ``logging.Logger`` object
+        Object for output logging.
+
     """
     # Get logger and log-file names
     logName, logFilename = _GET_LOG_NAMES(name, run=run, rank=rank, version=version)
@@ -293,6 +322,9 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
         strLvl = logging.INFO
     else:
         strLvl = logging.WARNING
+
+    # Turn off file-logging
+    if(not tofile): logFilename = None
 
     fileLvl = logging.DEBUG
     # Create logger
