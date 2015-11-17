@@ -328,7 +328,7 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
 
     fileLvl = logging.DEBUG
     # Create logger
-    if(rank == 0):
+    if(rank == 0 or rank is None):
         logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, strLevel=strLvl)
     else:
         logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, tostr=False)
