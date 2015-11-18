@@ -48,7 +48,7 @@ __version__ = '0.23'
 _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 
-def main(run=1, verbose=True, debug=True, loadsave=True):
+def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, redo_remnants=True):
     # Initialization
     # --------------
     #     MPI Parameters
@@ -81,7 +81,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True):
             create_mergerDets = True
         else:
             log.info("Merger Details file exists.")
-            if(not loadsave):
+            if(not loadsave or redo_mergers):
                 log.info(" - Recreating anyway.")
                 create_mergerDets = True
 
@@ -94,7 +94,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True):
             create_remnantDets = True
         else:
             log.info("Remnant Details file exists.")
-            if(not loadsave):
+            if(not loadsave or redo_remnants):
                 log.info(" - Recreating anyway.")
                 create_remnantDets = True
 
@@ -458,10 +458,13 @@ def _matchRemnantDetails(run, log, mdets=None):
         if(np.size(inds) > 0):
             ids[ii] = d_ids[ii, BH_TYPE.OUT][inds[0]]
             scales[ii] = d_scales[ii, BH_TYPE.OUT][inds]
+            masses[ii] = d_masses[ii, BH_TYPE.OUT][inds]
+            dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
             mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
+            csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
         else:
-            log.warning("Merger %d without details entries!" % (ii))
-            ids[ii] = -1
+            log.warning("Merger %d without post-merger details entries!" % (ii))
+            ids[ii] = m_ids[ii, BH_TYPE.OUT]
             scales[ii] = []
             masses[ii] = []
             dens[ii] = []
@@ -481,7 +484,8 @@ def _matchRemnantDetails(run, log, mdets=None):
                 checkScale = m_scales[nextMerger]
                 # Error if still not fixed
                 if(nextMerger >= 0 and ids[ii] not in m_ids[nextMerger]):
-                    errStr = "ERROR: ids[%d] = %d, merger ids %d = %s" % (ii, ids[ii], nextMerger, str(m_ids[nextMerger]))
+                    errStr = "ERROR: ids[{}] = {}, merger ids {} = {}"
+                    errStr = errStr.format(ii, ids[ii], nextMerger, str(m_ids[nextMerger]))
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
 
@@ -497,11 +501,12 @@ def _matchRemnantDetails(run, log, mdets=None):
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
 
-            scales[ii] = np.append(scales[ii], d_scales[nextMerger, BH_TYPE.OUT][:])
-            masses[ii] = np.append(masses[ii], d_masses[nextMerger, BH_TYPE.OUT][:])
-            dens[ii] = np.append(dens[ii], d_dens[nextMerger, BH_TYPE.OUT][:])
-            mdots[ii] = np.append(scales[ii], d_mdots[nextMerger, BH_TYPE.OUT][:])
-            csnds[ii] = np.append(csnds[ii], d_csnds[nextMerger, BH_TYPE.OUT][:])
+            inds = np.where(d_scales[nextMerger, BH_TYPE.OUT] > m_scales[ii])[0]
+            scales[ii] = np.append(scales[ii], d_scales[nextMerger, BH_TYPE.OUT][inds])
+            masses[ii] = np.append(masses[ii], d_masses[nextMerger, BH_TYPE.OUT][inds])
+            dens[ii] = np.append(dens[ii], d_dens[nextMerger, BH_TYPE.OUT][inds])
+            mdots[ii] = np.append(mdots[ii], d_mdots[nextMerger, BH_TYPE.OUT][inds])
+            csnds[ii] = np.append(csnds[ii], d_csnds[nextMerger, BH_TYPE.OUT][inds])
 
             # Get next merger in Tree
             nextMerger = nextBH[nextMerger]
@@ -510,7 +515,8 @@ def _matchRemnantDetails(run, log, mdets=None):
                 nextMerger = _findNextMerger(checkID, checkScale, m_ids, m_scales)
                 # Error if still not fixed
                 if(nextMerger >= 0 and ids[ii] not in m_ids[nextMerger]):
-                    errStr = "ERROR: ids[%d] = %d, merger ids %d = %s" % (ii, ids[ii], nextMerger, str(m_ids[nextMerger]))
+                    errStr = "ERROR: ids[{}] = {}, merger ids {} = {}"
+                    errStr = errStr.format(ii, ids[ii], nextMerger, str(m_ids[nextMerger]))
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
 
@@ -676,7 +682,8 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
                     #    Cant interpolate IDs, select random subset instead...
                     tempIDs = np.random.choice(tempIDs, size=_MAX_DETAILS_PER_SNAP, replace=False)
                     if(not isinstance(tempIDs[0], DTYPE.ID)):
-                        errStr = "Error: incorrect dtype for random tempIDs = %s" % (np.dtype(tempIDs[0]))
+                        errStr = "Error: incorrect dtype for random tempIDs = {}"
+                        errStr = errStr.format(np.dtype(tempIDs[0]))
                         log.error(errStr)
                         raise RuntimeError(errStr)
 
@@ -753,7 +760,7 @@ def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log):
     beg = datetime.now()
     zio.dictToNPZ(data, fname, verbose=True)
     end = datetime.now()
-    log.info(" - - Saved to '%s' after %s" % (filename, str(end-beg)))
+    log.info(" - - Saved to '%s' after %s" % (fname, str(end-beg)))
 
     return data
 
