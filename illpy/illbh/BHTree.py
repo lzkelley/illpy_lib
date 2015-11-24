@@ -244,15 +244,59 @@ def _countFutureMergers(next, ind):
 
 
 def _countPastMergers(last, ind, verbose=False):
-
     last_in  = last[ind, BH_TYPE.IN]
     last_out = last[ind, BH_TYPE.OUT]
-
     num_in   = 0
     num_out  = 0
-
     if(last_in >= 0):  num_in  = _countPastMergers(last, last_in)
     if(last_out >= 0): num_out = _countPastMergers(last, last_out)
     if(verbose): print "%d  <===  %d (%d)   %d (%d)" % (ind, last_in, num_in, last_out, num_out)
-
     return np.max([num_in, num_out])+1
+
+
+def allIDsForTree(run, mrg, tree=None, mergers=None):
+    """Get all of the ID numbers for BH in the same merger-tree as the given merger.
+    """
+    if not tree:
+        tree = loadTree(run)
+    nextMerg = tree[BH_TREE.NEXT]
+    lastMerg = tree[BH_TREE.LAST]
+    if not mergers:
+        mergers = BHMergers.loadFixedMergers(run)
+    m_ids = mergers[MERGERS.IDS]
+
+    # Go to the last merger
+    fin = mrg
+    while(nextMerg[fin] >= 0):
+        fin = nextMerg[fin]
+
+    # Go backwards to get all IDs
+    allIDs = _getPastIDs(m_ids, lastMerg, fin)
+    return allIDs
+
+
+def _getPastIDs(m_ids, lastMerg, ind, idlist=[]):
+    """Get all BH IDs in past-mergers of this BHTree.
+
+    Arguments
+    ---------
+    m_ids : (N,2) array of int
+        Merger BH ID numbers.
+    last : (N,2) array of int
+        For a given merger, give the index of the merger for each of the constituent BHs.
+        `-1` if there was no previous merger.
+    ind : int
+        Index of merger to follow.
+    idlist : list of int
+        Existing list of merger IDs to append to.  Uses a `set` type intermediate to assure unique
+        values.
+    """
+    ids_in = [m_ids[ind, BH_TYPE.IN]]
+    ids_out = [m_ids[ind, BH_TYPE.OUT]]
+    last_in  = lastMerg[ind, BH_TYPE.IN]
+    last_out = lastMerg[ind, BH_TYPE.OUT]
+    if(last_in >= 0):
+        ids_in = _getPastIDs(m_ids, lastMerg, last_in, ids_in)
+    if(last_out >= 0):
+        ids_out = _getPastIDs(m_ids, lastMerg, last_out, ids_out)
+    return list(set(ids_in + ids_out + idlist))
