@@ -75,6 +75,8 @@ _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.n
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
 _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
 
+_DETAILS_UNIQUE_IDS_FILENAME    = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
+
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
 
 _LOG_DIR = "./logs/"
@@ -241,6 +243,11 @@ def GET_BLACKHOLE_TREE_FILENAME(run, version):
     return fname
 
 
+def GET_DETAILS_UNIQUE_IDS_FILENAME(run, snap, version):
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _DETAILS_UNIQUE_IDS_FILENAME % (run, snap, version)
+    return fname
+
 def _GET_STATUS_FILENAME(name, run=None, version=None):
     statFilename = os.path.splitext(os.path.basename(name)) + "_stat"
     if(run): statFilename += "_ill%d" % (run)
@@ -334,6 +341,49 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
         logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, tostr=False)
 
     return logger
+
+
+def _distributeSnapshots(comm):
+    """Evenly distribute snapshot numbers across multiple processors.
+    """
+    size = comm.size
+    rank = comm.rank
+    mySnaps = np.arange(NUM_SNAPS)
+    if(size > 1):
+        # Randomize which snapshots go to which processor for load-balancing
+        mySnaps = np.random.permutation(mySnaps)
+        # Make sure all ranks are synchronized on initial (randomized) list before splitting
+        mySnaps = comm.bcast(mySnaps, root=0)
+        mySnaps = np.array_split(mySnaps, size)[rank]
+
+    return mySnaps
+    
+
+def _checkLoadSave(fname, loadsave, log):
+    """See if a file exists and can be loaded, or if it needs to be reconstructed.
+    """
+    log.debug("_checkLoadSave()")
+    log.debug(" - Checking for file '%s'" % (fname))
+    data = None
+    if os.path.exists(fname):
+        logStr = " - File exists..."
+        if not loadsave:
+            logStr += " not loading it."
+            log.debug(logStr)
+        else:
+            logStr += " loading..."
+            log.debug(logStr)
+            try:
+                data = zio.npzToDict(fname)
+            except Exception, e:
+                log.warning(" - Load Failed: %s." % (str(e)))
+            else:
+                log.debug(" - Loaded data.")
+
+    else:
+        log.debug(" - File does not exist.")
+
+    return data
 
 
 assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
