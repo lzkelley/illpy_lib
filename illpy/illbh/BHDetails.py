@@ -66,12 +66,12 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from illpy.Constants import DTYPE, NUM_SNAPS
+import zcode.inout as zio
 
+from illpy.Constants import DTYPE, NUM_SNAPS
 import BHConstants
 from BHConstants import DETAILS
 
-import zcode.inout as zio
 
 VERSION = 0.23                                    # Version of BHDetails
 
@@ -465,3 +465,7 @@ def _getPrecision(args):
     else:                minDiff = np.power(10.0, _DEF_PRECISION)
     order = int(np.log10(0.49*minDiff))
     return order
+
+
+
+
