@@ -41,16 +41,13 @@ import illpy.illbh.BHConstants
 from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
     _distributeSnapshots
-# from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, \
-#     NUM_BH_TIMES, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, DETAILS_PHYSICAL_KEYS
-# from illpy.illbh.MatchDetails import getDetailIndicesForMergers
 import illpy.Constants
 from illpy.Constants import DTYPE, NUM_SNAPS
 
 import zcode.inout as zio
 import zcode.math as zmath
 
-"""CREATE LISTS OF ALL UNIQUE IDS IN EACH SNAPSHOT'S DETAILS FILES."""
+# """CREATE LISTS OF ALL UNIQUE IDS IN EACH SNAPSHOT'S DETAILS FILES."""
 
 
 __version__ = '0.23'
@@ -246,6 +243,7 @@ def allDetailsForBHLineage(run, mrg, log):
         # Make sure all ranks are synchronized on initial (randomized) list before splitting
         mySnaps = comm.bcast(mySnaps, root=0)
         mySnaps = np.array_split(mySnaps, size)[rank]
+        comm.Barrier()
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
@@ -894,14 +892,6 @@ def _matchRemnantDetails(run, log, mdets=None):
                     else:
                         mcorrected[ii][mrg[0]:] -= inMass
                         goods += 1
-
-                    # print(ii, jj)
-                    # print("\t", mscale, "\t", scales[ii][useInds])
-                    # print("\t", masses[ii][useInds])
-                    # print("\t", m_masses[jj, BH_TYPE.IN])
-                    # print("\t", np.diff(masses[ii][useInds]))
-                    # print("\t", np.diff(masses[ii][useInds])-inMass)
-                    # count += 1
 
             jj = nextBH[jj]
             if count > 100: return
