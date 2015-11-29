@@ -25,10 +25,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import logging
 from glob import glob
+import numpy as np
 
 import zcode.inout as zio
 
-from .. Constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE
+from .. Constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, NUM_SNAPS
 
 
 # Illustris Parameters
