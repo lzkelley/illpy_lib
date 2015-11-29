@@ -3,12 +3,14 @@ Construct and/or load a Blackhole Merger tree from the illustris blackhole merge
 
 Functions
 ---------
-    loadTree
-    analyzeTree
+-   loadTree                  - Load tree data from save file if possible, or recalculate directly.
+-   analyzeTree               - Analyze the merger tree data to obtain typical number of repeats...
+-   allIDsForTree             - Get all ID numbers for BH in the same merger-tree.
 
-    _constructBHTree
-    _countFutureMergers
-    _countPastMergers
+-   _constructBHTree          - Use merger data to find and connect BHs which merge multiple times.
+-   _countFutureMergers       - Count the number of future mergers using the next-merger map.
+-   _countPastMergers         - Count the number of past mergers using the last-merger map.
+-   _getPastIDs               - Get all BH IDs in past-mergers of this BHTree.
 
 """
 
@@ -31,8 +33,7 @@ VERSION = 0.21
 
 
 def loadTree(run, mergers=None, loadsave=True, verbose=True):
-    """
-    Load tree data from save file if possible, or recalculate directly.
+    """Load tree data from save file if possible, or recalculate directly.
 
     Arguments
     ---------
@@ -81,63 +82,6 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
 
         # Save Tree data
         zio.dictToNPZ(tree, fname, verbose=True)
-
-    return tree
-
-
-def _constructBHTree(run, mergers, verbose=True):
-    """Use merger data to find and connect BHs which merge multiple times.
-
-    Arguments
-    ---------
-        run     : <int>, Illlustris run number {1, 3}
-        mergers : <dict>, BHMergers dictionary
-        verbose : <bool>, (optional=True), Print verbose output
-
-    Returns
-    -------
-        tree : <dict>  container for tree data - see BHTree doc
-
-    """
-
-    if(verbose): print " - - BHTree.constructBHTree()"
-
-    cosmo = Cosmology()
-
-    numMergers = mergers[MERGERS.NUM]
-    last     = -1*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
-    next     = -1*np.ones([numMergers], dtype=DTYPE.INDEX)
-    lastTime = -1.0*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
-    nextTime = -1.0*np.ones([numMergers], dtype=DTYPE.SCALAR)
-
-    # Convert merger scale factors to ages
-    scales = mergers[MERGERS.SCALES]
-    times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
-
-    # Construct Merger Tree from node IDs
-    if(verbose): print " - - - Building BH Merger Tree"
-    start = datetime.now()
-    mids = mergers[MERGERS.IDS]
-    BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
-    stop = datetime.now()
-    if(verbose): print " - - - - Built after %s" % (str(stop-start))
-
-    inds = np.where(last < 0)[0]
-    if(verbose): print " - - - %d Missing 'last'" % (len(inds))
-
-    inds = np.where(next < 0)[0]
-    if(verbose): print " - - - %d Missing 'next'" % (len(inds))
-
-    # Create dictionary to store data
-    tree = {BH_TREE.LAST: last,
-            BH_TREE.NEXT: next,
-            BH_TREE.LAST_TIME: lastTime,
-            BH_TREE.NEXT_TIME: nextTime,
-
-            BH_TREE.CREATED: datetime.now().ctime(),
-            BH_TREE.RUN: run,
-            BH_TREE.VERSION: VERSION
-            }
 
     return tree
 
@@ -233,29 +177,28 @@ def analyzeTree(tree, verbose=True):
     return timeBetween, numPast, numFuture
 
 
-def _countFutureMergers(next, ind):
-    count = 0
-    ii = ind
-    while(next[ii] >= 0):
-        count += 1
-        ii = next[ii]
-
-    return count
-
-
-def _countPastMergers(last, ind, verbose=False):
-    last_in  = last[ind, BH_TYPE.IN]
-    last_out = last[ind, BH_TYPE.OUT]
-    num_in   = 0
-    num_out  = 0
-    if(last_in >= 0):  num_in  = _countPastMergers(last, last_in)
-    if(last_out >= 0): num_out = _countPastMergers(last, last_out)
-    if(verbose): print "%d  <===  %d (%d)   %d (%d)" % (ind, last_in, num_in, last_out, num_out)
-    return np.max([num_in, num_out])+1
-
-
 def allIDsForTree(run, mrg, tree=None, mergers=None):
     """Get all of the ID numbers for BH in the same merger-tree as the given merger.
+
+    Arguments
+    ---------
+    run : int
+        Illustris simulation run number {1,3}.
+    mrg : int
+        Index of the target BH merger.  Any merger number in the same tree will yield the same
+        results.
+    tree : dict or `None`
+        BHTree object will merger-tree data.  Loaded if not provided.
+    mergers : dict or `None`
+        BHMergers object will merger data.  Loaded if not provided.
+
+    Returns
+    -------
+    fin : int
+        Index of the final merger this bh-tree participates in.  Acts as a unique identifier.
+    allIDs : list of int
+        List of all ID numbers of BHs which participate in this merger tree.
+
     """
     if not tree:
         tree = loadTree(run)
@@ -272,7 +215,89 @@ def allIDsForTree(run, mrg, tree=None, mergers=None):
 
     # Go backwards to get all IDs
     allIDs = _getPastIDs(m_ids, lastMerg, fin)
-    return allIDs
+    return fin, allIDs
+
+
+def _constructBHTree(run, mergers, verbose=True):
+    """Use merger data to find and connect BHs which merge multiple times.
+
+    Arguments
+    ---------
+        run     : <int>, Illlustris run number {1, 3}
+        mergers : <dict>, BHMergers dictionary
+        verbose : <bool>, (optional=True), Print verbose output
+
+    Returns
+    -------
+        tree : <dict>  container for tree data - see BHTree doc
+
+    """
+
+    if(verbose): print " - - BHTree.constructBHTree()"
+
+    cosmo = Cosmology()
+
+    numMergers = mergers[MERGERS.NUM]
+    last     = -1*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
+    next     = -1*np.ones([numMergers], dtype=DTYPE.INDEX)
+    lastTime = -1.0*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
+    nextTime = -1.0*np.ones([numMergers], dtype=DTYPE.SCALAR)
+
+    # Convert merger scale factors to ages
+    scales = mergers[MERGERS.SCALES]
+    times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
+
+    # Construct Merger Tree from node IDs
+    if(verbose): print " - - - Building BH Merger Tree"
+    start = datetime.now()
+    mids = mergers[MERGERS.IDS]
+    BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
+    stop = datetime.now()
+    if(verbose): print " - - - - Built after %s" % (str(stop-start))
+
+    inds = np.where(last < 0)[0]
+    if(verbose): print " - - - %d Missing 'last'" % (len(inds))
+
+    inds = np.where(next < 0)[0]
+    if(verbose): print " - - - %d Missing 'next'" % (len(inds))
+
+    # Create dictionary to store data
+    tree = {BH_TREE.LAST: last,
+            BH_TREE.NEXT: next,
+            BH_TREE.LAST_TIME: lastTime,
+            BH_TREE.NEXT_TIME: nextTime,
+
+            BH_TREE.CREATED: datetime.now().ctime(),
+            BH_TREE.RUN: run,
+            BH_TREE.VERSION: VERSION
+            }
+
+    return tree
+
+
+def _countFutureMergers(next, ind):
+    """Use the map of `next` mergers and a starting index to count the future number of mergers.
+    """
+    count = 0
+    ii = ind
+    while(next[ii] >= 0):
+        count += 1
+        ii = next[ii]
+    return count
+
+
+def _countPastMergers(last, ind):
+    """Use the map of `last` mergers and a starting index to count the past number of mergers.
+    """
+    last_in  = last[ind, BH_TYPE.IN]
+    last_out = last[ind, BH_TYPE.OUT]
+    num_in   = 0
+    num_out  = 0
+    if(last_in >= 0):
+        num_in = _countPastMergers(last, last_in)
+    if(last_out >= 0): 
+        num_out = _countPastMergers(last, last_out)
+    return np.max([num_in, num_out])+1
 
 
 def _getPastIDs(m_ids, lastMerg, ind, idlist=[]):
@@ -290,6 +315,8 @@ def _getPastIDs(m_ids, lastMerg, ind, idlist=[]):
     idlist : list of int
         Existing list of merger IDs to append to.  Uses a `set` type intermediate to assure unique
         values.
+
+    Used by: `allIDsForTree`.
     """
     ids_in = [m_ids[ind, BH_TYPE.IN]]
     ids_out = [m_ids[ind, BH_TYPE.OUT]]
