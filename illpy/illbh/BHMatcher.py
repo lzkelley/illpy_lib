@@ -15,10 +15,15 @@ Functions
 -   loadMergerDetails        - Load a previously calculated merger-details file.
 -   loadRemnantDetails       - Load a previously calculated remnant-details file.
 
+-   allDetailsForBHLineage   - Load all of the details entries for a given BH lineage (merger tree).
+-   inferMergerOutMasses     - Infer the 'out' BH masses at time of mergers based on available data.
+
 -   _matchMergerDetails      - Find details entries matching merger-BH ID numbers.
 -   _matchRemnantDetails     - Combine merger-details entries to obtain an entire remnant's life.
--   _findNextMerger          - Find the next merger index in which a particular BH participates.
+-   _detailsForMergers_snapshots - Find details entries for BH IDs in a particular snapshots.
 -   _saveDetails             - Package details into dictionary and save to NPZ file.
+-   _findNextMerger          - Find the next merger index in which a particular BH participates.
+-   _indBefAft               - Retrieve the index matching the minimum greater-than zero of input.
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -34,7 +39,8 @@ import illpy.illbh.BHMergers
 import illpy.illbh.BHTree
 import illpy.illbh.BHConstants
 from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
-    GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP
+    GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
+    _distributeSnapshots
 # from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TYPE, BH_TIME, NUM_BH_TYPES, \
 #     NUM_BH_TIMES, _LOG_DIR, GET_MERGER_DETAILS_FILENAME, DETAILS_PHYSICAL_KEYS
 # from illpy.illbh.MatchDetails import getDetailIndicesForMergers
@@ -43,6 +49,9 @@ from illpy.Constants import DTYPE, NUM_SNAPS
 
 import zcode.inout as zio
 import zcode.math as zmath
+
+"""CREATE LISTS OF ALL UNIQUE IDS IN EACH SNAPSHOT'S DETAILS FILES."""
+
 
 __version__ = '0.23'
 _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
@@ -67,6 +76,11 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     log.debug(header)
     if(rank == 0):
         print("Log filename = ", log.filename)
+
+    if rank == 0: log.warning("Running 'allDetailsForBHLineage(run, 0, log)'")
+    allDetailsForBHLineage(run, 0, log)
+    return
+
 
     # Check status of files, determine what operations to perform
     create_mergerDets = False
@@ -203,6 +217,268 @@ def loadRemnantDetails(run, verbose=True, log=None):
     return remnantDets
 
 
+def allDetailsForBHLineage(run, mrg, log):
+    """Load all of the details entries for a given BH lineage (merger tree).
+    """
+    log.debug("allDetailsForBHLineage()")
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+    size = comm.size
+
+    bhIDs = None
+    if(rank == 0):
+        bhIDs = illpy.illbh.BHTree.allIDsForTree(run, mrg)
+        bhIDs = np.array(bhIDs)
+        numBHs = bhIDs.size
+        log.info(" - Merger {} has a tree with {} unique BHs".format(mrg, numBHs))
+        if numBHs < 2:
+            errStr = "ERROR: only IDs found for merger {} are : {}".format(mrg, str(bhIDs))
+            log.error(errStr)
+            raise RuntimeError(errStr)
+
+    # Distribute snapshots to each processor
+    mySnaps = np.arange(NUM_SNAPS)
+    if(size > 1):
+        # Send unique IDs to all processors
+        bhIDs = comm.bcast(bhIDs, root=0)
+        # Randomize which snapshots go to which processor for load-balancing
+        mySnaps = np.random.permutation(mySnaps)
+        # Make sure all ranks are synchronized on initial (randomized) list before splitting
+        mySnaps = comm.bcast(mySnaps, root=0)
+        mySnaps = np.array_split(mySnaps, size)[rank]
+
+    log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
+        rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
+
+    # Get details entries for unique merger IDs in snapshot list
+    # ----------------------------------------------------------
+    #    Use ``maxPerSnap = None`` to save ALL details entries
+    nums, scales, masses, mdots, dens, csnds, ids = \
+        _detailsForMergers_snapshots(run, mySnaps, bhIDs, None, log)
+
+    # Collect results and organize
+    # ----------------------------
+    if(size > 1):
+        log.debug(" - Gathering")
+        beg = datetime.now()
+        # Gather results from each processor into ``rank=0``
+        tempScales = comm.gather(scales, root=0)
+        tempMasses = comm.gather(masses, root=0)
+        tempMdots = comm.gather(mdots, root=0)
+        tempDens = comm.gather(dens, root=0)
+        tempCsnds = comm.gather(csnds, root=0)
+        tempIds = comm.gather(ids, root=0)
+        tempNums = comm.gather(nums, root=0)
+        end = datetime.now()
+        log.debug(" - - Done after %s" % (str(end-beg)))
+
+        # Gather snapshot numbers for ordering
+        mySnaps = comm.gather(mySnaps, root=0)
+
+        # Organize results appropriately
+        if(rank == 0):
+            log.debug(" - Stacking")
+            beg = datetime.now()
+
+            nums = np.zeros(numBHs)
+            scales = numBHs*[[None]]
+            masses = numBHs*[[None]]
+            mdots = numBHs*[[None]]
+            dens = numBHs*[[None]]
+            csnds = numBHs*[[None]]
+            ids = numBHs*[[None]]
+
+            # Iterate over each black-hole and processor, collect results into single arrays
+            for ii, mm in enumerate(bhIDs):
+                for jj in xrange(size):
+                    errStr = ""
+                    if(tempIds[jj][ii][0] is not None):
+                        dd = tempIds[jj][ii][0]
+                        # Make sure all of the details IDs are consistent
+                        if(np.any(tempIds[jj][ii] != dd)):
+                            errStr += "ii = {}, jj = {}, mm = {}; tempIds[0] = {}".format(ii, jj, mm, dd)
+                            errStr += " tempIds = {}".format(str(tempIds[ii]))
+
+                        # Make sure details IDs match expected merger ID
+                        if(dd != mm):
+                            errStr += "\nii = {}, jj = {}, mm = {}; dd = {}".format(ii, jj, mm, dd)
+
+                        # If no entries have been stored yet, replace with first entries
+                        if(ids[ii][0] is None):
+                            ids[ii] = tempIds[jj][ii]
+                            scales[ii] = tempScales[jj][ii]
+                            masses[ii] = tempMasses[jj][ii]
+                            mdots[ii] = tempMdots[jj][ii]
+                            dens[ii] = tempDens[jj][ii]
+                            csnds[ii] = tempCsnds[jj][ii]
+                        # If entries already exist, append new ones
+                        else:
+                            # Double check that all existing IDs are consistent with new ones
+                            #    This should be redundant, but whatevs
+                            if(np.any(ids[ii] != dd)):
+                                errStr += "\nii = {}, jj = {}, mm = {}, dd = {}, ids = {}".format(ii, jj, mm, dd, str(ids))
+                            ids[ii] = np.append(ids[ii], tempIds[jj][ii])
+                            scales[ii] = np.append(scales[ii], tempScales[jj][ii])
+                            masses[ii] = np.append(masses[ii], tempMasses[jj][ii])
+                            mdots[ii] = np.append(mdots[ii], tempMdots[jj][ii])
+                            dens[ii] = np.append(dens[ii], tempDens[jj][ii])
+                            csnds[ii] = np.append(csnds[ii], tempCsnds[jj][ii])
+
+                        # Count the number of entries for each BH from each processor
+                        nums[ii] += tempNums[jj][ii]
+
+                    if(len(errStr) > 0):
+                        log.error(errStr)
+                        zio.mpiError(comm, log=log, err=errStr)
+
+            # Merge lists of snapshots, and look for any missing
+            mySnaps = np.hstack(mySnaps)
+            log.debug("Obtained %d Snapshots" % (mySnaps.size))
+            missingSnaps = []
+            for ii in xrange(NUM_SNAPS):
+                if(ii not in mySnaps):
+                    missingSnaps.append(ii)
+
+            if(len(missingSnaps) > 0):
+                log.warning("WARNING: snaps %s not in results!" % (str(missingSnaps)))
+
+            log.debug("Total entries stored = %d" % (np.sum([np.sum(nn) for nn in nums])))
+
+    # Sort results by time
+    if(rank == 0):
+
+        # Sort entries for each BH by scalefactor
+        log.debug(" - Sorting")
+        beg = datetime.now()
+        for ii in xrange(numBHs):
+            if(nums[ii] == 0): continue
+            # Check ID numbers yet again
+            if(not np.all(ids[ii] == ids[ii][0])):
+                errStr = "Error!  ii = {}, ID = {}, IDs = {}"
+                errStr = errStr.format(ii, ids[ii][0], ids[ii])
+                log.error(errStr)
+                zio.mpiError(comm, log=log, err=errStr)
+
+            inds = np.argsort(scales[ii])
+            scales[ii] = scales[ii][inds]
+            masses[ii] = masses[ii][inds]
+            dens[ii] = dens[ii][inds]
+            mdots[ii] = mdots[ii][inds]
+            csnds[ii] = csnds[ii][inds]
+
+        end = datetime.now()
+        log.debug(" - - Done after %s" % (str(end-beg)))
+
+        # Save data
+        filename = "ill-%d_merger-%d_full-tree-details.npz" % (run, mrg)
+        data = _saveDetails(filename, run, ids, scales, masses, dens, mdots, csnds, log)
+
+    return
+
+
+def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
+    """Based on 'merger' and 'details' information, infer the 'out' BH masses at time of mergers.
+
+    The Illustris 'merger' files have the incorrect values output for the 'out' BH mass.  This
+    method uses the data included in 'details' entries (via ``BHDetails``), which were matched
+    to mergers here in ``BHMatcher``, to infer the approximate mass of the 'out' BH at the
+    time of merger.
+
+    The ``mergerDetails`` entries have the details for both 'in' and 'out' BHs both 'before' and
+    'after' merger.  First the 'out' BH's entries just 'before' merger are used directly as the
+    'inferred' mass.  In the few cases where these entries don't exist, the code falls back on
+    calculating the difference between the total mass (given by the 'out' - 'after' entry) and the
+    'in' BH mass recorded by the merger event (which should be correct); if this still doesn't
+    work (which shouldn't ever happen), then the difference between the 'out'-'after' mass and the
+    'in'-'before' mass is used, which should also be good --- but slightly less accurate (because
+    the 'in'-'before' mass might have been recorded some small period of time before the actual
+    merger event.
+
+    Arguments
+    ---------
+       run     <int>  :
+       mergers <dict> :
+       mdets   <dict> :
+       verbose <str>  :
+       debug   <str>  :
+
+    Returns
+    -------
+       outMass <flt64>[N] : inferred 'out' BH masses at the time of merger
+
+    """
+    if(log is None):
+        log = illpy.illbh.BHConstants._loadLogger(
+            __file__, verbose=True, debug=False, run=run, tofile=False)
+
+    log.debug("inferMergerOutMasses()")
+
+    # Load Mergers
+    if(mergers is None):
+        mergers = illpy.illbh.BHMergers.loadFixedMergers(run, verbose=False)
+    m_scales = mergers[MERGERS.SCALES]
+    m_masses = mergers[MERGERS.MASSES]
+    numMergers = mergers[MERGERS.NUM]
+    del mergers
+
+    # Load Merger Details
+    if(mdets is None):
+        mdets = loadMergerDetails(run, log=log)
+    d_masses = mdets[DETAILS.MASSES]
+    d_scales = mdets[DETAILS.SCALES]
+    del mdets
+
+    # Find details entries before and after merger
+    massBef = np.zeros_like(m_masses)
+    massAft = np.zeros_like(m_masses)
+    for ii, sc in enumerate(m_scales):
+        for bh in [BH_TYPE.IN, BH_TYPE.OUT]:
+            if(d_scales[ii].size == 0):
+                log.warning("Merger %s with zero details entries" % str(ii))
+            else:
+                # 'before' is ``sc > d_scales``
+                bef = _indBefAft(sc - d_scales[ii, bh])
+                if(bef is not None):
+                    if(np.isfinite(d_masses[ii, bh][bef])):
+                        massBef[ii, bh] = d_masses[ii, bh][bef]
+                    elif(bef > 0):
+                        massBef[ii, bh] = d_masses[ii, bh][bef-1]
+
+                # 'after' is ``d_scales > sc``
+                aft = _indBefAft(d_scales[ii, bh] - sc)
+                if(aft):
+                    massAft[ii, bh] = d_masses[ii, bh][aft]
+
+    # Fix Mass Entries
+    # ----------------
+    massBef = massBef.reshape(2*numMergers)
+    massAft = massAft.reshape(2*numMergers)
+    masses = np.zeros_like(massBef)
+    ntot = masses.size
+
+    bads = np.where(np.isfinite(massBef) == False)[0]
+    print("Bads Before = ", bads)
+    print("\t", massBef[bads])
+    bads = np.where(np.isfinite(massAft) == False)[0]
+    print("Bads After = ", bads)
+    print("\t", massAft[bads])
+
+    # Use 'before' masses
+    inds = np.where(massBef > 0.0)
+    masses[inds] = massBef[inds]
+    bads = np.where(masses == 0.0)
+    nfix = np.size(inds)
+    nbad = np.size(bads)
+    frac = nfix/ntot
+    log.info(" - Used %d/%d = %.4f after masses.  %d remain" % (nfix, ntot, frac, nbad))
+
+    massBef = massBef.reshape(numMergers, 2)
+    massAft = massAft.reshape(numMergers, 2)
+    masses = masses.reshape(numMergers, 2)
+
+    return masses
+
+
 def _matchMergerDetails(run, comm, log):
     """Find details entries matching merger-BH ID numbers.
 
@@ -233,6 +509,7 @@ def _matchMergerDetails(run, comm, log):
     bhIDsUnique = comm.bcast(bhIDsUnique, root=0)
 
     # Distribute snapshots to each processor
+    """
     mySnaps = np.arange(NUM_SNAPS)
     if(size > 1):
         # Randomize which snapshots go to which processor for load-balancing
@@ -240,6 +517,8 @@ def _matchMergerDetails(run, comm, log):
         # Make sure all ranks are synchronized on initial (randomized) list before splitting
         mySnaps = comm.bcast(mySnaps, root=0)
         mySnaps = np.array_split(mySnaps, size)[rank]
+    """
+    mySnaps = _distributeSnapshots(comm)
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
@@ -247,7 +526,7 @@ def _matchMergerDetails(run, comm, log):
     # Get details entries for unique merger IDs in snapshot list
     # ----------------------------------------------------------
     nums, scales, masses, mdots, dens, csnds, ids = \
-        _detailsForMergers_snapshots(run, mySnaps, bhIDsUnique, log)
+        _detailsForMergers_snapshots(run, mySnaps, bhIDsUnique, _MAX_DETAILS_PER_SNAP, log)
 
     # Collect results and organize
     # ----------------------------
@@ -391,7 +670,6 @@ def _matchRemnantDetails(run, log, mdets=None):
     log.debug("_matchRemnantDetails()")
     comm = MPI.COMM_WORLD
     rank = comm.rank
-    size = comm.size
 
     # Only use root-processor (for now at least)
     if(rank != 0):
@@ -402,8 +680,8 @@ def _matchRemnantDetails(run, log, mdets=None):
     log.debug("Loading Mergers")
     mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
     m_scales = mergers[MERGERS.SCALES]
-    m_sort = np.argsort(m_scales)
     m_ids = mergers[MERGERS.IDS]
+    m_masses = mergers[MERGERS.MASSES]
     numMergers = np.size(m_scales)
     del mergers
 
@@ -443,8 +721,14 @@ def _matchRemnantDetails(run, log, mdets=None):
 
     # Initialize data for results
     ids = np.zeros(numMergers, dtype=DTYPE.ID)
+    mono = np.ones(numMergers, dtype=np.bool)
+    ndups = np.zeros(numMergers, dtype=np.int)
+    nents = np.zeros(numMergers, dtype=np.int)
+    idnums = numMergers*[None]
+    mrgnums = numMergers*[None]
     scales = numMergers*[None]
     masses = numMergers*[None]
+    mcorrected = numMergers*[None]
     dens = numMergers*[None]
     mdots = numMergers*[None]
     csnds = numMergers*[None]
@@ -462,6 +746,8 @@ def _matchRemnantDetails(run, log, mdets=None):
             dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
             mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
             csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
+            idnums[ii] = d_ids[ii, BH_TYPE.OUT][inds]
+            mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
         else:
             log.warning("Merger %d without post-merger details entries!" % (ii))
             ids[ii] = m_ids[ii, BH_TYPE.OUT]
@@ -470,6 +756,8 @@ def _matchRemnantDetails(run, log, mdets=None):
             dens[ii] = []
             mdots[ii] = []
             csnds[ii] = []
+            idnums[ii] = []
+            mrgnums[ii] = []
 
         # Subsequent mergers
         #    Find the next merger that this 'out' BH participates in
@@ -501,12 +789,18 @@ def _matchRemnantDetails(run, log, mdets=None):
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
 
-            inds = np.where(d_scales[nextMerger, BH_TYPE.OUT] > m_scales[ii])[0]
+            if(np.size(scales[ii]) > 0):
+                inds = np.where(d_scales[nextMerger, BH_TYPE.OUT] > np.max(scales[ii]))[0]
+            else:
+                inds = np.where(d_scales[nextMerger, BH_TYPE.OUT] > m_scales[ii])[0]
+
             scales[ii] = np.append(scales[ii], d_scales[nextMerger, BH_TYPE.OUT][inds])
             masses[ii] = np.append(masses[ii], d_masses[nextMerger, BH_TYPE.OUT][inds])
             dens[ii] = np.append(dens[ii], d_dens[nextMerger, BH_TYPE.OUT][inds])
             mdots[ii] = np.append(mdots[ii], d_mdots[nextMerger, BH_TYPE.OUT][inds])
             csnds[ii] = np.append(csnds[ii], d_csnds[nextMerger, BH_TYPE.OUT][inds])
+            idnums[ii] = np.append(idnums[ii], d_ids[nextMerger, BH_TYPE.OUT][inds])
+            mrgnums[ii] = np.append(mrgnums[ii], nextMerger*np.ones(inds.size, dtype=int))
 
             # Get next merger in Tree
             nextMerger = nextBH[nextMerger]
@@ -532,27 +826,98 @@ def _matchRemnantDetails(run, log, mdets=None):
             dens[ii] = dens[ii][inds]
             mdots[ii] = mdots[ii][inds]
             csnds[ii] = csnds[ii][inds]
+            idnums[ii] = idnums[ii][inds]
+            mrgnums[ii] = mrgnums[ii][inds]
 
             # Find and remove duplicates
             dups = np.where(np.isclose(scales[ii][:-1], scales[ii][1:], rtol=1e-8))[0]
             if(np.size(dups) > 0):
+                ndups[ii] += np.size(dups)
                 scales[ii] = np.delete(scales[ii], dups)
                 masses[ii] = np.delete(masses[ii], dups)
                 dens[ii] = np.delete(dens[ii], dups)
                 mdots[ii] = np.delete(mdots[ii], dups)
                 csnds[ii] = np.delete(csnds[ii], dups)
+                idnums[ii] = np.delete(idnums[ii], dups)
+                mrgnums[ii] = np.delete(mrgnums[ii], dups)
+
+            nents[ii] = np.size(scales[ii])
+            if(not zmath.mono(masses[ii], 'ge')):
+                mono[ii] = False
 
         else:
             log.warning("Merger %d without ANY entries." % (ii))
 
+    log.debug("Remnant details collected.")
+    log.debug(" - Average number of entries: %e" % (np.mean(nents)))
+    log.debug(" - Average number of duplicates removed: %e" % (np.mean(ndups)))
+    nmon = np.count_nonzero(mono)
+    ntot = mono.size
+    frac = nmon/ntot
+    log.debug(" - %d/%d = %.4f Masses are montonic." % (nmon, ntot, frac))
+
+    # Calculate 'corrected' remnant masses
+    # ------------------------------------
+    log.debug("'Correcting' remnant masses for later mergers.")
+    mcorrected = np.array(masses)
+    correctionErrs = []
+    goods = 0
+    count = 0
+    for ii in xrange(numMergers):
+
+        jj = nextBH[ii]
+        while(jj >= 0):
+            inMass = m_masses[jj, BH_TYPE.IN]
+            mscale = m_scales[jj]
+            # Find scales after the merger
+            inds = np.where(scales[ii] > mscale)[0]
+            if(inds.size == 0):
+                log.warning("Merger %d, Next %d, no matching scales after %f!" % (ii, jj, mscale))
+                correctionErrs.append(ii)
+            else:
+                useInds = np.arange(np.max([inds[0]-3, 0]), np.min([inds[0]+3, inds[-1]]))
+
+                # If there is only one index, use it
+                if(useInds.size == 1):
+                    mcorrected[ii][useInds[0]:] -= inMass
+                    goods += 1
+                # If there are multiple indices, try to find merger
+                else:
+                    # Get changes in mass in these indices
+                    minc = np.diff(masses[ii][useInds])
+                    # Look for first time mass increases by more than mass of second-BH
+                    #     `+1` because 'True' means ``minc[1] > minc[0]+inMass``
+                    mrg = np.where(minc >= inMass)[0] + 1
+                    if(mrg.size == 0):
+                        log.warning("Merger %d, Next %d, missing secondary mass!" % (ii, jj))
+                        correctionErrs.append(ii)
+                    else:
+                        mcorrected[ii][mrg[0]:] -= inMass
+                        goods += 1
+
+                    # print(ii, jj)
+                    # print("\t", mscale, "\t", scales[ii][useInds])
+                    # print("\t", masses[ii][useInds])
+                    # print("\t", m_masses[jj, BH_TYPE.IN])
+                    # print("\t", np.diff(masses[ii][useInds]))
+                    # print("\t", np.diff(masses[ii][useInds])-inMass)
+                    # count += 1
+
+            jj = nextBH[jj]
+            if count > 100: return
+
+    log.info(" - {} Correction errors: {}".format(len(correctionErrs), str(correctionErrs)))
+    log.info(" - {} Successful corerctions".format(goods))
+
     savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
-    data = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log)
+    data = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
+                        mcorrected=mcorrected)
 
     return data
 
 
-def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
-    """Find details entries for mergers in particular snapshots.
+def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
+    """Find details entries for BH IDs in a particular snapshots.
 
     For each snapshot, store at most `_MAX_DETAILS_PER_SNAP` entries for each blackhole,
     interpolating values to an even spacing in scale-factor if more entries are found.  The first
@@ -566,6 +931,13 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
         Snapshots to search for details entries.
     bhIDsUnique : (N,) array of long
         Sequence of all unique, merger-BH ID numbers.
+    maxPerSnap : int or `None`
+        The maximum number of details entries to store for each snapshot.  If more entries than
+        this are found, the values are interpolated down to a linearly-even spacing of
+        scale-factors within the range of the matching details entries.
+        The maximum number of entries stored is thus ``maxPerSnap*np.size(snapshots)``
+        for each BH.  When loading all merger/remnant details, this should be
+        `_MAX_DETAILS_PER_SNAP`.
     log : ``logging.Logger`` object
         Object for logging stream output.
 
@@ -591,16 +963,6 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
     ids : (N,) array of arrays of long
         ID number of the black-hole for each entry (for error-checking).
 
-
-    Parameters
-    ----------
-    _MAX_DETAILS_PER_SNAP : int
-        The maximum number of details entries to store for each snapshot.  If more entries than
-        this are found, the values are interpolated down to a linearly-even spacing of
-        scale-factors within the range of the matching details entries.
-        The maximum number of entries stored is thus ``_MAX_DETAILS_PER_SNAP*np.size(snapshots)``
-        for each BH.
-
     """
     log.debug("_detailsForMergers_snapshot()")
 
@@ -611,6 +973,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
     #     Make sure snapshots are iterable
     snapshots = np.atleast_1d(snapshots)
     numUniqueBHs = bhIDsUnique.size
+    log.debug(" - {} Unique IDs, maxPerSnap = {}".format(numUniqueBHs, maxPerSnap))
 
     numMatchesTotal = np.zeros(numUniqueBHs, dtype=int)   # Number of matches in all snapshots
     numStoredTotal = np.zeros(numUniqueBHs, dtype=int)    # Number of entries stored in all
@@ -671,16 +1034,16 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
                 tempCsnds = dets[DETAILS.CS][tempMatches]
                 tempIDs = dets[DETAILS.IDS][tempMatches]
 
-                # Interpolate down to only `_MAX_DETAILS_PER_SNAP` entries
-                if(numMatchesSnap[ii] > _MAX_DETAILS_PER_SNAP):
+                # Interpolate down to only `maxPerSnap` entries
+                if maxPerSnap and numMatchesSnap[ii] > maxPerSnap:
                     #    Create even spacing in scale-factor to interpolate to
-                    newScales = zmath.spacing(tempScales, scale='lin', num=_MAX_DETAILS_PER_SNAP)
+                    newScales = zmath.spacing(tempScales, scale='lin', num=maxPerSnap)
                     tempMasses = np.interp(newScales, tempScales, tempMasses)
                     tempMdots = np.interp(newScales, tempScales, tempMdots)
                     tempDens = np.interp(newScales, tempScales, tempDens)
                     tempCsnds = np.interp(newScales, tempScales, tempCsnds)
                     #    Cant interpolate IDs, select random subset instead...
-                    tempIDs = np.random.choice(tempIDs, size=_MAX_DETAILS_PER_SNAP, replace=False)
+                    tempIDs = np.random.choice(tempIDs, size=maxPerSnap, replace=False)
                     if(not isinstance(tempIDs[0], DTYPE.ID)):
                         errStr = "Error: incorrect dtype for random tempIDs = {}"
                         errStr = errStr.format(np.dtype(tempIDs[0]))
@@ -692,7 +1055,14 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
                 # Store matches
                 #    If this is the first set of entries, replace ``[None]``
                 if(scales[ii][0] is None):
-                    scales[ii] = tempScales
+                    try:
+                        scales[ii] = tempScales
+                    except:
+                        print(np.shape(scales[ii]))
+                        print(scales[ii])
+                        print(np.shape(tempScales))
+                        zio.mpiError(comm)
+
                     masses[ii] = tempMasses
                     mdots[ii] = tempMdots
                     dens[ii] = tempDens
@@ -718,13 +1088,6 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
             if(count >= numDets):
                 break
 
-        scales = np.array(scales)
-        masses = np.array(masses)
-        mdots = np.array(mdots)
-        dens = np.array(dens)
-        csnds = np.array(csnds)
-        ids = np.array(ids)
-
         numMatchesTotal += numMatchesSnap
         numStoredTotal += numStoredSnap
         snapTotal = np.sum(numMatchesSnap)
@@ -735,10 +1098,17 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, log):
         log.debug(" - Average and total number stored = {:f}, {:d}".format(
             numStoredTotal.mean(), np.sum(numStoredTotal)))
 
+    scales = np.array(scales)
+    masses = np.array(masses)
+    mdots = np.array(mdots)
+    dens = np.array(dens)
+    csnds = np.array(csnds)
+    ids = np.array(ids)
+
     return numStoredTotal, scales, masses, mdots, dens, csnds, ids
 
 
-def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log):
+def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log, mcorrected=None):
     """Package details into dictionary and save to NPZ file.
     """
     log.debug("_saveDetails()")
@@ -755,6 +1125,9 @@ def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log):
             'detailsPerSnapshot': _MAX_DETAILS_PER_SNAP,
             'detailsKeys': _GET_KEYS,
             }
+
+    if mcorrected:
+        data['masses_corrected'] = mcorrected
 
     log.info(" - Saving data to '%s'" % (fname))
     beg = datetime.now()
@@ -789,6 +1162,8 @@ def _findNextMerger(myID, myScale, ids, scales):
         Index of the next merger the `myID` blackhole takes place in.
         If no next merger is found, returns `-1`.
 
+
+    Used by: `_matchRemnantDetails`
     """
     # Find where this ID matches another, but they dont have the same time (i.e. not same merger)
     search = (((myID == ids[:, 0]) | (myID == ids[:, 1])) & (myScale != scales))
@@ -806,111 +1181,10 @@ def _findNextMerger(myID, myScale, ids, scales):
     return nind
 
 
-def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
-    """Based on 'merger' and 'details' information, infer the 'out' BH masses at time of mergers.
-
-    The Illustris 'merger' files have the incorrect values output for the 'out' BH mass.  This
-    method uses the data included in 'details' entries (via ``BHDetails``), which were matched
-    to mergers here in ``BHMatcher``, to infer the approximate mass of the 'out' BH at the
-    time of merger.
-
-    The ``mergerDetails`` entries have the details for both 'in' and 'out' BHs both 'before' and
-    'after' merger.  First the 'out' BH's entries just 'before' merger are used directly as the
-    'inferred' mass.  In the few cases where these entries don't exist, the code falls back on
-    calculating the difference between the total mass (given by the 'out' - 'after' entry) and the
-    'in' BH mass recorded by the merger event (which should be correct); if this still doesn't
-    work (which shouldn't ever happen), then the difference between the 'out'-'after' mass and the
-    'in'-'before' mass is used, which should also be good --- but slightly less accurate (because
-    the 'in'-'before' mass might have been recorded some small period of time before the actual
-    merger event.
-
-    Arguments
-    ---------
-       run     <int>  :
-       mergers <dict> :
-       mdets   <dict> :
-       verbose <str>  :
-       debug   <str>  :
-
-    Returns
-    -------
-       outMass <flt64>[N] : inferred 'out' BH masses at the time of merger
-
-    """
-    if(log is None):
-        log = illpy.illbh.BHConstants._loadLogger(
-            __file__, verbose=True, debug=False, run=run, tofile=False)
-
-    log.debug("inferMergerOutMasses()")
-
-    # Load Mergers
-    if(mergers is None):
-        mergers = illpy.illbh.BHMergers.loadFixedMergers(run, verbose=False)
-    m_scales = mergers[MERGERS.SCALES]
-    m_masses = mergers[MERGERS.MASSES]
-    numMergers = mergers[MERGERS.NUM]
-    del mergers
-
-    # Load Merger Details
-    if(mdets is None):
-        mdets = loadMergerDetails(run, log=log)
-    d_masses = mdets[DETAILS.MASSES]
-    d_scales = mdets[DETAILS.SCALES]
-    del mdets
-
-    # Find details entries before and after merger
-    massBef = np.zeros_like(m_masses)
-    massAft = np.zeros_like(m_masses)
-    for ii, sc in enumerate(m_scales):
-        for bh in [BH_TYPE.IN, BH_TYPE.OUT]:
-            if(d_scales[ii].size == 0):
-                log.warning("Merger %s with zero details entries" % str(ii))
-            else:
-                # 'before' is ``sc > d_scales``
-                bef = _indBefAft(sc - d_scales[ii, bh])
-                if(bef is not None):
-                    if(np.isfinite(d_masses[ii, bh][bef])):
-                        massBef[ii, bh] = d_masses[ii, bh][bef]
-                    elif(bef > 0):
-                        massBef[ii, bh] = d_masses[ii, bh][bef-1]
-
-                # 'after' is ``d_scales > sc``
-                aft = _indBefAft(d_scales[ii, bh] - sc)
-                if(aft):
-                    massAft[ii, bh] = d_masses[ii, bh][aft]
-
-    # Fix Mass Entries
-    # ----------------
-    massBef = massBef.reshape(2*numMergers)
-    massAft = massAft.reshape(2*numMergers)
-    masses = np.zeros_like(massBef)
-    ntot = masses.size
-
-    bads = np.where(np.isfinite(massBef) == False)[0]
-    print("Bads Before = ", bads)
-    print("\t", massBef[bads])
-    bads = np.where(np.isfinite(massAft) == False)[0]
-    print("Bads After = ", bads)
-    print("\t", massAft[bads])
-
-    # Use 'before' masses
-    inds = np.where(massBef > 0.0)
-    masses[inds] = massBef[inds]
-    bads = np.where(masses == 0.0)
-    nfix = np.size(inds)
-    nbad = np.size(bads)
-    frac = nfix/ntot
-    log.info(" - Used %d/%d = %.4f after masses.  %d remain" % (nfix, ntot, frac, nbad))
-
-    massBef = massBef.reshape(numMergers, 2)
-    massAft = massAft.reshape(numMergers, 2)
-    masses = masses.reshape(numMergers, 2)
-
-    return masses
-
-
 def _indBefAft(scaleDiff):
     """Retrieve the index matching the minimum of `scaleDiff` greater-than zero.
+
+    Used by: `inferMergerOutMasses`
     """
     try:
         ind = zmath.argextrema(scaleDiff, 'min', 'g')
