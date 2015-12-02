@@ -214,8 +214,8 @@ def allIDsForTree(run, mrg, tree=None, mergers=None):
         fin = nextMerg[fin]
 
     # Go backwards to get all IDs
-    allIDs = _getPastIDs(m_ids, lastMerg, fin)
-    return fin, allIDs
+    allIDs, mrgInds = _getPastIDs(m_ids, lastMerg, fin)
+    return fin, allIDs, mrgInds
 
 
 def _constructBHTree(run, mergers, verbose=True):
@@ -300,7 +300,7 @@ def _countPastMergers(last, ind):
     return np.max([num_in, num_out])+1
 
 
-def _getPastIDs(m_ids, lastMerg, ind, idlist=[]):
+def _getPastIDs(m_ids, lastMerg, ind, idlist=[], mrglist=[]):
     """Get all BH IDs in past-mergers of this BHTree.
 
     Arguments
@@ -320,10 +320,12 @@ def _getPastIDs(m_ids, lastMerg, ind, idlist=[]):
     """
     ids_in = [m_ids[ind, BH_TYPE.IN]]
     ids_out = [m_ids[ind, BH_TYPE.OUT]]
+    mrg_in = [ind]
+    mrg_out = [ind]
     last_in  = lastMerg[ind, BH_TYPE.IN]
     last_out = lastMerg[ind, BH_TYPE.OUT]
     if(last_in >= 0):
-        ids_in = _getPastIDs(m_ids, lastMerg, last_in, ids_in)
+        ids_in, mrg_in = _getPastIDs(m_ids, lastMerg, last_in, ids_in, mrg_in)
     if(last_out >= 0):
-        ids_out = _getPastIDs(m_ids, lastMerg, last_out, ids_out)
-    return list(set(ids_in + ids_out + idlist))
+        ids_out, mrg_out = _getPastIDs(m_ids, lastMerg, last_out, ids_out, mrg_out)
+    return list(set(ids_in + ids_out + idlist)), list(set(mrg_in + mrg_out + mrglist))
