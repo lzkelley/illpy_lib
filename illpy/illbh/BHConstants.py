@@ -17,7 +17,7 @@ Classes
 
 Functions
 ---------
-
+-   _loadLogger     - Initialize a ``logging.Logger`` object for output messages.
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -79,6 +79,8 @@ _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d
 _DETAILS_UNIQUE_IDS_FILENAME    = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
 
 _BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
+_BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz"
+
 
 _LOG_DIR = "./logs/"
 
@@ -241,6 +243,12 @@ def GET_REMNANT_DETAILS_FILENAME(run, version, maxPerSnap):
 def GET_BLACKHOLE_TREE_FILENAME(run, version):
     fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
     fname += _BLACKHOLE_TREE_FILENAME % (run, version)
+    return fname
+
+
+def GET_BLACKHOLE_TREE_DETAILS_FILENAME(run, fmrg, version):
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _BLACKHOLE_TREE_DETAILS_FILENAME % (run, fmrg, version)
     return fname
 
 
