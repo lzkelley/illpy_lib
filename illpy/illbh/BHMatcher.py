@@ -47,7 +47,7 @@ from illpy.Constants import DTYPE, NUM_SNAPS
 import zcode.inout as zio
 import zcode.math as zmath
 
-__version__ = '0.23'
+__version__ = '0.24'
 _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 
@@ -123,9 +123,10 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     # Extend merger-details to account for later mergers
     # --------------------------------------------------
     if(create_remnantDets):
+        comm.Barrier()
         log.info("Creating Remnant Details")
         beg = datetime.now()
-        _matchRemnantDetails(run, log, mdets=mdets)
+        mrems = _matchRemnantDetails(run, log, mdets=mdets)
         end = datetime.now()
         log.debug(" - Done after %s" % (str(end - beg)))
 
@@ -534,15 +535,6 @@ def _matchMergerDetails(run, comm, log):
     bhIDsUnique = comm.bcast(bhIDsUnique, root=0)
 
     # Distribute snapshots to each processor
-    """
-    mySnaps = np.arange(NUM_SNAPS)
-    if(size > 1):
-        # Randomize which snapshots go to which processor for load-balancing
-        mySnaps = np.random.permutation(mySnaps)
-        # Make sure all ranks are synchronized on initial (randomized) list before splitting
-        mySnaps = comm.bcast(mySnaps, root=0)
-        mySnaps = np.array_split(mySnaps, size)[rank]
-    """
     mySnaps = _distributeSnapshots(comm)
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
@@ -657,6 +649,9 @@ def _matchMergerDetails(run, comm, log):
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
 
+        ndups = np.zeros((numMergers, 2))
+        nosc = np.zeros((numMergers, 2))
+
         # Sort entries for each BH by scalefactor
         log.debug(" - Sorting")
         beg = datetime.now()
@@ -673,6 +668,7 @@ def _matchMergerDetails(run, comm, log):
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
 
+                # Order by scale-factor
                 inds = np.argsort(scales[ii, jj])
                 scales[ii, jj] = scales[ii, jj][inds]
                 masses[ii, jj] = masses[ii, jj][inds]
@@ -680,14 +676,44 @@ def _matchMergerDetails(run, comm, log):
                 mdots[ii, jj] = mdots[ii, jj][inds]
                 csnds[ii, jj] = csnds[ii, jj][inds]
 
+                # Find and remove duplicates
+                sameScales = np.isclose(scales[ii, jj][:-1], scales[ii, jj][1:], rtol=1e-8)
+                sameMasses = np.isclose(masses[ii, jj][:-1], masses[ii, jj][1:], rtol=1e-8)
+                dups = np.where(sameScales & sameMasses)[0]
+                if(np.size(dups) > 0):
+                    ndups[ii, jj] = np.size(dups)
+                    scales[ii, jj] = np.delete(scales[ii, jj], dups)
+                    masses[ii, jj] = np.delete(masses[ii, jj], dups)
+                    dens[ii, jj] = np.delete(dens[ii, jj], dups)
+                    mdots[ii, jj] = np.delete(mdots[ii, jj], dups)
+                    csnds[ii, jj] = np.delete(csnds[ii, jj], dups)
+                    ids[ii, jj] = np.delete(ids[ii, jj], dups)
+
+                # Find and remove non-monotonic entries
+                bads = np.where(np.diff(masses[ii, jj]) < 0.0)[0]
+                if bads.size > 0:
+                    nosc[ii, jj] = bads.size
+                    scales[ii, jj] = np.delete(scales[ii, jj], bads)
+                    masses[ii, jj] = np.delete(masses[ii, jj], bads)
+                    dens[ii, jj] = np.delete(dens[ii, jj], bads)
+                    mdots[ii, jj] = np.delete(mdots[ii, jj], bads)
+                    csnds[ii, jj] = np.delete(csnds[ii, jj], bads)
+                    ids[ii, jj] = np.delete(ids[ii, jj], bads)
+
+                nums[ii, jj] = scales[ii, jj].size
+
         end = datetime.now()
         log.debug(" - - Done after %s" % (str(end-beg)))
+        # Log basic statistics
+        _logStats('Number of entries', nums, log)
+        _logStats('Duplicate entries', ndups, log)
+        _logStats('Non-monotonic entries', nosc, log)
 
         # Save data
         filename = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
         data = _saveDetails(filename, run, ids, scales, masses, dens, mdots, csnds, log)
 
-    return
+    return data
 
 
 def _matchRemnantDetails(run, log, mdets=None):
@@ -879,7 +905,9 @@ def _matchRemnantDetails(run, log, mdets=None):
             mrgnums[ii] = mrgnums[ii][inds]
 
             # Find and remove duplicates
-            dups = np.where(np.isclose(scales[ii][:-1], scales[ii][1:], rtol=1e-8))[0]
+            sameScales = np.isclose(scales[ii][:-1], scales[ii][1:], rtol=1e-8)
+            sameMasses = np.isclose(masses[ii][:-1], masses[ii][1:], rtol=1e-8)
+            dups = np.where(sameScales & sameMasses)[0]
             if(np.size(dups) > 0):
                 ndups[ii] += np.size(dups)
                 scales[ii] = np.delete(scales[ii], dups)
@@ -913,20 +941,23 @@ def _matchRemnantDetails(run, log, mdets=None):
             log.warning("Merger %d without ANY entries." % (ii))
 
     log.debug("Remnant details collected.")
-    log.debug(" - Average number of entries: %e" % (np.mean(nents)))
-    log.debug(" - Average number of duplicates removed: %e" % (np.mean(ndups)))
-    log.debug(" - Duplicate entries:")
-    log.debug(" - - %d Mergers with duplicates" % (np.count_nonzero(ndups)))
-    log.debug(" - - Median and 68% (overall): {}".format(
-        str(zmath.confidenceIntervals(ndups, ci=0.68))))
-    log.debug(" - - Average num (nonzero): {}".format(
-        str(zmath.confidenceIntervals(ndups, ci=0.68, filter='g')))
-    log.debug(" - Non-monotonic entries:")
-    log.debug(" - - %d Mergers with non-monotonicity" % (np.count_nonzero(nosc)))
-    log.debug(" - - Median and 68% (overall): {}".format(
-        str(zmath.confidenceIntervals(nosc, ci=0.68))))
-    log.debug(" - - Average num (nonzero): {}".fomat(
-        str(zmath.confidenceIntervals(nosc, ci=0.68, filter='g')))
+    _logStats('Number of entries', nents, log)
+    _logStats('Duplicate entries', ndups, log)
+    _logStats('Non-monotonic entries', nosc, log)
+    # log.debug(" - Average number of entries: %e" % (np.mean(nents)))
+    # log.debug(" - Average number of duplicates removed: %e" % (np.mean(ndups)))
+    # log.debug(" - Duplicate entries:")
+    # log.debug(" - - %d Mergers with duplicates" % (np.count_nonzero(ndups)))
+    # log.debug(" - - Median and 68% (overall): {}".format(
+    #     str(zmath.confidenceIntervals(ndups, ci=0.68))))
+    # log.debug(" - - Average num (nonzero): {}".format(
+    #     str(zmath.confidenceIntervals(ndups, ci=0.68, filter='g'))))
+    # log.debug(" - Non-monotonic entries:")
+    # log.debug(" - - %d Mergers with non-monotonicity" % (np.count_nonzero(nosc)))
+    # log.debug(" - - Median and 68% (overall): {}".format(
+    #     str(zmath.confidenceIntervals(nosc, ci=0.68))))
+    # log.debug(" - - Average num (nonzero): {}".fomat(
+    #     str(zmath.confidenceIntervals(nosc, ci=0.68, filter='g'))))
     log.debug(" - - Number remaining non-monotonic: %d" % (np.count_nonzero(oscf)))
 
     fname = 'nonmono-scales.npz'
@@ -1264,5 +1295,34 @@ def _indBefAft(scaleDiff):
 
     return ind
 
+
+def _logStats(name, prop, log):
+    """Log basic statistics about the given property.
+
+    Arguments
+    ---------
+    name : str
+        Name of the property.
+    prop : array_like of scalar
+        Array of measures of the target property.
+    log : ``logging.Logger`` object
+        Object to log to.
+
+    """
+    prop = np.asarray(prop)
+    prop = prop.flatten()
+    cnt = np.count_nonzero(prop)
+    try:
+        tot = prop.size
+    except:
+        tot = len(prop)
+    frac = cnt/tot
+    log.debug(" - {}:".format(name))
+    log.debug(" - - {:6d}/{:6d} = {:.4f} nonzero".format(cnt, tot, frac))
+    log.debug(" - - Median and 68% (overall): {}".format(
+        str(zmath.confidenceIntervals(prop, ci=0.68))))
+    log.debug(" - - Median and 68% (nonzero): {}".format(
+        str(zmath.confidenceIntervals(prop, ci=0.68, filter='g'))))
+    return
 
 if(__name__ == "__main__"): main()
