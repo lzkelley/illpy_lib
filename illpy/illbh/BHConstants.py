@@ -76,9 +76,10 @@ _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.n
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
 _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
 
-_DETAILS_UNIQUE_IDS_FILENAME    = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
+_DETAILS_UNIQUE_IDS_FILENAME     = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
+_DETAILS_ALL_UNIQUE_IDS_FILENAME = 'ill-%d_blackhole_details_all-unique-ids_v%s.npz'
 
-_BLACKHOLE_TREE_FILENAME        = "ill-%d_bh-tree_v%.2f.npz"
+_BLACKHOLE_TREE_FILENAME         = "ill-%d_bh-tree_v%.2f.npz"
 _BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz"
 
 
@@ -257,6 +258,13 @@ def GET_DETAILS_UNIQUE_IDS_FILENAME(run, snap, version):
     fname += _DETAILS_UNIQUE_IDS_FILENAME % (run, snap, version)
     return fname
 
+
+def GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, version):
+    fname = _PROCESSED_DIR % (GET_ILLUSTRIS_RUN_NAMES(run))
+    fname += _DETAILS_ALL_UNIQUE_IDS_FILENAME % (run, version)
+    return fname
+
+
 def _GET_STATUS_FILENAME(name, run=None, version=None):
     statFilename = os.path.splitext(os.path.basename(name)) + "_stat"
     if(run): statFilename += "_ill%d" % (run)
@@ -366,7 +374,7 @@ def _distributeSnapshots(comm):
         mySnaps = np.array_split(mySnaps, size)[rank]
 
     return mySnaps
-    
+
 
 def _checkLoadSave(fname, loadsave, log):
     """See if a file exists and can be loaded, or if it needs to be reconstructed.
