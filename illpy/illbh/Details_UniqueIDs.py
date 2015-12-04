@@ -12,18 +12,18 @@ Functions
 ---------
 -   main                 - Performs initialization and runs the desired internal function.
 -   loadUniqueIDs        - Load the Unique BH ID numbers for a particular snapshot.
+-   loadAllUniqueIDs     -
 
--   _loadAllUniqueIDs    - Load the Unique BH ID numbers for all snapshots; MPI enabled.
--   _mergeUnique         - 
+-   _calculateAllUniqueIDs - Load the Unique BH ID numbers for all snapshots; MPI enabled.
+-   _mergeUnique         -
 -   _saveUnique          - Create, save and return a dictionary of Unique BH Data.
+-   _mergeAllUnique      -
 -   _checkLog            - Create a default logging object if one is not given.
 
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
 import os
-import numbers
 import numpy as np
 from collections import Counter
 from mpi4py import MPI
@@ -56,7 +56,6 @@ class Settings:
 
         if kwargs is not None:
             self._parseArgs(kwargs)
-
 
     def _parseArgs(self, kwargs):
         pars = ArgumentParser()
@@ -114,10 +113,10 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
 
     Arguments
     ---------
-    
+
     Returns
     -------
-    
+
     """
     if log is None:
         # Initialize log
@@ -168,7 +167,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
         else:
             log.debug(logStr)
             ids_uniq = np.zeros(0, dtype=DTYPE.ID)
-            scales_uniq = np.zeros((0,2), dtype=DTYPE.SCALAR)
+            scales_uniq = np.zeros((0, 2), dtype=DTYPE.SCALAR)
 
         bads = np.where(scales_uniq == 0.0)
         if bads[0].size > 0:
@@ -187,7 +186,36 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
     return data
 
 
-def _loadAllUniqueIDs(run=1, loadsave=False, log=None):
+def loadAllUniqueIDs(run, loadsave=True, log=None):
+    """
+    """
+    log = _checkLog(log, run=run)
+    log.debug("loadAllUniqueIDs()")
+    fname = BHConstants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
+    log.debug(" - Filename '%s'" % (fname))
+    if os.path.exists(fname):
+        log.debug(" - - File Exists.")
+        if loadsave:
+            log.debug(" - - Loading.")
+            data = zio.npzToDict(fname)
+        else:
+            log.debug(" - - Not Loading.")
+    else:
+        log.debug(" - File does Not exist.")
+        loadsave = False
+
+    if not loadsave:
+        # Calculate the unique IDs for each snapshot
+        _calculateAllUniqueIDs(run, loadsave=False, log=log)
+        # Merge unique IDs from each Snapshot
+        snaps, ids, scales = _mergeAllUnique(run, log)
+        # Save data
+        data = _saveUnique(run, snaps, fname, ids, scales, log)
+
+    return data
+
+
+def _calculateAllUniqueIDs(run=1, loadsave=True, log=None):
     """Load the Unique BH ID numbers for all snapshots; MPI enabled.
 
     Snapshot numbers are distributed to all of the active processes, and `loadUniqueIDs` is called
@@ -222,7 +250,7 @@ def _loadAllUniqueIDs(run=1, loadsave=False, log=None):
     return
 
 
-def _mergeUnique(snaps, old_ids, old_scales, new_data, log): # new_snap, new_ids, new_scales, log):
+def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
     """
     """
     log.debug("_mergeUnique()")
@@ -265,17 +293,6 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log): # new_snap, new_ids
             #    Update length
             n_old += 1
 
-
-    '''
-    if not issubclass(old_ids.dtype.type, numbers.Integral):
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
-        raise RuntimeError("old_ids at snap = %d is non-integral!" % (new_snap))
-
-    if not issubclass(new_ids.dtype.type, numbers.Integral):
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
-        raise RuntimeError("new_ids at snap = %d is non-integral!" % (new_snap))
-    '''
-
     if old_ids.dtype.type is not np.uint64:
         print("types = ", old_ids.dtype.type, new_ids.dtype.type)
         raise RuntimeError("old_ids at snap = %d is non-integral!" % (new_snap))
@@ -308,7 +325,7 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
     ---------
     run : int
         Illustris run number {1,3}
-    snap : int
+    snap : int or array_like of int
         Illustris snapshot number {1,135}
     fname : str
         Filename to save to.
@@ -339,63 +356,33 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
         DETAILS.NUM: uids.size,
         }
 
-    zio.dictToNPZ(data, fname, verbose=False)
-    log.debug(" - Saved to '%s'" % (fname))
+    zio.dictToNPZ(data, fname, verbose=False, log=log)
     return data
 
 
-def test():
-
-    log = BHConstants._loadLogger(__file__, debug=True, verbose=True, run=1)
-
-    '''
-    d41 = loadUniqueIDs(1, 41, None, log=log)
-    d42 = loadUniqueIDs(1, 42, None, log=log)
-    d43 = loadUniqueIDs(1, 43, None, log=log)
-    d44 = loadUniqueIDs(1, 44, None, log=log)
-
-    snaps = 41
-    ids = d41[DETAILS.IDS]
-    scales = d41[DETAILS.SCALES]
-
-    snaps, ids, scales = _mergeUnique(snaps, ids, scales, d42, log)
-    snaps, ids, scales = _mergeUnique(snaps, ids, scales, d43, log)
-    snaps, ids, scales = _mergeUnique(snaps, ids, scales, d44, log)
-    '''
-
+def _mergeAllUnique(run, log):
+    """
+    """
+    log.debug("_mergeAllUnique()")
     first = True
     newDets = None
     oldDets = None
     for ii in xrange(NUM_SNAPS):
-        newDets = loadUniqueIDs(1, ii, None, log=log)
+        newDets = loadUniqueIDs(run, ii, None, log=log)
         if oldDets is not None:
             if first:
                 ids = oldDets[DETAILS.IDS]
                 scales = oldDets[DETAILS.SCALES]
                 snaps = ii
                 ids = np.atleast_1d(ids)
-                print("(%d: %s, %s)" % (snaps, str(ids), str(scales)))
                 first = False
 
-            print("%03d ids = %d" % (ii, len(ids)))
             snaps, ids, scales = _mergeUnique(snaps, ids, scales, newDets, log)
-            if snaps is False:
-                return ids, scales
-            print("\tids = %d" % (len(ids)))
 
         if newDets[DETAILS.NUM] > 0:
             oldDets = newDets
 
-    fname = 'merged-ids.npz'
-    data = {
-        'snaps': snaps,
-        'ids': ids,
-        'scales': scales
-        }
-
-    zio.dictToNPZ(data, fname, verbose=True)
-
-    return
+    return snaps, ids, scales
 
 
 def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
