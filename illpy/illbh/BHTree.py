@@ -54,9 +54,9 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
 
     # Reload existing BH Merger Tree
     # ------------------------------
-    if(loadsave):
-        if(verbose): print " - - - Loading save file '%s'" % (fname)
-        if(os.path.exists(fname)):
+    if loadsave:
+        if verbose: print " - - - Loading save file '%s'" % (fname)
+        if os.path.exists(fname):
             tree = zio.npzToDict(fname)
             if(verbose): print " - - - - Tree loaded"
         else:
@@ -66,15 +66,15 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
 
     # Recreate BH Merger Tree
     # -----------------------
-    if(not loadsave):
-        if(verbose): print " - - - Reconstructing BH Merger Tree"
+    if not loadsave:
+        if verbose: print " - - - Reconstructing BH Merger Tree"
         # Load Mergers if needed
-        if(mergers is None):
+        if mergers is None:
             mergers = BHMergers.loadFixedMergers(run)
             if(verbose): print " - - - - Loaded %d mergers" % (mergers[MERGERS.NUM])
 
         # Construct Tree
-        if(verbose): print " - - - - Constructing Tree"
+        if verbose: print " - - - - Constructing Tree"
         tree = _constructBHTree(run, mergers, verbose=verbose)
 
         # Analyze Tree Data, store meta-data to tree dictionary
@@ -100,7 +100,7 @@ def analyzeTree(tree, verbose=True):
 
     """
 
-    if(verbose): print " - - BHTree.analyzeTree()"
+    if verbose: print " - - BHTree.analyzeTree()"
 
     last         = tree[BH_TREE.LAST]
     next         = tree[BH_TREE.NEXT]
@@ -114,7 +114,7 @@ def analyzeTree(tree, verbose=True):
     numPast      = np.zeros(numMergers, dtype=int)
     numFuture    = np.zeros(numMergers, dtype=int)
 
-    if(verbose): print " - - - %d Mergers" % (numMergers)
+    if verbose: print " - - - %d Mergers" % (numMergers)
 
     # Find number of unique merger BHs (i.e. no previous mergers)
     inds = np.where((last[:, BH_TYPE.IN] < 0) & (last[:, BH_TYPE.OUT] < 0) & (next[:] < 0))
@@ -123,14 +123,14 @@ def analyzeTree(tree, verbose=True):
     inds = np.where(((last[:, BH_TYPE.IN] < 0) ^ (last[:, BH_TYPE.OUT] < 0)) & (next[:] < 0))
     numOneIsolated = len(inds[0])
 
-    if(verbose):
+    if verbose:
         print " - - - Mergers with neither  BH previously merged = %d" % (numTwoIsolated)
         print " - - - Mergers with only one BH previously merged = %d" % (numOneIsolated)
 
     for ii in xrange(numMergers):
         # Count Forward from First Mergers ##
         #    If this is a first merger
-        if(all(last[ii, :] < 0)):
+        if all(last[ii, :] < 0):
             # Count the number of mergers that the 'out' BH  from this merger, will later be in
             numFuture[ii] = _countFutureMergers(next, ii)
             # Accumulate for averaging
@@ -139,7 +139,7 @@ def analyzeTree(tree, verbose=True):
 
         # Count Backward from Last Mergers ##
         #    If this is a final merger
-        if(next[ii] < 0):
+        if next[ii] < 0:
             # Count the number of mergers along the longest branch of past merger tree
             numPast[ii] = _countPastMergers(last, ii)
             # Accumulate for averaging
@@ -147,8 +147,10 @@ def analyzeTree(tree, verbose=True):
             avePastNum += 1
 
     # Calculate averages
-    if(avePastNum   > 0): avePast   /= avePastNum
-    if(aveFutureNum > 0): aveFuture /= aveFutureNum
+    if avePastNum   > 0:
+        avePast /= avePastNum
+    if aveFutureNum > 0:
+        aveFuture /= aveFutureNum
 
     inds = np.where(next >= 0)[0]
     numRepeats = len(inds)
@@ -160,7 +162,7 @@ def analyzeTree(tree, verbose=True):
     inds = np.where(timeNext == 0.0)[0]
     numZeroInts = len(inds)
 
-    if(verbose):
+    if verbose:
         print " - - - Repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats)
         print " - - - Average number past, future  =  %.3f, %.3f" % (avePast, aveFuture)
         print " - - - Number of merger intervals    = %d" % (numInts)
@@ -210,7 +212,7 @@ def allIDsForTree(run, mrg, tree=None, mergers=None):
 
     # Go to the last merger
     fin = mrg
-    while(nextMerg[fin] >= 0):
+    while nextMerg[fin] >= 0:
         fin = nextMerg[fin]
 
     # Go backwards to get all IDs
@@ -233,7 +235,7 @@ def _constructBHTree(run, mergers, verbose=True):
 
     """
 
-    if(verbose): print " - - BHTree.constructBHTree()"
+    if verbose: print " - - BHTree.constructBHTree()"
 
     cosmo = Cosmology()
 
@@ -248,18 +250,18 @@ def _constructBHTree(run, mergers, verbose=True):
     times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
 
     # Construct Merger Tree from node IDs
-    if(verbose): print " - - - Building BH Merger Tree"
+    if verbose: print " - - - Building BH Merger Tree"
     start = datetime.now()
     mids = mergers[MERGERS.IDS]
     BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
     stop = datetime.now()
-    if(verbose): print " - - - - Built after %s" % (str(stop-start))
+    if verbose: print " - - - - Built after %s" % (str(stop-start))
 
     inds = np.where(last < 0)[0]
-    if(verbose): print " - - - %d Missing 'last'" % (len(inds))
+    if verbose: print " - - - %d Missing 'last'" % (len(inds))
 
     inds = np.where(next < 0)[0]
-    if(verbose): print " - - - %d Missing 'next'" % (len(inds))
+    if verbose: print " - - - %d Missing 'next'" % (len(inds))
 
     # Create dictionary to store data
     tree = {BH_TREE.LAST: last,
@@ -280,7 +282,7 @@ def _countFutureMergers(next, ind):
     """
     count = 0
     ii = ind
-    while(next[ii] >= 0):
+    while next[ii] >= 0:
         count += 1
         ii = next[ii]
     return count
@@ -293,9 +295,9 @@ def _countPastMergers(last, ind):
     last_out = last[ind, BH_TYPE.OUT]
     num_in   = 0
     num_out  = 0
-    if(last_in >= 0):
+    if last_in >= 0:
         num_in = _countPastMergers(last, last_in)
-    if(last_out >= 0): 
+    if last_out >= 0:
         num_out = _countPastMergers(last, last_out)
     return np.max([num_in, num_out])+1
 
@@ -324,8 +326,8 @@ def _getPastIDs(m_ids, lastMerg, ind, idlist=[], mrglist=[]):
     mrg_out = [ind]
     last_in  = lastMerg[ind, BH_TYPE.IN]
     last_out = lastMerg[ind, BH_TYPE.OUT]
-    if(last_in >= 0):
+    if last_in >= 0:
         ids_in, mrg_in = _getPastIDs(m_ids, lastMerg, last_in, ids_in, mrg_in)
-    if(last_out >= 0):
+    if last_out >= 0:
         ids_out, mrg_out = _getPastIDs(m_ids, lastMerg, last_out, ids_out, mrg_out)
     return list(set(ids_in + ids_out + idlist)), list(set(mrg_in + mrg_out + mrglist))
