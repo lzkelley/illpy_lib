@@ -46,7 +46,7 @@ class Settings:
     run = 1
     verbose = True
     debug = True
-    func = '_loadAllUniqueIDs'
+    func = 'loadAllUniqueIDs'
 
     def __init__(self, kwargs=None):
         try:
@@ -98,7 +98,7 @@ def main(log=None, **kwargs):
     # ----------------------
     log.debug(" - Running '%s'" % (sets.func))
     func = globals()[sets.func]
-    func()
+    func(sets=sets)
 
     return
 
@@ -186,11 +186,17 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
     return data
 
 
-def loadAllUniqueIDs(run, loadsave=True, log=None):
+def loadAllUniqueIDs(run=Settings.run, loadsave=True, log=None, sets=None):
     """
     """
+    if sets is not None:
+        run = sets.run
     log = _checkLog(log, run=run)
     log.debug("loadAllUniqueIDs()")
+
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+
     fname = BHConstants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
     log.debug(" - Filename '%s'" % (fname))
     if os.path.exists(fname):
@@ -208,11 +214,14 @@ def loadAllUniqueIDs(run, loadsave=True, log=None):
         # Calculate the unique IDs for each snapshot
         _calculateAllUniqueIDs(run, loadsave=False, log=log)
         # Merge unique IDs from each Snapshot
-        snaps, ids, scales = _mergeAllUnique(run, log)
-        # Save data
-        data = _saveUnique(run, snaps, fname, ids, scales, log)
+        if rank == 0:
+            snaps, ids, scales = _mergeAllUnique(run, log)
+            # Save data
+            data = _saveUnique(run, snaps, fname, ids, scales, log)
 
-    return data
+    if rank == 0:
+        return data
+    return
 
 
 def _calculateAllUniqueIDs(run=1, loadsave=True, log=None):
@@ -355,6 +364,9 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
         DETAILS.SCALES: uscales.astype(DTYPE.SCALAR),
         DETAILS.NUM: uids.size,
         }
+
+    for key, val in data.items():
+        data[key] = np.asarray(val)
 
     zio.dictToNPZ(data, fname, verbose=False, log=log)
     return data
