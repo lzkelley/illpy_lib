@@ -366,7 +366,7 @@ def _distributeSnapshots(comm):
     size = comm.size
     rank = comm.rank
     mySnaps = np.arange(NUM_SNAPS)
-    if(size > 1):
+    if size > 1:
         # Randomize which snapshots go to which processor for load-balancing
         mySnaps = np.random.permutation(mySnaps)
         # Make sure all ranks are synchronized on initial (randomized) list before splitting
