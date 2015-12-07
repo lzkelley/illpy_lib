@@ -340,19 +340,19 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
     # Make sure directory exists
     zio.checkPath(logFilename)
     # Determine verbosity level
-    if(debug):
+    if debug:
         strLvl = logging.DEBUG
-    elif(verbose):
+    elif verbose:
         strLvl = logging.INFO
     else:
         strLvl = logging.WARNING
 
     # Turn off file-logging
-    if(not tofile): logFilename = None
+    if not tofile: logFilename = None
 
     fileLvl = logging.DEBUG
     # Create logger
-    if(rank == 0 or rank is None):
+    if rank == 0 or rank is None:
         logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, strLevel=strLvl)
     else:
         logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, tostr=False)
