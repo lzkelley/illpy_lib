@@ -98,28 +98,32 @@ def organizeDetails(run, loadsave=True, verbose=True):
     tempFiles = [BHConstants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in xrange(NUM_SNAPS)]
 
     # Check if all temp files already exist
-    if(loadsave):
+    if loadsave:
         tempExist = all([os.path.exists(tfil) for tfil in tempFiles])
-        if(not tempExist):
-            if(verbose): print " - - - Temp files do not exist '%s'" % (tempFiles[0])
+        if not tempExist:
+            if verbose:
+                print " - - - Temp files do not exist '%s'" % (tempFiles[0])
             loadsave = False
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
-    if(not loadsave):
+    if not loadsave:
         # Get Illustris BH Details Filenames
-        if(verbose): print " - - - Finding Illustris BH Details files"
+        if verbose:
+            print " - - - Finding Illustris BH Details files"
         rawFiles = BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
-        if(len(rawFiles) < 1): raise RuntimeError("Error no details files found!!")
+        if len(rawFiles) < 1:
+            raise RuntimeError("Error no details files found!!")
 
         # Reorganize into temp files
-        if(verbose): print " - - - Reorganizing details into temporary files"
+        if verbose:
+            print " - - - Reorganizing details into temporary files"
         _reorganizeBHDetailsFiles(run, rawFiles, tempFiles, verbose=verbose)
 
     # Confirm all temp files exist
     tempExist = all([os.path.exists(tfil) for tfil in tempFiles])
 
     # If files are missing, raise error
-    if(not tempExist):
+    if not tempExist:
         print "Temporary Files still missing!  '%s'" % (tempFiles[0])
         raise RuntimeError("Temporary Files missing!")
 
@@ -465,7 +469,3 @@ def _getPrecision(args):
     else:                minDiff = np.power(10.0, _DEF_PRECISION)
     order = int(np.log10(0.49*minDiff))
     return order
-
-
-
-
