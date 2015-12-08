@@ -20,6 +20,7 @@ Functions
 
 -   _matchMergerDetails      - Find details entries matching merger-BH ID numbers.
 -   _matchRemnantDetails     - Combine merger-details entries to obtain an entire remnant's life.
+-   _unmergedMasses          -
 -   _detailsForMergers_snapshots - Find details entries for BH IDs in a particular snapshots.
 -   _saveDetails             - Package details into dictionary and save to NPZ file.
 -   _findNextMerger          - Find the next merger index in which a particular BH participates.
@@ -29,6 +30,7 @@ Functions
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import logging
 import numpy as np
 from datetime import datetime
 
@@ -164,7 +166,7 @@ def loadMergerDetails(run, verbose=True, log=None):
     mergerDetFName = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
     logStr = "Merger Details File '%s'" % (mergerDetFName)
     mergerDets = None
-    if(os.path.exists(mergerDetFName)):
+    if os.path.exists(mergerDetFName):
         mergerDets = zio.npzToDict(mergerDetFName)
         logStr += " loaded."
         log.info(logStr)
@@ -733,7 +735,76 @@ def _matchMergerDetails(run, log):
     return data
 
 
-def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
+def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
+    if log is None:
+        log = illpy.illbh.BHConstants._loadLogger(
+            __file__, debug=True, verbose=True, run=run, version=__version__)
+
+    log.debug("_createRemnantDetails()")
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+    # Only use root-processor
+    if rank != 0:
+        return
+
+    if mergers is None:
+        log.debug("Loading Mergers.")
+        mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
+    if mdets is None:
+        log.debug("Loading Merger-Details.")
+        mdets = loadMergerDetails(run, log=log)
+    if tree is None:
+        log.debug("Loading BHTree.")
+        tree = illpy.illbh.BHTree.loadTree(run)
+
+    # Create 'remnant' profiles ('RemnantDetails') based on tree and MergerDetails
+    ids, scales, masses, dens, mdots, csnds = \
+        _matchRemnantDetails(run, log=log, mergers=mergers, mdets=mdets, tree=tree)
+
+
+
+    mcorrected = _unmergedMasses(scales, masses, mergers, tree[BH_TREE.NEXT], log=log)
+
+    savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
+    data = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
+                        mcorrected=mcorrected)
+
+    return data
+
+
+def _cleanErrDetails(ids, scales, masses, dens, mdots, csnds, log):
+    log.debug("_cleanErrDetails()")
+    numMergers = len(ids)
+    OSC_ITER = 3
+    nentsBeg = np.zeros(numMergers, dtype=np.int)
+    nentsEnd = np.zeros(numMergers, dtype=np.int)
+    nosc = np.zeros((numMergers, OSC_ITER), dtype=np.int)
+
+    for ii in xrange(numMergers):
+        nentsBeg[ii] = len(scales[ii])
+
+        bads = np.where(np.diff(masses[ii]) < 0.0)[0]
+        if bads.size > 0:
+
+            ids[ii] = np.delete(ids[ii], bads)
+            scales[ii] = np.delete(scales[ii], bads)
+            masses[ii] = np.delete(masses[ii], bads)
+            dens[ii] = np.delete(dens[ii], bads)
+            mdots[ii] = np.delete(mdots[ii], bads)
+            csnds[ii] = np.delete(csnds[ii], bads)
+
+        nentsEnd[ii] = np.size(scales[ii])
+
+    LVL = logging.INFO
+    _logStats('Initial Entries', nentsBeg, log, lvl=LVL)
+    _logStats('Final Entries', nentsEnd, log, lvl=LVL)
+    for jj in xrange(OSC_ITER):
+        _logStats('Nonmonotonic Entries, pass %d' % (jj), nosc[:, jj], log, lvl=LVL)
+
+    return ids, scales, masses, dens, mdots, csnds
+
+
+def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     """Combine merger-details entries to obtain details for an entire merger-remnant's life.
 
     Each merger 'out'-BH is followed in subsequent mergers to combine the details entries forming
@@ -762,32 +833,21 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_matchRemnantDetails()")
-    comm = MPI.COMM_WORLD
-    rank = comm.rank
-
-    # Only use root-processor (for now at least)
-    if rank != 0:
-        return
 
     # Load Mergers
-    # ------------
     log.debug("Loading Mergers")
-    mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
+    if mergers is None:
+        mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
     m_scales = mergers[MERGERS.SCALES]
     m_ids = mergers[MERGERS.IDS]
-    numMergers = np.size(m_scales)
+    numMergers = np.int(mergers[MERGERS.NUM])     # Convert from ``np.array(int)``
 
     # Load merger-details file
-    # ------------------------
     if mdets is None:
         log.debug("Loading Merger-Details")
-        loadname = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
-        log.info(" - Loading from '%s'" % (loadname))
-        if not os.path.exists(loadname):
-            errStr = "ERROR: '%s' does not exist!" % (loadname)
-            log.error(errStr)
-            zio.mpiError(comm, log=log, err=errStr)
-        mdets = zio.npzToDict(loadname)
+        mdets = loadMergerDetails(run, log=log)
+        if mdets is None:
+            raise RuntimeError("Couldn't load `mdets`.")
 
     # Unpack data
     d_ids = mdets[DETAILS.IDS]
@@ -805,16 +865,12 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
 
     # Initialize data for results
     ids = np.zeros(numMergers, dtype=DTYPE.ID)
-    ndups = np.zeros(numMergers, dtype=np.int)
     nents = np.zeros(numMergers, dtype=np.int)
-    oscf = np.ones(numMergers, dtype=np.bool)
-    nosc = np.zeros(numMergers, dtype=np.int)     # Number of non-monotonic entries deleted
-    oscScales = numMergers*[None]                 # Scales with non-monotonicity
+
     idnums = numMergers*[None]
     mrgnums = numMergers*[None]
     scales = numMergers*[None]
     masses = numMergers*[None]
-    mcorrected = numMergers*[None]
     dens = numMergers*[None]
     mdots = numMergers*[None]
     csnds = numMergers*[None]
@@ -826,13 +882,14 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
         # First Merger
         #    Store details after merger time for 'out' BH
         inds = np.where(d_scales[ii, BH_TYPE.OUT] > m_scales[ii])[0]
-        if(np.size(inds) > 0):
+        if np.size(inds) > 0:
             ids[ii] = d_ids[ii, BH_TYPE.OUT][inds[0]]
             scales[ii] = d_scales[ii, BH_TYPE.OUT][inds]
             masses[ii] = d_masses[ii, BH_TYPE.OUT][inds]
             dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
             mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
             csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
+
             idnums[ii] = d_ids[ii, BH_TYPE.OUT][inds]
             mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
         else:
@@ -843,6 +900,7 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
             dens[ii] = []
             mdots[ii] = []
             csnds[ii] = []
+
             idnums[ii] = []
             mrgnums[ii] = []
 
@@ -886,6 +944,7 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
             dens[ii] = np.append(dens[ii], d_dens[next, BH_TYPE.OUT][inds])
             mdots[ii] = np.append(mdots[ii], d_mdots[next, BH_TYPE.OUT][inds])
             csnds[ii] = np.append(csnds[ii], d_csnds[next, BH_TYPE.OUT][inds])
+
             idnums[ii] = np.append(idnums[ii], d_ids[next, BH_TYPE.OUT][inds])
             mrgnums[ii] = np.append(mrgnums[ii], next*np.ones(inds.size, dtype=int))
 
@@ -913,94 +972,20 @@ def _matchRemnantDetails(run, log=None, mdets=None, tree=None):
             dens[ii] = dens[ii][inds]
             mdots[ii] = mdots[ii][inds]
             csnds[ii] = csnds[ii][inds]
+
             idnums[ii] = idnums[ii][inds]
             mrgnums[ii] = mrgnums[ii][inds]
-
-            # Find and remove duplicates
-            sameScales = np.isclose(scales[ii][:-1], scales[ii][1:], rtol=1e-8)
-            sameMasses = np.isclose(masses[ii][:-1], masses[ii][1:], rtol=1e-8)
-            dups = np.where(sameScales & sameMasses)[0]
-            if(np.size(dups) > 0):
-                ndups[ii] += np.size(dups)
-                scales[ii] = np.delete(scales[ii], dups)
-                masses[ii] = np.delete(masses[ii], dups)
-                dens[ii] = np.delete(dens[ii], dups)
-                mdots[ii] = np.delete(mdots[ii], dups)
-                csnds[ii] = np.delete(csnds[ii], dups)
-                idnums[ii] = np.delete(idnums[ii], dups)
-                mrgnums[ii] = np.delete(mrgnums[ii], dups)
-
-            # Find and remove non-monotonic entries
-            bads = np.where(np.diff(masses[ii]) < 0.0)[0]
-            if bads.size > 0:
-                nosc[ii] = bads.size
-                oscScales[ii] = scales[ii][bads]
-                # print(" - Nonmonotonic scales = ", scales[ii][bads])
-                scales[ii] = np.delete(scales[ii], bads)
-                masses[ii] = np.delete(masses[ii], bads)
-                dens[ii] = np.delete(dens[ii], bads)
-                mdots[ii] = np.delete(mdots[ii], bads)
-                csnds[ii] = np.delete(csnds[ii], bads)
-                idnums[ii] = np.delete(idnums[ii], bads)
-                mrgnums[ii] = np.delete(mrgnums[ii], bads)
-
             nents[ii] = np.size(scales[ii])
-            # Look for non-monotonicity
-            if(not zmath.mono(masses[ii], 'ge')):
-                oscf[ii] = True
-
         else:
             log.warning("Merger %d without ANY entries." % (ii))
 
     log.debug("Remnant details collected.")
     _logStats('Number of entries', nents, log)
-    _logStats('Duplicate entries', ndups, log)
-    _logStats('Non-monotonic entries', nosc, log)
-    log.debug(" - - Number remaining non-monotonic: %d" % (np.count_nonzero(oscf)))
 
-    if np.any(nosc > 0):
-        fname = 'nonmono-scales.npz'
-        np.savez(fname, scales=oscScales)
-        print("Saved to '%s'" % (fname))
-
-    # Calculate 'corrected' remnant masses
-    # ------------------------------------
-    log.debug("'Correcting' remnant masses for later mergers.")
-    mcorrected = np.array([np.array(mm) for mm in masses])
-    if np.any([np.any(mm < 0.0) for mm in masses]):
-        raise RuntimeError("Negative masses!")
-
-    numBon = 0
-    numMal = 0
-    corrErrs = []
-    for ii in xrange(numMergers):
-        mcorrected[ii], nbon, nmal = _unmergedMass(
-            ii, scales, mcorrected, mergers, nextMerger, log=log)
-        if nmal > 0:
-            corrErrs.append(ii)
-
-        numBon += nbon
-        numMal += nmal
-
-    numTot = numBon + numMal
-    nerrs = len(corrErrs)
-    log.info(" - {}/{} = {:.4f} Remnants with correction errors".format(
-        nerrs, numMergers, nerrs/numMergers))
-    log.info(" - {}/{} = {:.4f} Total Errors (over all mergers).".format(
-        numMal, numTot, numMal/numTot))
-    log.info(" - Errors on remnants: {}".format(str(corrErrs)))
-
-    savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
-    data = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
-                        mcorrected=mcorrected)
-
-    if np.any([np.any(mm < 0.0) for mm in masses]):
-        raise RuntimeError("Negative masses!")
-
-    return data
+    return idnums, scales, masses, dens, mdots, csnds
 
 
-def _unmergedMass(mind, scales, masses, mergers, nextMerger, log):
+def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
     """Remove mass from mergers for the remnant in this BH lineage.
 
     Arguments
@@ -1017,79 +1002,119 @@ def _unmergedMass(mind, scales, masses, mergers, nextMerger, log):
     remmass : array_like of scalar
 
     """
-    log.debug("_unmergedMass()")
-    # Starting ID for this remnant
-    bhID = mergers[MERGERS.IDS][mind, BH_TYPE.OUT]
-    # scales and masses for this remnant
-    scales = scales[mind]
-    masses = masses[mind]
-    # Index of next merger
-    next = nextMerger[mind]
-    log.debug(" - Merger %d (ID %d), Next = %d" % (mind, bhID, next))
-    # loop over all following mergers
-    nmal = 0
-    nbon = 0
-    while next >= 0:
-        # Figure out which BH the remnant is; select the other-BH's mass to subtract
-        if bhID == mergers[MERGERS.IDS][next, BH_TYPE.IN]:
-            otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.OUT]
-        elif bhID == mergers[MERGERS.IDS][next, BH_TYPE.OUT]:
-            otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.IN]
-        else:
-            errStr = "Initial Merger %d, out bh ID %d\n" % (mind, bhID)
-            errStr += "\tNext merger {}, IDs dont match: {}, {}".format(
-                next, mergers[MERGERS.IDS][next, BH_TYPE.IN],
-                mergers[MERGERS.IDS][next, BH_TYPE.OUT])
-            log.error(errStr)
-            break
-            # raise RuntimeError(errStr)
-
-        # Figure out which entries to subtract the mass from
-        mscale = mergers[MERGERS.SCALES][next]
-        # Find scales after the merger
-        allInds = np.where(scales >= mscale)[0]
-        if allInds.size == 0:
-            log.warning("Merger %d, Next %d, no matching scales after %f!" % (mind, next, mscale))
-        else:
-            inds = np.array(allInds)
-            if np.isclose(scales[inds[0]], mscale) and inds.size > 1 and inds[0] > 0:
-                #    Dont need `+1` because were starting at ``inds[0]-1``
-                inds = inds[np.argmax(np.diff(masses[inds[0]-1:inds[0]+2]))]
+    log.debug("_unmergedMasses()")
+    numMergers = mergers[MERGERS.NUM]
+    allUnmerged = []
+    errMergs_mass = []     # Mergers which cause errors trying to subtract masses
+    effMergs_mass = []     # Mergers which are effected by the above errors
+    errMergs_id = []     # Mergers where the IDs dont match properly
+    effMergs_id = []
+    errCorr = []
+    numMal = 0
+    numBon = 0
+    for mind in xrange(numMergers):
+        # Starting ID for this remnant
+        bhID = mergers[MERGERS.IDS][mind, BH_TYPE.OUT]
+        # scales and masses for this remnant
+        scales = allScales[mind]
+        masses = allMasses[mind]
+        # Index of next merger
+        next = nextMerger[mind]
+        log.debug(" - Merger %d (ID %d), Next = %d" % (mind, bhID, next))
+        nmal = 0
+        nbon = 0
+        # loop over all following mergers
+        while next >= 0:
+            # Figure out which BH the remnant is; select the other-BH's mass to subtract
+            if bhID == mergers[MERGERS.IDS][next, BH_TYPE.IN]:
+                otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.OUT]
+            elif bhID == mergers[MERGERS.IDS][next, BH_TYPE.OUT]:
+                otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.IN]
             else:
-                inds = inds[0]
+                errStr = "Initial Merger %d, out bh ID %d\n" % (mind, bhID)
+                errStr += "\tNext merger {}, IDs dont match: {}, {}".format(
+                    next, mergers[MERGERS.IDS][next, BH_TYPE.IN],
+                    mergers[MERGERS.IDS][next, BH_TYPE.OUT])
+                log.error(errStr)
+                errMergs_id.append(mind)
+                effMergs_id.append(next)
+                break
+                # raise RuntimeError(errStr)
 
-            masses[inds:] -= otherMass
-
-            bads = np.where(masses[inds:] <= 0.0)[0]
-            nbad = bads.size
-            ntot = masses.size - inds
-            if nbad > 0:
-                nmal += 1
-                logStr = "Merger {}, next {}: {}/{} = {:.4f} Invalid masses!".format(
-                    mind, next, nbad, ntot, nbad/ntot)
-                log.debug(logStr)
-                if nbad > 4 or nbad/ntot > 0.2:
-                    errStr = "Merger {}, next {}: Too many ({}/{}) invalid masses!\n".format(
-                        mind, next, nbad, ntot)
-                    endInd = np.min([len(allInds), 5])
-                    useInds = allInds[:endInd]
-                    errStr += "\tinds = {}...\n".format(str(useInds))
-                    errStr += "\tmscale = {}, scales = {}...\n".format(
-                        mscale, str(scales[useInds]))
-                    errStr += "\tother = {}, masses = {}...\n".format(
-                        otherMass, str(masses[useInds]))
-                    log.warning(errStr)
-                    # raise RuntimeError(errStr)
-                    # Add the mass back on
-                    masses[inds:] += otherMass
+            # Figure out which entries to subtract the mass from
+            mscale = mergers[MERGERS.SCALES][next]
+            # Find scales after the merger
+            allInds = np.where(scales >= mscale)[0]
+            if allInds.size == 0:
+                log.warning("Merger %d, Next %d, no matching scales after %f!" % (mind, next, mscale))
             else:
-                nbon += 1
+                inds = np.array(allInds)
+                if np.isclose(scales[inds[0]], mscale) and inds.size > 1 and inds[0] > 0:
+                    #    Dont need `+1` because were starting at ``inds[0]-1``
+                    inds = inds[np.argmax(np.diff(masses[inds[0]-1:inds[0]+2]))]
+                else:
+                    inds = inds[0]
 
-        # Update for next merger
-        bhID = mergers[MERGERS.IDS][next, BH_TYPE.OUT]
-        next = nextMerger[next]
+                masses[inds:] -= otherMass
 
-    return masses, nbon, nmal
+                bads = np.where(masses[inds:] <= 0.0)[0]
+                nbad = bads.size
+                ntot = masses.size - inds
+                if nbad > 0:
+                    nmal += 1
+                    logStr = "Merger {}, next {}: {}/{} = {:.4f} Invalid masses!".format(
+                        mind, next, nbad, ntot, nbad/ntot)
+                    log.debug(logStr)
+                    if nbad > 4 or nbad/ntot > 0.2:
+                        errStr = "Merger {}, next {}: Too many ({}/{}) invalid masses!\n".format(
+                            mind, next, nbad, ntot)
+                        endInd = np.min([len(allInds), 5])
+                        useInds = allInds[:endInd]
+                        errStr += "\tinds = {}...\n".format(str(useInds))
+                        errStr += "\tmscale = {}, scales = {}...\n".format(
+                            mscale, str(scales[useInds]))
+                        errStr += "\tother = {}, masses = {}...\n".format(
+                            otherMass, str(masses[useInds]))
+                        log.warning(errStr)
+                        # raise RuntimeError(errStr)
+                        # Add the mass back on
+                        masses[inds:] += otherMass
+                        errMergs_mass.append(mind)
+                        effMergs_mass.append(next)
+                else:
+                    nbon += 1
+
+            # Update for next merger
+            bhID = mergers[MERGERS.IDS][next, BH_TYPE.OUT]
+            next = nextMerger[next]
+
+        allUnmerged.append(masses)
+        numBon += nbon
+        numMal += nmal
+        if nbon > 0:
+            errCorr.append(mind)
+
+    numTot = numBon + numMal
+    nerrs = len(errCorr)
+    log.info(" - {}/{} = {:.4f} Remnants with correction errors".format(
+        nerrs, numMergers, nerrs/numMergers))
+    log.info(" - {}/{} = {:.4f} Total Errors (over all mergers).".format(
+        numMal, numTot, numMal/numTot))
+    # log.info(" - Errors on remnants: {}".format(str(corrErrs)))
+    errMergs_id = np.array(list(set(errMergs_id)))
+    effMergs_id = np.array(list(set(effMergs_id)))
+    frac_id = errMergs_id.size/numMergers
+    errMergs_mass = np.array(list(set(errMergs_mass)))
+    effMergs_mass = np.array(list(set(effMergs_mass)))
+    frac_mass = errMergs_mass.size/numMergers
+    logStr = " - ID Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mergers"
+    logStr = logStr.format(effMergs_id.size, numMergers, frac_id, errMergs_id.size)
+    log.info(logStr)
+    logStr = " - Mass Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mergers"
+    logStr = logStr.format(effMergs_mass.size, numMergers, frac_mass, errMergs_mass.size)
+    log.info(logStr)
+
+    return allUnmerged
 
 
 def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
@@ -1373,7 +1398,7 @@ def _indBefAft(scaleDiff):
     return ind
 
 
-def _logStats(name, prop, log):
+def _logStats(name, prop, log, lvl=logging.DEBUG):
     """Log basic statistics about the given property.
 
     Arguments
@@ -1394,11 +1419,11 @@ def _logStats(name, prop, log):
     except:
         tot = len(prop)
     frac = cnt/tot
-    log.debug(" - {}:".format(name))
-    log.debug(" - - {:6d}/{:6d} = {:.4f} nonzero".format(cnt, tot, frac))
-    log.debug(" - - Median and 68% (overall): {}".format(
+    log.log(lvl, " - {}:".format(name))
+    log.log(lvl, " - - {:6d}/{:6d} = {:.4f} nonzero".format(cnt, tot, frac))
+    log.log(lvl, " - - Median and 68% (overall): {}".format(
         str(zmath.confidenceIntervals(prop, ci=0.68))))
-    log.debug(" - - Median and 68% (nonzero): {}".format(
+    log.log(lvl, " - - Median and 68% (nonzero): {}".format(
         str(zmath.confidenceIntervals(prop, ci=0.68, filter='g'))))
     return
 
