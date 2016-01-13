@@ -237,7 +237,9 @@ def _constructBHTree(run, mergers, verbose=True):
 
     if verbose: print " - - BHTree.constructBHTree()"
 
-    cosmo = Cosmology()
+    # cosmo = Cosmology()
+    import illpy.illcosmo
+    cosmo = illpy.illcosmo.cosmology.Cosmology()
 
     numMergers = mergers[MERGERS.NUM]
     last     = -1*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)

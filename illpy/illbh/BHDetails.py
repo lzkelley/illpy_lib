@@ -166,8 +166,10 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
     if(verbose): print " - - BHDetails._reorganizeBHDetailsFiles()"
 
     # Load cosmology
-    from illpy import illcosmo
-    cosmo = illcosmo.Cosmology()
+    # from illpy import illcosmo
+    # cosmo = illcosmo.Cosmology()
+    import illpy.illcosmo
+    cosmo = illpy.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()
 
     # Open new ASCII, Temp details files

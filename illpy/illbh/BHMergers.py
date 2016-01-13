@@ -486,7 +486,9 @@ def _mapToSnapshots(scales, verbose=True):
     numMergers = len(scales)
 
     # Load Cosmology
-    cosmo      = Cosmology()
+    # cosmo      = Cosmology()
+    import illpy.illcosmo
+    cosmo = illpy.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()
 
     # Map Mergers-2-Snapshots: snapshot before (or ontop) of each merger
