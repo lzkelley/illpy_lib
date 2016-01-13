@@ -28,38 +28,35 @@ _PROCESSED_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postp
 
 # Physical Constants
 class CONV_ILL_TO_CGS(Enum):
+    """Convert from illustris units to physical [cgs] units (multiply).
     """
-    Convert from illustris units to physical [cgs] units (multiply).
-    """
-    MASS        = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [Msol]
-    MDOT        = 10.22                          # Multiply by this to get [Msol/yr]
-    DENS        = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
-    DIST        = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
-    VEL         = 1.0e5                          # [km/s] to [cm/s]
-    CS          = 1.0                            # ??????? FIX
+    MASS = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [g]
+    MDOT = 10.22*MSOL/YR                  # Multiply by this to get [g/s]
+    DENS = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
+    DIST = KPC/HPAR                       # Convert from [ckpc/h] to [comoving cm]
+    VEL  = 1.0e5                          # [km/s] to [cm/s]
+    CS   = 1.0                            # ??????? FIX
 
 
 class CONV_CGS_TO_SOL(Enum):
+    """Convert from cgs units to (standard) solar units, e.g. Msol, PC, etc, by multiplication
     """
-    Convert from cgs units to (standard) solar units, e.g. Msol, PC, etc, by multiplication
-    """
-    MASS        = 1.0/MSOL                       # [g] ==> Msol
-    MDOT        = YR/MSOL                        # [g/s] ==> [Msol/yr]
-    DENS        = np.power(PC, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
-    NDENS       = np.power(PC, 3.0)               # [1/cm^3] ==> [1/pc^3]
-    DIST        = 1.0/PC                         # [cm] ==> [pc]
-    VEL         = 1.0e-5                         # [cm/s] ==> [km/s]
-    ENER        = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
+    MASS  = 1.0/MSOL                       # [g] ==> Msol
+    MDOT  = YR/MSOL                        # [g/s] ==> [Msol/yr]
+    DENS  = np.power(PC, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
+    NDENS = np.power(PC, 3.0)               # [1/cm^3] ==> [1/pc^3]
+    DIST  = 1.0/PC                         # [cm] ==> [pc]
+    VEL   = 1.0e-5                         # [cm/s] ==> [km/s]
+    ENER  = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
 
 
 class CONV_ILL_TO_SOL(Enum):
+    """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
     """
-    Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
-    """
-    MASS        = CONV_ILL_TO_CGS.MASS.value*CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
-    MDOT        = CONV_ILL_TO_CGS.MDOT.value*CONV_CGS_TO_SOL.MDOT.value  #  to [Msol/yr]
-    DENS        = CONV_ILL_TO_CGS.DENS.value*CONV_CGS_TO_SOL.DENS.value  #  to [Msol/pc^3]
-    DIST        = CONV_ILL_TO_CGS.DIST.value*CONV_CGS_TO_SOL.DIST.value  #  to comoving-pc
+    MASS = CONV_ILL_TO_CGS.MASS.value*CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
+    MDOT = CONV_ILL_TO_CGS.MDOT.value*CONV_CGS_TO_SOL.MDOT.value  # to [Msol/yr]
+    DENS = CONV_ILL_TO_CGS.DENS.value*CONV_CGS_TO_SOL.DENS.value  # to [Msol/pc^3]
+    DIST = CONV_ILL_TO_CGS.DIST.value*CONV_CGS_TO_SOL.DIST.value  # to comoving-pc
 
 
 # Indices for Different Types of Particles
