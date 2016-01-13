@@ -2,26 +2,56 @@
 
 """
 
-
+import os
 import numpy as np
 import scipy as sp
 from scipy import interpolate
-import sys
-import os
+import astropy as ap
+import astropy.cosmology
 
 from ..Constants import BOX_LENGTH
 from zcode.constants import HPAR, H0, SPLC, KPC
 
-_DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))                                # Get local path, and data directory
-_TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"                                     # Contains cosmological values for each snapshot
+# Get local path, and data directory
+_DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
+# Contains cosmological values for each snapshot
+_TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"
 
-
-INTERP = "quadratic"                                                                                # Type of interpolation for scipy
+INTERP = "quadratic"                     # Type of interpolation for scipy
 FLT_TYPE = np.float32
+IMPOSE_FLOOR = True                # Enforce a minimum for certain parameters (e.g. comDist)
+MAXIMUM_SCALE_FACTOR = 0.9999      # Scalefactor for minimum of certain parameters (e.g. comDist)
 
-IMPOSE_FLOOR = True                                                                                 # Enforce a minimum for certain parameters (e.g. comDist)
-MAXIMUM_SCALE_FACTOR = 0.9999                                                                       # Scalefactor for minimum of certain parameters (e.g. comDist)
 
+class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
+    """
+    """
+    Omega0 = 0.2726
+    OmegaLambda = 0.7274
+    OmegaBaryon = 0.0456
+    HubbleParam = 0.704
+    H0 = HubbleParam * 100.0
+
+    def __init__(self, max_scale=None):
+        # Initialize parent class
+        ap.cosmology.FlatLambdaCDM.__init__(
+            self, H0=self.H0, Om0=self.Omega0, Ob0=self.OmegaBaryon)
+
+        # Load illustris snapshot scale factors
+        fname = os.path.join(_DATA_PATH, _TIMES_FILENAME)
+        cosmo_data = np.load(fname)
+        self.snapshot_scales = cosmo_data['scale']
+
+        # Impose maximum scale-factor
+        if max_scale:
+            if max_scale < self.snapshot_scales[-2]:
+                err_str = "``max_scale = {}`` must be greater than penultimate snapshot scale = {}"
+                err_str = err_str.format(max_scale, self.snapshot_scales[-2])
+                raise ValueError(err_str)
+
+            self.snapshot_scales[-1] = np.min([max_scale, self.snapshot_scales[-1]])
+
+        return
 
 
 class Cosmology(object):
