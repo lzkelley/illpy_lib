@@ -19,6 +19,8 @@ Functions
 -   inferMergerOutMasses     - Infer 'out' BH masses at time of mergers based on available data.
 
 -   _matchMergerDetails      - Find details entries matching merger-BH ID numbers.
+-   _createRemnantDetails    - 
+-   _cleanErrDetails         - 
 -   _matchRemnantDetails     - Combine merger-details entries to obtain an entire remnant's life.
 -   _unmergedMasses          -
 -   _detailsForMergers_snapshots - Find details entries for BH IDs in a particular snapshots.
@@ -50,7 +52,7 @@ from illpy.Constants import DTYPE, NUM_SNAPS
 import zcode.inout as zio
 import zcode.math as zmath
 
-__version__ = '0.24'
+__version__ = '0.25'
 _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 
@@ -736,6 +738,25 @@ def _matchMergerDetails(run, log):
 
 
 def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
+    """Create and Save Remnant Details Entries.
+
+    Loads required data objects, calls `_matchRemnantDetails()`, corrects masses, and saves
+    results to a npz file named by `GET_REMNANT_DETAILS_FILENAME`.
+
+    Arguments
+    ---------
+    run : int
+    log : ``logging.Logger`` or `None`
+    mergers : dict or `None`
+    mdets : dict of `None`
+    tree : dict of `None`
+
+    Returns
+    -------
+    rdets : dict
+
+    """
+
     if log is None:
         log = illpy.illbh.BHConstants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
@@ -761,15 +782,13 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     ids, scales, masses, dens, mdots, csnds = \
         _matchRemnantDetails(run, log=log, mergers=mergers, mdets=mdets, tree=tree)
 
-
-
     mcorrected = _unmergedMasses(scales, masses, mergers, tree[BH_TREE.NEXT], log=log)
 
     savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
-    data = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
+    rdets = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
                         mcorrected=mcorrected)
 
-    return data
+    return rdets
 
 
 def _cleanErrDetails(ids, scales, masses, dens, mdots, csnds, log):
@@ -819,8 +838,12 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
         Illustris simulation run number {1,3}.
     log : ``logging.Logger``
         Logging object.
+    mergers : dict or `None`
+        BH-Mergers dictionary.  Loaded from file if (`None`) not provided.
     mdets : dict or `None`
         `MergerDetails` data, loaded if not proveded.
+    tree : dict or `None`
+        BH-Merger-Tree dictionary.  Loaded from file if (`None`) not provided.
 
     Returns
     -------
@@ -882,16 +905,27 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
         # First Merger
         #    Store details after merger time for 'out' BH
         inds = np.where(d_scales[ii, BH_TYPE.OUT] > m_scales[ii])[0]
-        if np.size(inds) > 0:
-            ids[ii] = d_ids[ii, BH_TYPE.OUT][inds[0]]
-            scales[ii] = d_scales[ii, BH_TYPE.OUT][inds]
-            masses[ii] = d_masses[ii, BH_TYPE.OUT][inds]
-            dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
-            mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
-            csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
+        if inds.size > 0:
+            # Make sure values are valid
+            temp_mdots = d_mdots[ii, BH_TYPE.OUT][inds]
+            #    Find locations which are <=0.0 or inf
+            bads = np.where((temp_mdots <= 0.0) | (~np.isfinite(temp_mdots)))[0]
+            # Remove bad elements
+            if bads.size > 0:
+                inds = np.delete(inds, bads)
 
-            idnums[ii] = d_ids[ii, BH_TYPE.OUT][inds]
-            mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
+            # If valid elements remain
+            if inds.size > 0:
+                ids[ii] = d_ids[ii, BH_TYPE.OUT][inds[0]]
+                scales[ii] = d_scales[ii, BH_TYPE.OUT][inds]
+                masses[ii] = d_masses[ii, BH_TYPE.OUT][inds]
+                dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
+                mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
+                csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
+
+                idnums[ii] = d_ids[ii, BH_TYPE.OUT][inds]
+                mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
+
         else:
             log.warning("Merger %d without post-merger details entries!" % (ii))
             ids[ii] = m_ids[ii, BH_TYPE.OUT]
@@ -917,7 +951,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
                 checkScale = m_scales[next]
                 # Error if still not fixed
                 if next >= 0 and ids[ii] not in m_ids[next]:
-                    errStr = "ERROR: ids[{}] = {}, merger ids {} = {}"
+                    errStr = "ids[{}] = {}, merger ids {} = {}"
                     errStr = errStr.format(ii, ids[ii], next, str(m_ids[next]))
                     log.error(errStr)
                     zio.mpiError(comm, log=log, err=errStr)
@@ -928,7 +962,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             # Make sure ID numbers match
             if checkID:
                 if np.any(checkID != nextIDs):
-                    errStr = "ERROR: ii = %d, next = %d, IDs don't match!" % (ii, next)
+                    errStr = "ii = %d, next = %d, IDs don't match!" % (ii, next)
                     errStr += "\nids[ii] = %d, check = %d" % (ids[ii], checkID)
                     errStr += "\nd_ids = %s" % (str(nextIDs))
                     log.error(errStr)
@@ -939,14 +973,24 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             else:
                 inds = np.where(d_scales[next, BH_TYPE.OUT] > m_scales[ii])[0]
 
-            scales[ii] = np.append(scales[ii], d_scales[next, BH_TYPE.OUT][inds])
-            masses[ii] = np.append(masses[ii], d_masses[next, BH_TYPE.OUT][inds])
-            dens[ii] = np.append(dens[ii], d_dens[next, BH_TYPE.OUT][inds])
-            mdots[ii] = np.append(mdots[ii], d_mdots[next, BH_TYPE.OUT][inds])
-            csnds[ii] = np.append(csnds[ii], d_csnds[next, BH_TYPE.OUT][inds])
+            if inds.size > 0:
+                # Make sure values are valid
+                temp_mdots = d_mdots[next, BH_TYPE.OUT][inds]
+                #    Find locations which are <=0.0 or inf
+                bads = np.where((temp_mdots <= 0.0) | (~np.isfinite(temp_mdots)))[0]
+                # Remove bad elements
+                if bads.size > 0:
+                    inds = np.delete(inds, bads)
 
-            idnums[ii] = np.append(idnums[ii], d_ids[next, BH_TYPE.OUT][inds])
-            mrgnums[ii] = np.append(mrgnums[ii], next*np.ones(inds.size, dtype=int))
+                if inds.size > 0:
+                    scales[ii] = np.append(scales[ii], d_scales[next, BH_TYPE.OUT][inds])
+                    masses[ii] = np.append(masses[ii], d_masses[next, BH_TYPE.OUT][inds])
+                    dens[ii] = np.append(dens[ii], d_dens[next, BH_TYPE.OUT][inds])
+                    mdots[ii] = np.append(mdots[ii], d_mdots[next, BH_TYPE.OUT][inds])
+                    csnds[ii] = np.append(csnds[ii], d_csnds[next, BH_TYPE.OUT][inds])
+
+                    idnums[ii] = np.append(idnums[ii], d_ids[next, BH_TYPE.OUT][inds])
+                    mrgnums[ii] = np.append(mrgnums[ii], next*np.ones(inds.size, dtype=int))
 
             # Get next merger in Tree
             next = nextMerger[next]
@@ -978,6 +1022,12 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             nents[ii] = np.size(scales[ii])
         else:
             log.warning("Merger %d without ANY entries." % (ii))
+
+        if np.any(~np.isfinite(mdots[ii])):
+            errStr = "Infinite mdots at merger {}\n".format(ii)
+            errStr += "\tmdots = {}".format(mdots[ii])
+            log.error(errStr)
+            raise RuntimeError(errStr)
 
     log.debug("Remnant details collected.")
     _logStats('Number of entries', nents, log)
