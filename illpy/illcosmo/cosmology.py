@@ -24,7 +24,13 @@ MAXIMUM_SCALE_FACTOR = 0.9999      # Scalefactor for minimum of certain paramete
 
 
 class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
-    """
+    """Astropy cosmology object with illustris parameters and additional functions and wrappers.
+
+    Methods
+    -------
+    -   scale_to_age         - Convert from scale-factor to age of the universe [seconds].
+    -   age_to_scale         - Convert from age of the universe [seconds] to scale-factor.
+
     """
     Omega0 = 0.2726
     OmegaLambda = 0.7274
@@ -32,7 +38,9 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
     HubbleParam = 0.704
     H0 = HubbleParam * 100.0
 
-    def __init__(self, max_scale=None):
+    _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1]
+
+    def __init__(self, max_scale=None, interp_grid=100):
         # Initialize parent class
         ap.cosmology.FlatLambdaCDM.__init__(
             self, H0=self.H0, Om0=self.Omega0, Ob0=self.OmegaBaryon)
@@ -51,7 +59,52 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
 
             self.snapshot_scales[-1] = np.min([max_scale, self.snapshot_scales[-1]])
 
+        # Create grids for interpolations
+        # -------------------------------
+        #    Set the first point to be the highest redshift of the snapshots
+        min_scale = np.min(self.snapshot_scales)
+        max_redz = self._scale_to_z(min_scale)
+        z_grid_pnts = np.append(max_redz, self._Z_GRID)
+        #    Make sure grid is monotonically decreasing
+        if not np.all(np.diff(z_grid_pnts) < 0.0):
+            err_str = "Non-monotonic z_grid = {}".format(z_grid_pnts)
+            err_str += "\nMin snapshot scale = {}, redshift = {}".format(min_scale, max_redz)
+            raise ValueError(err_str)
+
+        z0 = z_grid_pnts[0]
+        zgrid = None
+        for z1 in z_grid_pnts[1:]:
+            temp = np.logspace(*np.log10([z0, z1]), num=interp_grid, endpoint=False)
+            if zgrid is None:
+                zgrid = temp
+            else:
+                zgrid = np.append(zgrid, temp)
+            z0 = z1
+
+        zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=interp_grid))
+        self._zgrid = np.sort(zgrid)
+        # Ages in seconds
+        self._age_grid = self.age(zgrid).cgs.value
         return
+
+    @staticmethod
+    def _scale_to_z(sf):
+        """Convert from scale-factor to redshift.
+        """
+        sf = np.array(sf)
+        return (1.0/sf) - 1.0
+
+    def scale_to_age(self, sf):
+        """Convert from scale-factor to age of the universe [seconds].
+        """
+        zz = self._scale_to_z(sf)
+        return self.age(zz).cgs.value
+
+    def age_to_scale(self, age):
+        """Convert from age of the universe [seconds] to scale-factor.
+        """
+        zz = np.interp(age, self._age_grid, self._zgrid, left=np.nan, right=np.nan)
+        return self.scale_factor(zz)
 
 
 class Cosmology(object):
