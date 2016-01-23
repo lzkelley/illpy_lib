@@ -82,9 +82,11 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
             z0 = z1
 
         zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=interp_grid))
-        self._zgrid = np.sort(zgrid)
         # Ages in seconds
-        self._age_grid = self.age(zgrid).cgs.value
+        age_grid = self.age(zgrid).cgs.value
+        inds = np.argsort(age_grid)
+        self._zgrid = zgrid[inds]
+        self._age_grid = age_grid[inds]
         return
 
     @staticmethod
