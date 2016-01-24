@@ -95,7 +95,8 @@ from illpy.illbh.BHConstants import MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_F
 from illpy.illbh import BHMatcher
 
 from illpy.Constants import DTYPE
-from illpy import Cosmology
+# from illpy import Cosmology
+# import illpy.illcosmo
 
 import zcode.inout as zio
 
@@ -486,7 +487,6 @@ def _mapToSnapshots(scales, verbose=True):
     numMergers = len(scales)
 
     # Load Cosmology
-    # cosmo      = Cosmology()
     import illpy.illcosmo
     cosmo = illpy.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()

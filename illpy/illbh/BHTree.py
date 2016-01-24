@@ -20,7 +20,8 @@ import numpy as np
 from datetime import datetime
 
 from ..Constants import DTYPE
-from .. import Cosmology
+# from .. import Cosmology
+import illpy.illcosmo
 import BHConstants
 from BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
 import BHMergers
