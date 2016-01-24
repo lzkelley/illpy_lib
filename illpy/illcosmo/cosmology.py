@@ -1,6 +1,7 @@
 """
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import numpy as np
@@ -40,7 +41,7 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
 
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1]
 
-    def __init__(self, max_scale=None, interp_grid=100):
+    def __init__(self, max_scale=None, interp_points=100):
         # Initialize parent class
         ap.cosmology.FlatLambdaCDM.__init__(
             self, H0=self.H0, Om0=self.Omega0, Ob0=self.OmegaBaryon)
@@ -65,29 +66,59 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         min_scale = np.min(self.snapshot_scales)
         max_redz = self._scale_to_z(min_scale)
         z_grid_pnts = np.append(max_redz, self._Z_GRID)
-        #    Make sure grid is monotonically decreasing
-        if not np.all(np.diff(z_grid_pnts) < 0.0):
-            err_str = "Non-monotonic z_grid = {}".format(z_grid_pnts)
-            err_str += "\nMin snapshot scale = {}, redshift = {}".format(min_scale, max_redz)
+        #    Create a grid in redshift
+        zgrid = self._init_interp_grid(z_grid_pnts, interp_points)
+        self._grid_z = zgrid
+        self._sort_z = np.argsort(zgrid)
+        # Calculate corresponding values in desired parameters
+        #    Ages in seconds
+        self._grid_age = self.age(zgrid).cgs.value
+        self._sort_age = np.argsort(self._grid_age)
+        #    Comoving distances in centimeters
+        self._grid_comdist = self.comoving_distance(zgrid).cgs.value
+        self._sort_comdist = np.argsort(self._grid_comdist)
+
+        return
+
+    def _init_interp_grid(self, z_pnts, num_pnts):
+        """Create a grid in redshift for interpolation.
+        
+        Arguments
+        ---------
+        z_pnts : (N,) array_like of scalar
+            Monotonically decreasing redshift values greater than zero.  Inbetween each pair of
+            values, `num_pnts` points are evenly added in log-space.  Also, `num_pnts` are added
+            from the minimum given value down to redshift `0.0`.
+        num_pnts : int
+            Number of grid points to insert between each pair of values in `z_pnts`.
+
+        Returns
+        -------
+        zgrid : (M,) array of scalar
+            The total length of the final array will be ``N * num_pnts + 1``; that is, `num_pnts`
+            for each value given in `z_pnts`, plus redshift `0.0` at the end.
+
+        """
+        # Make sure grid is monotonically decreasing
+        if not np.all(np.diff(z_pnts) < 0.0):
+            err_str = "Non-monotonic z_grid = {}".format(z_pnts)
             raise ValueError(err_str)
 
-        z0 = z_grid_pnts[0]
+        z0 = z_pnts[0]
         zgrid = None
-        for z1 in z_grid_pnts[1:]:
-            temp = np.logspace(*np.log10([z0, z1]), num=interp_grid, endpoint=False)
+        # Create a log-spacing of points between each pair of values in the given points
+        for z1 in z_pnts[1:]:
+            temp = np.logspace(*np.log10([z0, z1]), num=num_pnts, endpoint=False)
             if zgrid is None:
                 zgrid = temp
             else:
                 zgrid = np.append(zgrid, temp)
             z0 = z1
+        
+        # Linearly space from the last point up to `0.0` (cant reach `0.0` with log-spacing)
+        zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=num_pnts))
+        return zgrid
 
-        zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=interp_grid))
-        # Ages in seconds
-        age_grid = self.age(zgrid).cgs.value
-        inds = np.argsort(age_grid)
-        self._zgrid = zgrid[inds]
-        self._age_grid = age_grid[inds]
-        return
 
     @staticmethod
     def _scale_to_z(sf):
@@ -96,16 +127,39 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         sf = np.array(sf)
         return (1.0/sf) - 1.0
 
+    @staticmethod
+    def _interp(vals, xx, yy, inds=None):
+        if inds is None:
+            inds = np.argsort(xx)
+        # arrs = np.interp(vals, xx[inds], yy[inds], left=np.nan, right=np.nan)
+        # PchipInterpolate guarantees monotonicity with higher order.  Gives more accurate results.
+        arrs = sp.interpolate.PchipInterpolator(xx[inds], yy[inds], extrapolate=False)(vals)
+        return arrs
+
     def scale_to_age(self, sf):
         """Convert from scale-factor to age of the universe [seconds].
         """
         zz = self._scale_to_z(sf)
-        return self.age(zz).cgs.value
+        if np.size(zz) == 1:
+            age = self.age(zz).cgs.value
+        else:
+            age = self._interp(zz, self._grid_z, self._grid_age, self._sort_z)
+        return age
+
+    def scale_to_comdist(self, sf):
+        """Convert from scale-factor to comoving distance [cm].
+        """
+        zz = self._scale_to_z(sf)
+        if np.size(zz) == 1:
+            comdist = self.comoving_distance(zz).cgs.value
+        else:
+            comdist = self._interp(zz, self._grid_z, self._grid_comdist, self._sort_z)
+        return comdist
 
     def age_to_scale(self, age):
         """Convert from age of the universe [seconds] to scale-factor.
         """
-        zz = np.interp(age, self._age_grid, self._zgrid, left=np.nan, right=np.nan)
+        zz = self._interp(age, self._grid_age, self._grid_z, self._sort_age)
         return self.scale_factor(zz)
 
 
