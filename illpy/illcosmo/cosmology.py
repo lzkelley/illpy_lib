@@ -76,8 +76,9 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         self._sort_age = np.argsort(self._grid_age)
         #    Comoving distances in centimeters
         self._grid_comdist = self.comoving_distance(zgrid).cgs.value
-        self._sort_comdist = np.argsort(self._grid_comdist)
-
+        # self._sort_comdist = np.argsort(self._grid_comdist)
+        #    Comoving volume of the universe
+        self._grid_comvol = self.comoving_volume(zgrid).cgs.value
         return
 
     def _init_interp_grid(self, z_pnts, num_pnts):
@@ -155,6 +156,16 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         else:
             comdist = self._interp(zz, self._grid_z, self._grid_comdist, self._sort_z)
         return comdist
+
+    def scale_to_comvol(self, sf):
+        """Convert from scale-factor to comoving volume [cm^3].
+        """
+        zz = self._scale_to_z(sf)
+        if np.size(zz) == 1:
+            comvol = self.comoving_volume(zz).cgs.value
+        else:
+            comvol = self._interp(zz, self._grid_z, self._grid_comvol, self._sort_z)
+        return comvol
 
     def age_to_scale(self, age):
         """Convert from age of the universe [seconds] to scale-factor.
