@@ -20,25 +20,26 @@ Classes
 
 Functions
 ---------
-   getMergerAndSubhaloIndices           : get merger, snapshot and subhalo index numbers
-   loadMergerEnvironments               : primary API - load all subhalo environments as dict
-   main                                 : Process all merger subhalos from scratch.
+   - get_merger_and_subhalo_indices     - get merger, snapshot and subhalo index numbers
+   - loadMergerEnvironments             - primary API - load all subhalo environments as dict
+   - main                               - Process all merger subhalos from scratch.
 
-   _runMaster                           : process manages all secondary ``slave`` processes
-   _runSlave                            : secondary process loads and saves data for each subhalo
-   _collectMergerEnvironments           : merge all subhalo environment files into single dict
-   _loadSingleMergerEnv                 : load a single merger-subhalo environment and save.
-   _initStorage                         : initializes dict to store data for all subhalos
-   _parseArguments                      : parse commant line arguments
-   _mpiError                            : raise an error through MPI and exit all processes
+   - _runMaster                         - process manages all secondary ``slave`` processes
+   - _runSlave                          - secondary process loads and saves data for each subhalo
+   - _collectMergerEnvironments         - merge all subhalo environment files into single dict
+   - _loadSingleMergerEnv               - load a single merger-subhalo environment and save.
+   - _initStorage                       - initializes dict to store data for all subhalos
+   - _parseArguments                    - parse commant line arguments
+   - _mpiError                          - raise an error through MPI and exit all processes
 
-   _GET_MERGER_SUBHALO_FILENAME          : get filename for individual subhalo file
-   _GET_MISSING_LIST_FILENAME            : get filename for list of missing subhalos
-   _GET_FAILED_LIST_FILENAME             : get filename for list of failed  subhalos
-   _GET_ENVIRONMENTS_STATUS_FILENAME     : get filename for status of ``main`` execution.
-   _GET_MERGER_ENVIRONMENT_FILENAME      : get filename for dictionary of all subhalos
+   - _GET_MERGER_SUBHALO_FILENAME       - get filename for individual subhalo file
+   - _GET_MISSING_LIST_FILENAME         - get filename for list of missing subhalos
+   - _GET_FAILED_LIST_FILENAME          - get filename for list of failed  subhalos
+   - _GET_ENVIRONMENTS_STATUS_FILENAME  - get filename for status of ``main`` execution.
+   - _GET_MERGER_ENVIRONMENT_FILENAME   - get filename for dictionary of all subhalos
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
 from datetime import datetime
@@ -56,10 +57,10 @@ from zcode.constants import PC
 from illpy.Subhalos.Constants import SUBHALO
 from illpy.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
 
-import Subhalo
-import Profiler
-import ParticleHosts
-from ParticleHosts import OFFTAB
+from . import Subhalo
+from . import Profiler
+from . import ParticleHosts
+from . ParticleHosts import OFFTAB
 
 import illpy.illbh
 from illpy.illbh import BHMergers, BHConstants
@@ -142,7 +143,7 @@ def _GET_MISSING_LIST_FILENAME(run, version=_VERSION):
     return _MISSING_LIST_FILENAME % (run, version)
 
 
-_FAILED_LIST_FILENAME =  "ill%d_failed_merger-subhalos_v%.2f.txt"
+_FAILED_LIST_FILENAME = "ill%d_failed_merger-subhalos_v%.2f.txt"
 def _GET_FAILED_LIST_FILENAME(run, version=_VERSION):
     return _FAILED_LIST_FILENAME % (run, version)
 
@@ -152,46 +153,51 @@ def _GET_ENVIRONMENTS_STATUS_FILENAME(run):
     return _ENVIRONMENTS_STATUS_FILENAME % (run, _VERSION)
 
 
-def getMergerAndSubhaloIndices(run, verbose=True):
-    """
-    Get indices of mergers, snapshots and subhalos.
+def get_merger_and_subhalo_indices(run, verbose=True):
+    """Get indices of mergers, snapshots and subhalos.
 
     Arguments
     ---------
 
     Returns
     -------
-       mergSnap <int>[N]     : snapshot number for each merger
-       snapMerg <int>[135][] : list of merger indices for each snapshot
-       mergSubh <int>[N]     : subhalo index number for each merger
+    merger_snaps : array(N,) of int
+        Snapshot number for each merger.
+    snap_mergers : (135,)
+        List of merger indices for each snapshot.
+    subh_ind_out : array(N,) of int
+        Subhalo index number for each merger out BH.
 
     """
-    if verbose: print(" - - Environments.getMergerAndSubhaloIndices()")
+    if verbose: print(" - - Environments.get_merger_and_subhalo_indices()")
 
     if verbose: print(" - - - Loading Mergers")
     mergers = BHMergers.loadFixedMergers(run, verbose=verbose)
     if verbose: print(" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM]))
 
     if verbose: print(" - - - Loading BH Hosts Catalog")
-    bhHosts = ParticleHosts.loadBHHosts(run, loadsave=True, verbose=True, bar=True)
+    bhHosts = ParticleHosts.loadBHHosts(run, loadsave=True, verbose=verbose, bar=True)
 
     # Snapshot for each merger
-    mergSnap = mergers[MERGERS.MAP_MTOS]
+    merger_snaps = mergers[MERGERS.MAP_MTOS]
     # Mergers for each snapshot
-    snapMerg = mergers[MERGERS.MAP_STOM]
+    snap_mergers = mergers[MERGERS.MAP_STOM]
+    num_mergers = len(merger_snaps)
 
     # Initialize merger-subhalos array to invalid `-1`
-    mergSubh = -1*np.ones(len(mergSnap), dtype=DTYPE.INDEX)
+    subh_ind_out = -1*np.ones(num_mergers, dtype=DTYPE.INDEX)
+    subh_ind_in = -1*np.ones(num_mergers, dtype=DTYPE.INDEX)
 
     # Iterate Over Snapshots, list of mergers for each
     # ------------------------------------------------
     if verbose: print(" - - - Associating Mergers with Subhalos")
-    for snap, mergs in enumerate(snapMerg):
+    for snap, mergs in enumerate(snap_mergers):
         # Skip if no mergers
         if len(mergs) <= 0: continue
 
-        # Get the 'out' BH ID numbers for mergers in this snapshot
-        outIDs = mergers[MERGERS.IDS][mergs, BH_TYPE.OUT]
+        # Get the BH ID numbers for mergers in this snapshot
+        ids_out = mergers[MERGERS.IDS][mergs, BH_TYPE.OUT]
+        ids_in = mergers[MERGERS.IDS][mergs, BH_TYPE.IN]
         # Select BH-Hosts dict for this snapshot
         #   Individual snapshot dictionaries have string keys
         snapStr = OFFTAB.snapDictKey(snap)
@@ -212,14 +218,18 @@ def getMergerAndSubhaloIndices(run, verbose=True):
                 raise RuntimeError("Run %d, Snap %d: Bad BH_IDS" % (run, snap))
         else:
             # Find the subhalo hosts for these merger BHs
-            mergSubh[mergs] = ParticleHosts.subhalosForBHIDs(run, snap, outIDs, bhHosts=bhHostsSnap,
-                                                             verbose=False)
+            subh_ind_out[mergs] = ParticleHosts.subhalosForBHIDs(
+                run, snap, ids_out, bhHosts=bhHostsSnap, verbose=False)
+            subh_ind_in[mergs] = ParticleHosts.subhalosForBHIDs(
+                run, snap, ids_in, bhHosts=bhHostsSnap, verbose=False)
 
-    numTot = len(mergSubh)
-    numGod = np.count_nonzero(mergSubh >= 0)
-    if verbose: print(" - - - - Good %d/%d = %.4f" % (numGod, numTot, 1.0*numGod/numTot))
+    n_tot = len(subh_ind_out)
+    n_good = np.count_nonzero(subh_ind_out >= 0)
+    if verbose: print(" - - Out Good: {:5d}/{:d} = {:.4f}".format(n_good, n_tot, n_good/n_tot))
+    n_good = np.count_nonzero(subh_ind_in >= 0)
+    if verbose: print(" - - In  Good: {:5d}/{:d} = {:.4f}".format(n_good, n_tot, n_good/n_tot))
 
-    return mergSnap, snapMerg, mergSubh
+    return merger_snaps, snap_mergers, subh_ind_out, subh_ind_in
 
 
 def _runMaster(run, comm):
@@ -244,10 +254,11 @@ def _runMaster(run, comm):
 
     print(" - Initializing")
 
-    mergSnap, snapMerg, mergSubh = getMergerAndSubhaloIndices(run, verbose=True)
+    merger_snaps, snap_mergers, subh_ind_out, subh_ind_in = \
+        get_merger_and_subhalo_indices(run, verbose=True)
 
     # Get all subhalos for each snapshot (including duplicates and missing)
-    snapSubh     = [mergSubh[smrg] for smrg in snapMerg]
+    snapSubh     = [subh_ind_out[smrg] for smrg in snap_mergers]
     # Get unique subhalos for each snapshot, discard duplicates
     snapSubh_uni = [np.array(list(set(ssubh))) for ssubh in snapSubh]
     # Discard missing matches ('-1')
@@ -546,7 +557,7 @@ def _loadAndCheckEnv(fname, rads, lenTypeExp, warn=False, care=True):
         if care: stat = False
         else:
             # See if all particles of any type are unexpectedly missing
-            for ii in xrange(2):
+            for ii in range(2):
                 if lenTypesAct[ii] == 0 and lenTypeExp[ii] != 0:
                     # Set as bad
                     stat = False
@@ -610,8 +621,7 @@ def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
 
 
 def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSION):
-    """
-    Load each subhalo environment file and merge into single dictionary object.
+    """Load each subhalo environment file and merge into single dictionary object.
 
     Parameters for dictionary are given by ``ENVIRON`` class.
 
@@ -625,7 +635,6 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
     Returns
     -------
         env <dict> : dictionary of merger-subhalo environments for all mergers
-
 
     Notes
     -----
@@ -643,7 +652,6 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
         - The number of good, missing, failed, and fixed files are tracked and reported at the end
           (if ``verbose`` is `True`).
 
-
     """
 
     if verbose: print(" - - Environments._collectMergerEnvironments()")
@@ -656,11 +664,12 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
     warnFlag = (not fixFails)
 
     # Load indices for mergers, snapshots and subhalos
-    mergSnap, snapMerg, mergSubh = getMergerAndSubhaloIndices(run, verbose=verbose)
-    numMergers = len(mergSnap)
+    merger_snaps, snap_mergers, subh_ind_out, subh_ind_in = \
+        get_merger_and_subhalo_indices(run, verbose=verbose)
+    numMergers = len(merger_snaps)
 
     # Get all subhalos for each snapshot (including duplicates and missing)
-    snapSubh = [mergSubh[smrg] for smrg in snapMerg]
+    snapSubh = [subh_ind_out[smrg] for smrg in snap_mergers]
 
     # Initialize Storage
     sampleSnap = 135
@@ -684,7 +693,6 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
     pbar = zio.getProgressBar(numMergers)
 
     with open(miss_fname, 'w') as missFile, open(fail_fname, 'w') as failFile:
-
         # Write header for output files
         for outFile, outType in zip([missFile, failFile], ['missing', 'failed']):
             if verbose: print(" - - - Opened %10s file '%s'" % (outType, outFile.name))
@@ -696,7 +704,7 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
 
         # Iterate over each Snapshot
         # ==========================
-        for snap, (merg, subh) in zmath.renumerate(zip(snapMerg, snapSubh)):
+        for snap, (merg, subh) in zmath.renumerate(zip(snap_mergers, snapSubh)):
 
             # Get indices of valid subhalos
             indsSubh = np.where(subh >= 0)[0]
@@ -807,29 +815,18 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
                 # Update progessbar
                 pbar.update(count)
 
-            # } for ind_subh, merger
-
-        # } for snap, (merg, subh)
-
         pbar.finish()
         end = datetime.now()
 
-    # } with missFile, failFile
-
-
-
     if verbose:
         print(" - - - Completed after %s" % (str(end-beg)))
-        print(" - - - Total   %5d/%5d = %f" % (count,   numMergers, 1.0*count/numMergers ))
+        print(" - - - Total   %5d/%5d = %f" % (count,   numMergers, 1.0*count/numMergers))
         print(" - - - Good    %5d/%5d = %f" % (numGood, numMergers, 1.0*numGood/numMergers))
         print(" - - - Missing %5d/%5d = %f" % (numMiss, numMergers, 1.0*numMiss/numMergers))
         print(" - - - Failed  %5d/%5d = %f" % (numFail, numMergers, 1.0*numFail/numMergers))
         print(" - - - Fixed   %5d/%5d = %f" % (numFixd, numMergers, 1.0*numFixd/numMergers))
 
     return env
-
-# _collectMergerEnvironments()
-
 
 
 def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION):
@@ -868,8 +865,8 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     inds = np.where(subhalos >= 0)[0]
     sample = np.min(inds)
 
-    ## Radial Profiles for Sample Halo
-    #  ------------------------------------
+    # Radial Profiles for Sample Halo
+    # ------------------------------------
     if verbose: print(" - - - Loading Profiles for Sample: Snap %d, Subhalo %d" % (snap, sample))
     fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalos[sample], version=version)
     subh = np.load(fname)
@@ -923,9 +920,8 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     env[ENVIRON.DISP] = np.zeros(shape_all)
     env[ENVIRON.POTS] = np.zeros(shape_all)
 
-
-    ## Catalog for Sample Halo
-    #  ------------------------------------
+    # Catalog for Sample Halo
+    # ------------------------------------
     if verbose: print(" - - - Loading Catalog for Sample: Snap %d, Subhalo %d" % (snap, sample))
     gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=sample, verbose=True)
     if verbose: print(" - - - Loading Group-Cat Keys: '%s'" % (str(gcat.keys())))
@@ -938,8 +934,6 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
         env[key] = np.zeros(shape)
 
     return env
-
-# _initStorage()
 
 
 def _parseArguments():
@@ -962,22 +956,17 @@ def _parseArguments():
 
     return args
 
-# _parseArguments()
-
-
-
-### ====================================================================
+# ====================================================================
 #
 #                           EXECUTABLE SCRIPT
 #
-### ====================================================================
-
+# ====================================================================
 
 
 def main():
 
-    ## Initialize MPI Parameters
-    #  -------------------------
+    # Initialize MPI Parameters
+    # -------------------------
 
     from mpi4py import MPI
 
@@ -991,21 +980,20 @@ def main():
         NAME = sys.argv[0]
         print("\n%s\n%s\n%s" % (NAME, '='*len(NAME), str(datetime.now())))
 
-
-    ## Parse Arguments
-    #  ---------------
+    # Parse Arguments
+    # ---------------
     args    = _parseArguments()
     RUN     = args.RUN
     VERBOSE = args.verbose
-    if   args.check  : CHECK_EXISTS = True
+    if   args.check:   CHECK_EXISTS = True
     elif args.nocheck: CHECK_EXISTS = False
 
     # Create Radial Bins (in simulation units)
     radExtrema = np.array(RAD_EXTREMA)/CONV_ILL_TO_SOL.DIST.value   # [pc] ==> [ill]
     radBins = zmath.spacing(radExtrema, num=RAD_BINS)
 
-    ## Master Process
-    #  --------------
+    # Master Process
+    # --------------
     if rank == 0:
         print("RUN           = %d  " % (RUN))
         print("VERSION       = %.2f" % (_VERSION))
@@ -1024,16 +1012,14 @@ def main():
         except Exception as err:
             _mpiError(comm, err)
 
-
         # Check subhalo files to see if/what is missing
         checkSubhaloFiles(RUN, verbose=VERBOSE, version=_VERSION)
 
         end_all = datetime.now()
         print(" - - Total Duration '%s'" % (str(end_all-beg_all)))
 
-
-    ## Slave Processes
-    #  ---------------
+    # Slave Processes
+    # ---------------
     else:
 
         try:
@@ -1041,15 +1027,7 @@ def main():
         except Exception as err:
             _mpiError(comm, err)
 
-
     return
-
-# main()
-
-
-
-
-
 
 
 def _mpiError(comm, err="ERROR"):
@@ -1065,21 +1043,14 @@ def _mpiError(comm, err="ERROR"):
 
     import traceback
     rank = comm.rank
-
     print("\nERROR: rank %d\n%s\n" % (rank, str(datetime.now())))
-    print sys.exc_info()[0]
-    print err.message
-    print err.__doc__
+    print(sys.exc_info()[0])
+    print(err.message)
+    print(err.__doc__)
     print("\n")
     print(traceback.format_exc())
     print("\n\n")
-
     comm.Abort(rank)
     return
-
-# _mpiError()
-
-
-
 
 if __name__ == "__main__": main()
