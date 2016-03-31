@@ -19,8 +19,8 @@ Functions
 -   inferMergerOutMasses     - Infer 'out' BH masses at time of mergers based on available data.
 
 -   _matchMergerDetails      - Find details entries matching merger-BH ID numbers.
--   _createRemnantDetails    - 
--   _cleanErrDetails         - 
+-   _createRemnantDetails    -
+-   _cleanErrDetails         -
 -   _matchRemnantDetails     - Combine merger-details entries to obtain an entire remnant's life.
 -   _unmergedMasses          -
 -   _detailsForMergers_snapshots - Find details entries for BH IDs in a particular snapshots.
@@ -77,10 +77,10 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
         print("Log filename = ", log.filename)
 
     # 336,
-    TARGET = 336
-    if rank == 0: log.warning("Running 'allDetailsForBHLineage(run, %d, log)'" % (TARGET))
-    allDetailsForBHLineage(run, TARGET, log, reload=True)
-    return
+    # TARGET = 336
+    # if rank == 0: log.warning("Running 'allDetailsForBHLineage(run, %d, log)'" % (TARGET))
+    # allDetailsForBHLineage(run, TARGET, log, reload=True)
+    # return
 
     # Check status of files, determine what operations to perform
     create_mergerDets = False
