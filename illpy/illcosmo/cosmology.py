@@ -66,7 +66,8 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         min_scale = np.min(self.snapshot_scales)
         max_redz = self._scale_to_z(min_scale)
         z_grid_pnts = np.append(max_redz, self._Z_GRID)
-        #    Create a grid in redshift
+        
+        #    Create a grid in redshift (float64)
         zgrid = self._init_interp_grid(z_grid_pnts, interp_points)
         self._grid_z = zgrid
         self._sort_z = np.argsort(zgrid)
