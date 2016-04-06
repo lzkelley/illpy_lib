@@ -89,7 +89,7 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
         if(verbose): stop = datetime.now()
         numParts = partData['count']
         numParams = len(partData.keys())-1
-        if(verbose): 
+        if(verbose):
             print "         %8d %6s, %2d pars, after %s" % \
                 (numParts, pname, numParams, str(stop-start))
 
@@ -101,10 +101,6 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
     if(len(data) == 1): data = data[0]
 
     return data, partTypes
-
-# importSubhaloParticles()
-
-
 
 
 def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VERBOSE):
@@ -136,20 +132,23 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
     #  ------------------
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
     if(verbose): print " - - - Loading group catalog from '%s'" % (path_output)
-    gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
-    
+    try:
+        gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
+    except:
+        print("\n\nFailed at snapNum = '{}'\n\tpath = '{}'\n\tfields = '{}'".format(
+            snapNum, path_output, fields))
+        raise
+
     if(isinstance(gcat, dict)): numSubhalos = gcat['count']
     else:                         numSubhalos = len(gcat)
     if(verbose): print " - - - - Loaded %d subhalos" % (numSubhalos)
 
     # If no subhalos selected, return full catalog
     if(subhalos is None): return gcat
-    
 
     ## Extract Target Subhalos
     #  -----------------------
-
-    if(isinstance(gcat, dict)): 
+    if(isinstance(gcat, dict)):
         subcat = {}
         for key in gcat.keys():
             if(key is not 'count'): subcat[key] = gcat[key][subhalos]
