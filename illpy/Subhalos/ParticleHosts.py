@@ -2,20 +2,19 @@
 Manage table of particle offsets for associating particles with halos and subhalos.
 
 The table is in the form of a dictionary with keys given by the values of the ``OFFTAB`` class.
-The method ``loadOffsetTable()`` is the only necessary API - it deals with constructing, saving, 
+The method ``loadOffsetTable()`` is the only necessary API - it deals with constructing, saving,
 and loading the offset table.
 
 Classes
 -------
     OFFTAB : enumerator-like class for dictionary key-words
 
-
 Functions
 ---------
     # loadOffsetTable            : load offset table for target run and snapshot
     loadBHHostsSnap            : load (sub)halo host associations for blackholes in one snapshot
     loadBHHosts                : load (sub)halo host associations for blackholes in all snapshots
-    main                       : 
+    main                       :
     subhalosForBHIDs           : find subhalos for given BH IDs
 
     _GET_OFFSET_TABLE_FILENAME : filename which the offset table is saved/loaded to/from
@@ -74,10 +73,8 @@ from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
                          GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
 from Constants import SNAPSHOT
 
-import zcode.inout      as zio
+import zcode.inout as zio
 # import illustris_python as ill
-
-
 
 _VERSION = 0.5
 
@@ -129,8 +126,6 @@ def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
-
-
 
 '''
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
@@ -218,27 +213,25 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 # loadOffsetTable()
 '''
 
+
 def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, convert=None):
-    """
-    Merger individual snapshot's blackhole hosts files into a single file.
-    
+    """Merge individual snapshot's blackhole hosts files into a single file.
+
     Arguments
     ---------
-        run      <int>  : illustris simulation number {1, 3}
-        loadsave <bool> : optional, load existing save if possible
-        version  <flt>  : optional, target version number
-        verbose  <bool> : optional, 
-        bar      <bool> : optional, 
-        convert  <bool> : optional, 
+    run      <int>  : illustris simulation number {1, 3}
+    loadsave <bool> : optional, load existing save if possible
+    version  <flt>  : optional, target version number
+    verbose  <bool> : optional,
+    bar      <bool> : optional,
+    convert  <bool> : optional,
 
     Returns
     -------
-        bhHosts <dict> : table of hosts for all snapshots
+    bhHosts <dict> : table of hosts for all snapshots
 
     """
-
     if(verbose): print " - - ParticleHosts.loadBHHosts()"
-
     if(bar is None): bar = bool(verbose)
 
     ## Load Existing Save
@@ -255,11 +248,10 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
             if(verbose): print " - - - - File does not Exist, reconstructing BH Hosts"
             loadsave = False
 
-
-    ## Reconstruct Hosts Table
-    #  =======================
+    # Reconstruct Hosts Table
+    # =======================
     if(not loadsave):
-        
+
         if(verbose): print " - - - Constructing Hosts Table"
         start = datetime.now()
 
@@ -273,8 +265,8 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
         # Select the dict-keys for snapshot hosts to transfer
         hostKeys = [OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS]
 
-        ## Create dictionary
-        #  -----------------
+        # Create dictionary
+        # -----------------
         bhHosts = {}
 
         # Add metadata
@@ -283,17 +275,15 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
         bhHosts[OFFTAB.CREATED] = datetime.now().ctime()
         bhHosts[OFFTAB.FILENAME] = saveFile
 
-        ## Load All BH-Hosts Files
-        #  -----------------------
+        # Load All BH-Hosts Files
+        # -----------------------
         for snap in xrange(NUM_SNAPS):
             # Load Snapshot BH-Hosts
             hdict = loadBHHostsSnap(run, snap, loadsave=True, verbose=True, convert=convert)
             # Extract and store target data
             snapStr = OFFTAB.snapDictKey(snap)
-            bhHosts[snapStr] = { hkey : hdict[hkey] for hkey in hostKeys }
+            bhHosts[snapStr] = {hkey: hdict[hkey] for hkey in hostKeys}
             if(bar): pbar.update(snap)
-
-        # } for ii, hfile
 
         if(bar): pbar.finish()
 
@@ -303,39 +293,29 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
         stop = datetime.now()
         if(verbose): print " - - - - Done after %s" % (str(stop-start))
 
-    # } if loadsave
-
     return bhHosts
-
-# loadBHHosts()
-
-
 
 
 def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=None, convert=None):
-    """
-    Load pre-existing, or manage the creation of the particle offset table.
+    """Load pre-existing, or manage the creation of the particle offset table.
 
     Arguments
     ---------
-       run      <int>  : illustris simulation number {1, 3}
-       snap     <int>  : illustris snapshot number {1, 135}
-       loadsave <bool> : optional, load existing table
-       verbose  <bool> : optional, print verbose output
+    run      <int>  : illustris simulation number {1, 3}
+    snap     <int>  : illustris snapshot number {1, 135}
+    loadsave <bool> : optional, load existing table
+    verbose  <bool> : optional, print verbose output
 
     Returns
     -------
-       offsetTable <dict> : particle offset table, see ``ParticleHosts`` docs for more info.
+    offsetTable <dict> : particle offset table, see `ParticleHosts` docs for more info.
 
     """
-
     if(verbose): print " - - ParticleHosts.loadBHHostsSnap()"
-
     if(bar is None): bar = bool(verbose)
 
-
-    ## Load Existing Save
-    #  ==================
+    # Load Existing Save
+    # ==================
     if(loadsave):
         saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version)
 
@@ -348,9 +328,8 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             if(verbose): print " - - - - File does not Exist, reconstructing BH Hosts"
             loadsave = False
 
-
-    ## Reconstruct Hosts Table
-    #  =======================
+    # Reconstruct Hosts Table
+    # =======================
     if(not loadsave):
         if(verbose): print " - - - Constructing Offset Table"
         start = datetime.now()
@@ -359,17 +338,17 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
         saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap)
 
         offsetFile = ''
-        if(convert is not None): 
+        if(convert is not None):
             offsetFile = _GET_OFFSET_TABLE_FILENAME(run, snap, version=convert)
             if(verbose): print " - - - Trying to convert from existing '%s'" % (offsetFile)
 
-        ## Convert an Existing (Full) Offset Table into BH Hosts
-        #  -----------------------------------------------------
+        # Convert an Existing (Full) Offset Table into BH Hosts
+        # -----------------------------------------------------
         if(os.path.exists(offsetFile)):
             offsetTable = zio.npzToDict(offsetFile)
 
             bhInds  = offsetTable[OFFTAB.BH_INDICES]
-            bhIDs   = offsetTable[OFFTAB.BH_IDS]    
+            bhIDs   = offsetTable[OFFTAB.BH_IDS]
             bhHalos = offsetTable[OFFTAB.BH_HALOS]
             bhSubhs = offsetTable[OFFTAB.BH_SUBHALOS]
 
@@ -385,7 +364,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
                 bhInds, bhIDs = _constructBHIndexTable(run, snap, verbose=verbose)
             except:
                 # If this is a known bad snapshot, set values to None
-                if(snap in GET_BAD_SNAPS(run)): 
+                if(snap in GET_BAD_SNAPS(run)):
                     if(verbose): print " - - - BAD SNAPSHOT: RUN %d, Snap %d" % (run, snap)
                     bhInds  = None
                     bhIDs   = None
@@ -399,18 +378,14 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             # On success, Find BH Subhalos
             else:
                 binInds = np.digitize(bhInds, offsets[:, PARTICLE.BH]).astype(DTYPE.INDEX)-1
-                if(any(binInds < 0)): 
+                if(any(binInds < 0)):
                     raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
 
                 bhHalos = haloNums[binInds]
                 bhSubhs = subhNums[binInds]
 
-        # } os.path.exists(offsetFile)
-
-
-        ## Save To Dict
-        #  ------------
-
+        # Save To Dict
+        # ------------
         hostTable = {}
 
         # Metadata
@@ -431,39 +406,29 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
 
         stop = datetime.now()
         if(verbose): print " - - - - Done after %s" % (str(stop-start))
-    
-    # } if loadsave
-
 
     return hostTable
 
-# loadBHHostsSnap()
-
-
 
 def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
-    """
-    Find the subhalo indices for the given BH ID numbers.
+    """Find the subhalo indices for the given BH ID numbers.
 
     Arguments
     ---------
-        run     <int>    : illustris simulation number {1, 3}
-        snap    <int>    : illustris snapshot number {0, 135}
-        bhIDs   <int>[N] : target BH ID numbers
-        verbose <bool>   : optional, print verbose output
+    run     <int>    : illustris simulation number {1, 3}
+    snap    <int>    : illustris snapshot number {0, 135}
+    bhIDs   <int>[N] : target BH ID numbers
+    verbose <bool>   : optional, print verbose output
 
     Returns
     -------
-        foundSubh <int>[N] : subhalo index numbers (`-1` for invalid)
+    foundSubh <int>[N] : subhalo index numbers (`-1` for invalid)
 
     """
-
-
     if(verbose): print " - - ParticleHosts.subhalosForBHIDs()"
 
-    ## Load (Sub)Halo Offset Table
-    #  ---------------------------
-
+    # Load (Sub)Halo Offset Table
+    # ---------------------------
     if(bhHosts is None):
         if(verbose): print " - - - Loading offset table"
         bhHosts = loadBHHostsSnap(run, snap, loadsave=True, verbose=verbose)
@@ -472,14 +437,15 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     outInds = bhHosts[OFFTAB.BH_INDICES]
     outSubh = bhHosts[OFFTAB.BH_SUBHALOS]
 
-
-    ## Convert IDs to Indices
-    #  ----------------------
+    # Convert IDs to Indices
+    # ----------------------
 
     # Sort IDs for faster searching
     sortIDs = np.argsort(outIDs)
     # Find matches in sorted array
     foundSorted = np.searchsorted(outIDs, bhIDs, sorter=sortIDs)
+    #    Not found matches will be set to length of array.  These will be caught as incorrect below
+    foundSorted[foundSorted == len(sortIDs)] -= 1
     # Reverse map to find matches in original array
     found = sortIDs[foundSorted]
 
@@ -487,9 +453,8 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     foundInds = outInds[found]
     foundSubh = outSubh[found]
 
-
-    ## Check Matches
-    #  -------------
+    # Check Matches
+    # -------------
 
     # Find incorrect matches
     inds = np.where(bhIDs != foundIDs)[0]
@@ -503,16 +468,11 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
         foundInds[inds] = -1
         foundSubh[inds] = -1
 
-
     return foundSubh
-
-# subhalosForBHIDs()
-
 
 
 def _constructOffsetTable(run, snap, verbose=True, bar=None):
-    """
-    Construct offset table from halo and subhalo catalogs.
+    """Construct offset table from halo and subhalo catalogs.
 
     Each 'entry' is the first particle index number for a group of particles.  Particles are
     grouped by the halos and subhalos they belong to.  The first entry is particles in the first
@@ -582,7 +542,6 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
         # Add the number of particles in this halo
         cumHaloParts[:] += haloCat['GroupLenType'][ii, :]
 
-
         ## Iterate over each Subhalo, in halo ``ii``
         #  -----------------------------------------
         for jj in xrange(haloCat['GroupNsubs'][ii]):
@@ -605,9 +564,6 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
             offs += 1
             if(bar): pbar.update(offs)
 
-        # } for jj
-
-
         # Add Entry for particles with NO subhalo
         haloNum[offs] = ii                        # Still part of halo ``ii``
         subhNum[offs] = -1                        # `-1` means no (sub)halo
@@ -620,9 +576,6 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
         offs += 1
         if(bar): pbar.update(offs)
 
-    # } for ii
-
-
     # Add entry for particles with NO halo and NO subhalo
     haloNum[offs] = -1
     subhNum[offs] = -1
@@ -631,9 +584,6 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     if(bar): pbar.finish()
 
     return haloNum, subhNum, offsets
-
-# _constructOffsetTable()
-
 
 
 def _constructBHIndexTable(run, snap, verbose=True):
@@ -663,16 +613,9 @@ def _constructBHIndexTable(run, snap, verbose=True):
     bhIDs = ill.snapshot.loadSubset(illpath, snap, PARTICLE.BH, fields=SNAPSHOT.IDS)
     numBHs = len(bhIDs)
     if(verbose): print " - - - - BHs Loaded (%7d)" % (numBHs)
-
     # Create 'indices' of BHs
     inds = np.arange(numBHs)
-
     return inds, bhIDs
-
-# _constructBHIndexTable()
-
-
-
 
 
 def main():
@@ -715,9 +658,5 @@ def main():
             sys.stdout.flush()
 
     return
-
-# main()
-
-
 
 if(__name__ == "__main__"): main()
