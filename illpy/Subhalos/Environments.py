@@ -830,12 +830,6 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
             for key in env_out[ENVIRON.GCAT_KEYS]:
                 env_out[key][inds_out, ...] = gcat[key][...]
 
-            # In BH
-            gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=subh_in[inds_subh_in], verbose=False)
-            # Extract desired data
-            for key in env_in[ENVIRON.GCAT_KEYS]:
-                env_in[key][inds_in, ...] = gcat[key][...]
-
             # Load Each Merger-Subhalo file contents
             # --------------------------------------
             for ind_subh, merger in zip(inds_subh_out, inds_out):
@@ -926,8 +920,30 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
                 env_out[ENVIRON.STAT][merger] = 1
                 numGood += 1
 
-                # Update progessbar
-                pbar.update(count)
+            # In BH
+            try:
+                gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=subh_in[inds_subh_in],
+                                                      verbose=False)
+                # Extract desired data
+                for key in env_in[ENVIRON.GCAT_KEYS]:
+                    env_in[key][inds_in, ...] = gcat[key][...]
+
+                # Load Each Merger-Subhalo file contents
+                # --------------------------------------
+                for ind_subh, merger in zip(inds_subh_in, inds_in):
+                    subhalo = subh_in[ind_subh]
+                    # Store Subhalo number for each merger
+                    env_in[ENVIRON.SUBH][merger] = subhalo
+                    env_in[ENVIRON.SNAP][merger] = snap
+                    # Set as good merger-environment
+                    env_in[ENVIRON.STAT][merger] = 1
+
+            except:
+                warnings.warn("gcat 'env_in' import snap {} failed.  {} Mergers.".format(
+                    snap, len(merg)))
+
+            # Update progessbar
+            pbar.update(count)
 
         pbar.finish()
         end = datetime.now()
