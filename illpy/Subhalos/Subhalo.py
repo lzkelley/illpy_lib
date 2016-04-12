@@ -22,7 +22,6 @@ VERBOSE = True
 LOAD_PARTICLES = [PARTICLE.GAS, PARTICLE.DM, PARTICLE.STAR, PARTICLE.BH]
 
 
-
 def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOSE):
     """
     Import particle data for a given Subhalo from the illustris snapshot files.
@@ -59,9 +58,8 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
 
     if(verbose): print " - - Subhalos._importSubhaloParticles()"
 
-    ## Prepare Particle Types to Import
+    # Prepare Particle Types to Import
     #  --------------------------------
-
     # Set particle types to Default
     if(partTypes is None): partTypes = LOAD_PARTICLES
 
@@ -74,10 +72,8 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
     # Get snapshot file path and filename
     outputPath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
-
-    ## Load Snapshot data for target Particles
+    # Load Snapshot data for target Particles
     #  ---------------------------------------
-
     if(verbose): print " - - - Loading snapshot data"
     data = []
     if(verbose): start_all = datetime.now()
@@ -92,7 +88,6 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
         if(verbose):
             print "         %8d %6s, %2d pars, after %s" % \
                 (numParts, pname, numParams, str(stop-start))
-
 
     if(verbose): stop_all = datetime.now()
     if(verbose): print " - - - - All After %s" % (str(stop_all-start_all))
@@ -123,15 +118,15 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
 
     import illustris_python as ill
 
-    if(verbose): print " - - Subhalo.importGroupCatalogData()"
+    if verbose: print " - - Subhalo.importGroupCatalogData()"
 
     # If no group-catalog fields given, use all of them (available)
-    if(fields is None): fields = SUBHALO.PROPERTIES()
+    if fields is None: fields = SUBHALO.PROPERTIES()
 
-    ## Load Group Catalog
-    #  ------------------
+    # Load Group Catalog
+    # ------------------
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
-    if(verbose): print " - - - Loading group catalog from '%s'" % (path_output)
+    if verbose: print " - - - Loading group catalog from '%s'" % (path_output)
     try:
         gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
     except:
@@ -139,16 +134,16 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
             snapNum, path_output, fields))
         raise
 
-    if(isinstance(gcat, dict)): numSubhalos = gcat['count']
-    else:                         numSubhalos = len(gcat)
-    if(verbose): print " - - - - Loaded %d subhalos" % (numSubhalos)
+    if isinstance(gcat, dict): numSubhalos = gcat['count']
+    else:                      numSubhalos = len(gcat)
+    if verbose: print " - - - - Loaded %d subhalos" % (numSubhalos)
 
     # If no subhalos selected, return full catalog
-    if(subhalos is None): return gcat
+    if subhalos is None: return gcat
 
-    ## Extract Target Subhalos
-    #  -----------------------
-    if(isinstance(gcat, dict)):
+    # Extract Target Subhalos
+    # -----------------------
+    if isinstance(gcat, dict):
         subcat = {}
         for key in gcat.keys():
             if(key is not 'count'): subcat[key] = gcat[key][subhalos]
@@ -156,5 +151,3 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
         subcat = gcat[subhalos]
 
     return subcat
-
-# importGroupCatalogData()
