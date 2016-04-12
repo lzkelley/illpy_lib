@@ -52,7 +52,7 @@ import warnings
 
 import zcode.inout as zio
 import zcode.math as zmath
-from zcode.constants import PC
+# from zcode.constants import PC
 
 from illpy.Subhalos.Constants import SUBHALO
 from illpy.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
@@ -62,8 +62,8 @@ from . import Profiler
 from . import ParticleHosts
 from . ParticleHosts import OFFTAB
 
-import illpy.illbh
-from illpy.illbh import BHMergers, BHConstants
+# import illpy.illbh
+from illpy.illbh import BHMergers
 from illpy.illbh.BHConstants import MERGERS, BH_TYPE
 
 # Hard Settings
