@@ -27,12 +27,12 @@ NUM_RAD_BINS = 100
 
 
 
-def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS, 
+def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS,
                           mostBound=None, verbose=True):
     """
     Construct binned, radial profiles of density for each particle species.
 
-    Profiles for the velocity dispersion and gravitational potential are also constructed for 
+    Profiles for the velocity dispersion and gravitational potential are also constructed for
     all particle types together.
 
     Arguments
@@ -52,7 +52,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
        partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy.Constants.PARTICLE``)
        partNames <str>[M]   : particle type strings for each type
        numsBins  <int>[M, N] : binned number of particles for ``M`` particle types, ``N`` bins each
-       massBins  <flt>[M, N] : binned radial mass profile 
+       massBins  <flt>[M, N] : binned radial mass profile
        densBins  <flt>[M, N] : binned mass density profile
        potsBins  <flt>[N]   : binned gravitational potential energy profile for all particles
        dispBins  <flt>[N]   : binned velocity dispersion profile for all particles
@@ -77,12 +77,12 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     posRef = None
 
     # If no particle ID is given, find it
-    if(mostBound is None): 
+    if(mostBound is None):
         # Get group catalog
         mostBound = Subhalo.importGroupCatalogData(run, snapNum, subhalos=subhalo, \
                                                    fields=[SUBHALO.MOST_BOUND])
 
-    if(mostBound is None): 
+    if(mostBound is None):
         warnStr  = "Could not find mostBound particle ID Number!"
         warnStr += "Run %d, Snap %d, Subhalo %d" % (run, snapNum, subhalo)
         warnings.warn(warnStr, RuntimeWarning)
@@ -97,7 +97,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         # Skip, if no particles of this type
         if(pdat['count'] == 0): continue
         inds = np.where(pdat[SNAPSHOT.IDS] == mostBound)[0]
-        if(len(inds) == 1): 
+        if(len(inds) == 1):
             if(verbose): print " - - - Found Most Bound Particle in '%s'" % (pname)
             posRef = pdat[SNAPSHOT.POS][inds[0]]
             break
@@ -105,7 +105,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # } pdat, pname
 
     # Set warning and return ``None`` if most-bound particle is not found
-    if(posRef is None): 
+    if(posRef is None):
         warnStr = "Could not find most bound particle in snapshot! %s" % (thisStr)
         warnings.warn(warnStr, RuntimeWarning)
         return None
@@ -119,7 +119,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     ## Iterate over all particle types and their data
     #  ==============================================
-    
+
     if(verbose): print " - - - Extracting and processing particle properties"
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
@@ -134,7 +134,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
         # Skip if this particle type has no elements
         #    use empty lists so that call to ``np.concatenate`` below works (ignored)
-        if(data['count'] == 0): 
+        if(data['count'] == 0):
             mass[ii] = []
             rads[ii] = []
             pots[ii] = []
@@ -161,7 +161,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     #  ------------------
 
     # Create radial bin spacings, these are the upper-bound radii
-    if(radBins is None): 
+    if(radBins is None):
         radExtrema[0] = radExtrema[0]*0.99
         radExtrema[1] = radExtrema[1]*1.01
         radBins = zmath.spacing(radExtrema, scale='log', num=nbins)
@@ -172,13 +172,9 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     for ii in range(len(radBins)):
         if(ii == 0): binVols[ii] = np.power(radBins[ii], 3.0)
         else:          binVols[ii] = np.power(radBins[ii], 3.0) - np.power(radBins[ii-1], 3.0)
-    # } ii
 
-
-
-    ## Bin Properties for all Particle Types
-    #  -------------------------------------
-
+    # Bin Properties for all Particle Types
+    # -------------------------------------
     densBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Density
     massBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.SCALAR)    # Mass
     numsBins = np.zeros([numPartTypes, numBins], dtype=DTYPE.INDEX)    # Count of particles
@@ -202,13 +198,10 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         # Divide by volume to get density
         densBins[ii, :] = massBins[ii, :]/binVols
 
-    # } for ii, pt1
-
     if(verbose): print " - - - - Binned %s particles" % (str(np.sum(numsBins, axis=1)))
 
-
-    ## Consistency check on numbers of particles
-    #  -----------------------------------------
+    # Consistency check on numbers of particles
+    # -----------------------------------------
     #      The total number of particles ``numTot`` shouldn't necessarily be in bins.
     #      The expected number of particles ``numExp`` are those that are within the bounds of bins
 
@@ -233,9 +226,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
             warnStr += "\nRads = %s" % (str(rads[ii]))
             warnings.warn(warnStr, RuntimeWarning)
             raise RuntimeError("")
-            
-
-    # } for ii
 
     # Convert list of arrays into 1D arrays of all elements
     rads = np.concatenate(rads)
@@ -243,7 +233,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     disp = np.concatenate(disp)
 
     # Bin Grav Potentials
-    counts, aves, stds = zmath.histogram(rads, radBins, weights=pots, 
+    counts, aves, stds = zmath.histogram(rads, radBins, weights=pots,
                                          edges='right', func='ave', stdev=True)
     potsBins[:, 0] = aves
     potsBins[:, 1] = stds
@@ -258,13 +248,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     return radBins, posRef, mostBound, partTypes, partNames, \
         numsBins, massBins, densBins, potsBins, dispBins
 
-# subhaloRadialProfiles()
-
-
-
-
-
-
 
 def reflectPos(pos, center=None):
     """
@@ -272,7 +255,7 @@ def reflectPos(pos, center=None):
 
     Input positions ``pos`` MUST BE GIVEN IN illustris simulation units: [ckpc/h] !
     If a particular ``center`` point is not given, the median position is used.
-    
+
     Arguments
     ---------
         pos    <flt>[N, 3] : array of ``N`` vectors, MUST BE IN SIMULATION UNITS
@@ -301,8 +284,3 @@ def reflectPos(pos, center=None):
     fix[offsets < -HALF] += FULL
 
     return fix
-
-# reflectPos()
-
-
-

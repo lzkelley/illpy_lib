@@ -786,7 +786,7 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
 
     savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
     rdets = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
-                        mcorrected=mcorrected)
+                         mcorrected=mcorrected)
 
     return rdets
 

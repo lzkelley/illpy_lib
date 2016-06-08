@@ -15,8 +15,6 @@ import illpy
 from illpy.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
 from Constants import SUBHALO
 
-# import illustris_python as ill
-
 VERBOSE = True
 
 LOAD_PARTICLES = [PARTICLE.GAS, PARTICLE.DM, PARTICLE.STAR, PARTICLE.BH]
