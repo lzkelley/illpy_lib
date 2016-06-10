@@ -59,7 +59,7 @@ class Log(object):
         prep = " -"*usenum
         if(usenum > 0): prep += " "
 
-        if(self.verbose): print prep + arg
+        if(self.verbose): print((prep + arg))
             
         if(type(self.__log) == file):
             if(not self.__log.closed): 

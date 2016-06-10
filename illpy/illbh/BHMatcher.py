@@ -29,7 +29,7 @@ Functions
 -   _indBefAft               - Retrieve the index matching the minimum greater-than zero of input.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import os
 import logging
@@ -74,7 +74,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
     log.debug(header)
     if(rank == 0):
-        print("Log filename = ", log.filename)
+        print(("Log filename = ", log.filename))
 
     # 336,
     # TARGET = 336
@@ -311,7 +311,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
 
             # Iterate over each black-hole and processor, collect results into single arrays
             for ii, mm in enumerate(bhIDs):
-                for jj in xrange(size):
+                for jj in range(size):
                     errStr = ""
                     if tempIds[jj][ii][0] is not None:
                         foundBH[ii] = True
@@ -364,7 +364,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
                         errStr = errStr % (ii, mm, ind)
                         errStr += "\nShould be in Snaps: %s" % (inSnaps)
                         inProc = None
-                        for jj in xrange(size):
+                        for jj in range(size):
                             if aveSnap in mySnaps[jj]:
                                 inproc = jj
                                 break
@@ -376,7 +376,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
             flatSnaps = np.hstack(mySnaps)
             log.debug("Obtained %d Snapshots" % (flatSnaps.size))
             missingSnaps = []
-            for ii in xrange(NUM_SNAPS):
+            for ii in range(NUM_SNAPS):
                 if(ii not in flatSnaps):
                     missingSnaps.append(ii)
 
@@ -395,7 +395,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
         # Sort entries for each BH by scalefactor
         log.debug(" - Sorting")
         beg = datetime.now()
-        for ii in xrange(numBHs):
+        for ii in range(numBHs):
             if nums[ii] == 0: continue
             # Check ID numbers yet again
             if not np.all(ids[ii] == ids[ii][0]):
@@ -502,11 +502,11 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
     ntot = masses.size
 
     bads = np.where(np.isfinite(massBef) == False)[0]
-    print("Bads Before = ", bads)
-    print("\t", massBef[bads])
+    print(("Bads Before = ", bads))
+    print(("\t", massBef[bads]))
     bads = np.where(np.isfinite(massAft) == False)[0]
-    print("Bads After = ", bads)
-    print("\t", massAft[bads])
+    print(("Bads After = ", bads))
+    print(("\t", massAft[bads]))
 
     # Use 'before' masses
     inds = np.where(massBef > 0.0)
@@ -600,7 +600,7 @@ def _matchMergerDetails(run, log):
 
             # Iterate over each black-hole and processor, collect results into single arrays
             for ii, mm in enumerate(bhIDsUnique):
-                for jj in xrange(size):
+                for jj in range(size):
                     errStr = ""
                     if tempIds[jj][ii][0] is not None:
                         dd = tempIds[jj][ii][0]
@@ -647,7 +647,7 @@ def _matchMergerDetails(run, log):
             mySnaps = np.hstack(mySnaps)
             log.debug("Obtained %d Snapshots" % (mySnaps.size))
             missingSnaps = []
-            for ii in xrange(NUM_SNAPS):
+            for ii in range(NUM_SNAPS):
                 if(ii not in mySnaps):
                     missingSnaps.append(ii)
 
@@ -676,8 +676,8 @@ def _matchMergerDetails(run, log):
         # Sort entries for each BH by scalefactor
         log.debug(" - Sorting")
         beg = datetime.now()
-        for ii in xrange(numMergers):
-            for jj in xrange(2):
+        for ii in range(numMergers):
+            for jj in range(2):
                 if nums[ii, jj] == 0:
                     continue
                 # Check ID numbers yet again
@@ -799,7 +799,7 @@ def _cleanErrDetails(ids, scales, masses, dens, mdots, csnds, log):
     nentsEnd = np.zeros(numMergers, dtype=np.int)
     nosc = np.zeros((numMergers, OSC_ITER), dtype=np.int)
 
-    for ii in xrange(numMergers):
+    for ii in range(numMergers):
         nentsBeg[ii] = len(scales[ii])
 
         bads = np.where(np.diff(masses[ii]) < 0.0)[0]
@@ -817,7 +817,7 @@ def _cleanErrDetails(ids, scales, masses, dens, mdots, csnds, log):
     LVL = logging.INFO
     _logStats('Initial Entries', nentsBeg, log, lvl=LVL)
     _logStats('Final Entries', nentsEnd, log, lvl=LVL)
-    for jj in xrange(OSC_ITER):
+    for jj in range(OSC_ITER):
         _logStats('Nonmonotonic Entries, pass %d' % (jj), nosc[:, jj], log, lvl=LVL)
 
     return ids, scales, masses, dens, mdots, csnds
@@ -901,7 +901,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     # Iterate over all mergers
     # ------------------------
     log.debug("Matching data to remnants")
-    for ii in xrange(numMergers):
+    for ii in range(numMergers):
         # First Merger
         #    Store details after merger time for 'out' BH
         inds = np.where(d_scales[ii, BH_TYPE.OUT] > m_scales[ii])[0]
@@ -1062,7 +1062,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
     errCorr = []
     numMal = 0
     numBon = 0
-    for mind in xrange(numMergers):
+    for mind in range(numMergers):
         # Starting ID for this remnant
         bhID = mergers[MERGERS.IDS][mind, BH_TYPE.OUT]
         # scales and masses for this remnant
@@ -1309,9 +1309,9 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
                     try:
                         scales[ii] = tempScales
                     except:
-                        print(np.shape(scales[ii]))
-                        print(scales[ii])
-                        print(np.shape(tempScales))
+                        print((np.shape(scales[ii])))
+                        print((scales[ii]))
+                        print((np.shape(tempScales)))
                         zio.mpiError(comm)
 
                     masses[ii] = tempMasses
@@ -1379,7 +1379,7 @@ def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log, **kwa
 
     # Add any additional parameters
     #    Make sure all values are arrays
-    for key, val in kwargs.items():
+    for key, val in list(kwargs.items()):
         kwargs[key] = np.asarray(val)
     data.update(kwargs)
 

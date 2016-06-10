@@ -13,19 +13,17 @@ Functions
 -   _getPastIDs               - Get all BH IDs in past-mergers of this BHTree.
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import warnings
 import numpy as np
 from datetime import datetime
 
-from ..Constants import DTYPE
-# from .. import Cosmology
-import illpy.illcosmo
-import BHConstants
-from BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
-import BHMergers
-import BuildTree
+from .. Constants import DTYPE
+from . import BHConstants
+from . BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
+from . import BHMergers
 
 import zcode.inout as zio
 from zcode.constants import MYR
@@ -49,17 +47,17 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
 
     """
 
-    if(verbose): print " - - BHTree.loadTree()"
+    if(verbose): print(" - - BHTree.loadTree()")
 
     fname = BHConstants.GET_BLACKHOLE_TREE_FILENAME(run, VERSION)
 
     # Reload existing BH Merger Tree
     # ------------------------------
     if loadsave:
-        if verbose: print " - - - Loading save file '%s'" % (fname)
+        if verbose: print(" - - - Loading save file '%s'" % (fname))
         if os.path.exists(fname):
             tree = zio.npzToDict(fname)
-            if(verbose): print " - - - - Tree loaded"
+            if(verbose): print(" - - - - Tree loaded")
         else:
             loadsave = False
             warnStr = "File '%s' does not exist!" % (fname)
@@ -68,14 +66,14 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
     # Recreate BH Merger Tree
     # -----------------------
     if not loadsave:
-        if verbose: print " - - - Reconstructing BH Merger Tree"
+        if verbose: print(" - - - Reconstructing BH Merger Tree")
         # Load Mergers if needed
         if mergers is None:
             mergers = BHMergers.loadFixedMergers(run)
-            if(verbose): print " - - - - Loaded %d mergers" % (mergers[MERGERS.NUM])
+            if(verbose): print(" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM]))
 
         # Construct Tree
-        if verbose: print " - - - - Constructing Tree"
+        if verbose: print(" - - - - Constructing Tree")
         tree = _constructBHTree(run, mergers, verbose=verbose)
 
         # Analyze Tree Data, store meta-data to tree dictionary
@@ -101,7 +99,7 @@ def analyzeTree(tree, verbose=True):
 
     """
 
-    if verbose: print " - - BHTree.analyzeTree()"
+    if verbose: print(" - - BHTree.analyzeTree()")
 
     last         = tree[BH_TREE.LAST]
     next         = tree[BH_TREE.NEXT]
@@ -115,7 +113,7 @@ def analyzeTree(tree, verbose=True):
     numPast      = np.zeros(numMergers, dtype=int)
     numFuture    = np.zeros(numMergers, dtype=int)
 
-    if verbose: print " - - - %d Mergers" % (numMergers)
+    if verbose: print(" - - - %d Mergers" % (numMergers))
 
     # Find number of unique merger BHs (i.e. no previous mergers)
     inds = np.where((last[:, BH_TYPE.IN] < 0) & (last[:, BH_TYPE.OUT] < 0) & (next[:] < 0))
@@ -125,10 +123,10 @@ def analyzeTree(tree, verbose=True):
     numOneIsolated = len(inds[0])
 
     if verbose:
-        print " - - - Mergers with neither  BH previously merged = %d" % (numTwoIsolated)
-        print " - - - Mergers with only one BH previously merged = %d" % (numOneIsolated)
+        print(" - - - Mergers with neither  BH previously merged = %d" % (numTwoIsolated))
+        print(" - - - Mergers with only one BH previously merged = %d" % (numOneIsolated))
 
-    for ii in xrange(numMergers):
+    for ii in range(numMergers):
         # Count Forward from First Mergers ##
         #    If this is a first merger
         if all(last[ii, :] < 0):
@@ -164,11 +162,11 @@ def analyzeTree(tree, verbose=True):
     numZeroInts = len(inds)
 
     if verbose:
-        print " - - - Repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats)
-        print " - - - Average number past, future  =  %.3f, %.3f" % (avePast, aveFuture)
-        print " - - - Number of merger intervals    = %d" % (numInts)
-        print " - - - - Time between = %.4e +- %.4e [Myr]" % (timeStats[0]/MYR, timeStats[1]/MYR)
-        print " - - - Number of zero time intervals = %d" % (numZeroInts)
+        print(" - - - Repeated mergers = %d/%d = %.4f" % (numRepeats, numMergers, fracRepeats))
+        print(" - - - Average number past, future  =  %.3f, %.3f" % (avePast, aveFuture))
+        print(" - - - Number of merger intervals    = %d" % (numInts))
+        print(" - - - - Time between = %.4e +- %.4e [Myr]" % (timeStats[0]/MYR, timeStats[1]/MYR))
+        print(" - - - Number of zero time intervals = %d" % (numZeroInts))
 
     timeBetween = timeNext[indsInt]
 
@@ -235,11 +233,12 @@ def _constructBHTree(run, mergers, verbose=True):
         tree : <dict>  container for tree data - see BHTree doc
 
     """
+    from . import BuildTree
+    import illpy.illcosmo
 
-    if verbose: print " - - BHTree.constructBHTree()"
+    if verbose: print(" - - BHTree.constructBHTree()")
 
     # cosmo = Cosmology()
-    import illpy.illcosmo
     cosmo = illpy.illcosmo.cosmology.Cosmology()
 
     numMergers = mergers[MERGERS.NUM]
@@ -253,18 +252,18 @@ def _constructBHTree(run, mergers, verbose=True):
     times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
 
     # Construct Merger Tree from node IDs
-    if verbose: print " - - - Building BH Merger Tree"
+    if verbose: print(" - - - Building BH Merger Tree")
     start = datetime.now()
     mids = mergers[MERGERS.IDS]
     BuildTree.buildTree(mids, times, last, next, lastTime, nextTime)
     stop = datetime.now()
-    if verbose: print " - - - - Built after %s" % (str(stop-start))
+    if verbose: print(" - - - - Built after %s" % (str(stop-start)))
 
     inds = np.where(last < 0)[0]
-    if verbose: print " - - - %d Missing 'last'" % (len(inds))
+    if verbose: print(" - - - %d Missing 'last'" % (len(inds)))
 
     inds = np.where(next < 0)[0]
-    if verbose: print " - - - %d Missing 'next'" % (len(inds))
+    if verbose: print(" - - - %d Missing 'next'" % (len(inds)))
 
     # Create dictionary to store data
     tree = {BH_TREE.LAST: last,

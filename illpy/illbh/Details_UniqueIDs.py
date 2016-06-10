@@ -21,7 +21,7 @@ Functions
 -   _checkLog            - Create a default logging object if one is not given.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import os
 import numpy as np
@@ -75,7 +75,7 @@ class Settings:
 
         # Move parameters from dictionary to attributes
         if kwargs:
-            for key, item in kwargs.items():
+            for key, item in list(kwargs.items()):
                 setattr(self, key, item)
 
         return
@@ -123,7 +123,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
         log = BHConstants._loadLogger(
             __file__, debug=True, verbose=True, run=run, rank=rank, version=__version__)
         if(rank == 0):
-            print("Log filename = ", log.filename)
+            print(("Log filename = ", log.filename))
     log.debug("loadUniqueIDs()")
 
     fname = GET_DETAILS_UNIQUE_IDS_FILENAME(run, snap, __version__)
@@ -275,7 +275,7 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
     if np.isscalar(snaps):
         old = snaps
         snaps = n_old * [None]
-        for ii in xrange(n_old):
+        for ii in range(n_old):
             snaps[ii] = [old]
 
     oo = 0
@@ -303,11 +303,11 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
             n_old += 1
 
     if old_ids.dtype.type is not np.uint64:
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
+        print(("types = ", old_ids.dtype.type, new_ids.dtype.type))
         raise RuntimeError("old_ids at snap = %d is non-integral!" % (new_snap))
 
     if new_ids.dtype.type is not np.uint64:
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
+        print(("types = ", old_ids.dtype.type, new_ids.dtype.type))
         raise RuntimeError("new_ids at snap = %d is non-integral!" % (new_snap))
 
     # Make sure things seem right
@@ -316,7 +316,7 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
     n_test = test_ids.size
     if len(old_ids) != n_test or n_test != len(old_scales) or n_test != len(snaps):
         dups = Counter(old_ids) - Counter(test_ids)
-        print("Duplicates = %s" % (str(dups.keys())))
+        print(("Duplicates = %s" % (str(list(dups.keys())))))
         errStr = "ERROR: num unique should be %d" % (n_test)
         errStr += "\nBut len(old_ids) = %d" % (len(old_ids))
         errStr += "\nBut len(old_scales) = %d" % (len(old_scales))
@@ -365,7 +365,7 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
         DETAILS.NUM: uids.size,
         }
 
-    for key, val in data.items():
+    for key, val in list(data.items()):
         data[key] = np.asarray(val)
 
     zio.dictToNPZ(data, fname, verbose=False, log=log)
@@ -379,7 +379,7 @@ def _mergeAllUnique(run, log):
     first = True
     newDets = None
     oldDets = None
-    for ii in xrange(NUM_SNAPS):
+    for ii in range(NUM_SNAPS):
         newDets = loadUniqueIDs(run, ii, None, log=log)
         if oldDets is not None:
             if first:
@@ -412,7 +412,7 @@ def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
         header = "\n%s\n%s\n%s" % (__file__, '='*len(__file__), str(datetime.now()))
         log.debug(header)
     if not rank:
-        print("Log filename = ", log.filename)
+        print(("Log filename = ", log.filename))
 
     return log
 

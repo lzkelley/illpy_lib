@@ -20,7 +20,7 @@ Functions
 -   _loadLogger     - Initialize a ``logging.Logger`` object for output messages.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import os
 import logging
@@ -392,7 +392,7 @@ def _checkLoadSave(fname, loadsave, log):
             log.debug(logStr)
             try:
                 data = zio.npzToDict(fname)
-            except Exception, e:
+            except Exception as e:
                 log.warning(" - Load Failed: %s." % (str(e)))
             else:
                 log.debug(" - Loaded data.")

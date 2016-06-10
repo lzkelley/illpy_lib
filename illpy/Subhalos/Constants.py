@@ -1,3 +1,7 @@
+"""
+"""
+import collections
+
 
 
 class SNAPSHOT():
@@ -86,4 +90,4 @@ class SUBHALO():
     @staticmethod
     def PROPERTIES():
         return [getattr(SUBHALO, it) for it in vars(SUBHALO)
-                if not it.startswith('_') and not callable(getattr(SUBHALO, it))]
+                if not it.startswith('_') and not isinstance(getattr(SUBHALO, it), collections.Callable)]

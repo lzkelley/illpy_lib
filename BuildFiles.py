@@ -21,7 +21,7 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = cosmo.lumDist(0.8)/cosmo.lumDist(0.5)                                                  # Test interpolation
 
     except Exception as ex:
-        print "ERROR: could not calculate Cosmology test values!"
+        print("ERROR: could not calculate Cosmology test values!")
         raise ex
 
 
@@ -31,7 +31,7 @@ def main(run=RUN, verbose=VERBOSE):
         if(tval <= 0.0 or tval >= 1.0):
             raise RuntimeError("ERROR: illpy.illcosmo.Cosmology - Test %d" % ii)
 
-    print "\n\nCosmology looks good.\n"
+    print("\n\nCosmology looks good.\n")
 
 
 
@@ -49,7 +49,7 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = np.average(dets[BHDetails.DETAIL_TIMES])
 
     except Exception as ex:
-        print "ERROR: could not calculate BHDetails test values!"
+        print("ERROR: could not calculate BHDetails test values!")
         raise ex
 
 
@@ -63,7 +63,7 @@ def main(run=RUN, verbose=VERBOSE):
         raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 3 = %f!" % t3)
 
 
-    print "\n\nBHDetails looks good.\n"
+    print("\n\nBHDetails looks good.\n")
 
 
     ### BHMERGERS ###
@@ -79,7 +79,7 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = np.average(dets[BHMergers.MERGERS_TIMES])
 
     except Exception as ex:
-        print "ERROR: could not calculate BHMergers test values!"
+        print("ERROR: could not calculate BHMergers test values!")
         raise ex
 
 
@@ -89,7 +89,7 @@ def main(run=RUN, verbose=VERBOSE):
             raise RuntimeError("ERROR: illpy.illbh.BHMergers - Test %d" % ii)
 
 
-    print "\n\nBHMergers looks good.\n"
+    print("\n\nBHMergers looks good.\n")
 
     return
 

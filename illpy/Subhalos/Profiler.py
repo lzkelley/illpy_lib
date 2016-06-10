@@ -7,6 +7,7 @@ Functions
 
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import warnings
 from datetime import datetime
@@ -15,16 +16,14 @@ import numpy as np
 
 from illpy.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
 
-import Subhalo
-import Constants
-from Constants import SNAPSHOT, SUBHALO
+from . import Subhalo
+from . import Constants
+from . Constants import SNAPSHOT, SUBHALO
 
 import zcode.math     as zmath
 import zcode.inout    as zio
 
-
 NUM_RAD_BINS = 100
-
 
 
 def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS,
@@ -60,9 +59,9 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     """
 
 
-    if(verbose): print " - - Profiler.subhaloRadialProfiles()"
+    if(verbose): print(" - - Profiler.subhaloRadialProfiles()")
 
-    if(verbose): print " - - - Loading subhalo partile data"
+    if(verbose): print(" - - - Loading subhalo partile data")
     # Redirect output during this call
     with zio.StreamCapture() as strCap:
         partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
@@ -90,7 +89,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
 
     thisStr = "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
-    if(verbose): print " - - - - %s : Loaded %s particles" % (thisStr, str(partNums))
+    if(verbose): print(" - - - - %s : Loaded %s particles" % (thisStr, str(partNums)))
 
     # Find the most-bound particle, store its position
     for pdat, pname in zip(partData, partNames):
@@ -98,7 +97,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         if(pdat['count'] == 0): continue
         inds = np.where(pdat[SNAPSHOT.IDS] == mostBound)[0]
         if(len(inds) == 1):
-            if(verbose): print " - - - Found Most Bound Particle in '%s'" % (pname)
+            if(verbose): print(" - - - Found Most Bound Particle in '%s'" % (pname))
             posRef = pdat[SNAPSHOT.POS][inds[0]]
             break
 
@@ -120,7 +119,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     ## Iterate over all particle types and their data
     #  ==============================================
 
-    if(verbose): print " - - - Extracting and processing particle properties"
+    if(verbose): print(" - - - Extracting and processing particle properties")
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
         # Make sure the expected number of particles are found
@@ -184,7 +183,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     dispBins = np.zeros([numBins, 2], dtype=DTYPE.SCALAR)               # Velocity dispersion
 
     # Iterate over particle types
-    if(verbose): print " - - - Binning properties by radii"
+    if(verbose): print(" - - - Binning properties by radii")
     for ii, (data, ptype) in enumerate(zip(partData, partTypes)):
 
         # Skip if this particle type has no elements
@@ -198,14 +197,14 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         # Divide by volume to get density
         densBins[ii, :] = massBins[ii, :]/binVols
 
-    if(verbose): print " - - - - Binned %s particles" % (str(np.sum(numsBins, axis=1)))
+    if(verbose): print(" - - - - Binned %s particles" % (str(np.sum(numsBins, axis=1))))
 
     # Consistency check on numbers of particles
     # -----------------------------------------
     #      The total number of particles ``numTot`` shouldn't necessarily be in bins.
     #      The expected number of particles ``numExp`` are those that are within the bounds of bins
 
-    for ii in xrange(numPartTypes):
+    for ii in range(numPartTypes):
 
         numExp = np.size(np.where(rads[ii] <= radBins[-1])[0])
         numAct = np.sum(numsBins[ii])

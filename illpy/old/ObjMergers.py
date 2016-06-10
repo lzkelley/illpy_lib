@@ -12,7 +12,7 @@
 import numpy as np
 from glob import glob
 from datetime import datetime
-import cPickle as pickle
+import pickle as pickle
 from Constants import *
 
 import AuxFuncs as aux
@@ -227,7 +227,7 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
         # Try to load save-file
         try: mergers = loadMergersFromSave(loadFile)
         # Fall back to loading mergers from merger-files
-        except Exception, err:
+        except Exception as err:
             if(log): log.log("FAILED '%s'" % err.message, 3)
             load = False
 

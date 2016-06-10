@@ -1,5 +1,7 @@
 """Illustris simulation data manipulation routines and submodules.
 """
-import Constants
-import illcosmo  # illcosmo.Cosmology import Cosmology
-import Subhalos
+
+
+from . import Constants
+from . import illcosmo
+from . import Subhalos
