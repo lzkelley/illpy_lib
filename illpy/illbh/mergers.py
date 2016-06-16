@@ -89,31 +89,24 @@ from datetime import datetime
 import numpy as np
 import h5py
 
-# from illpy.illbh import BHDetails
-# import illpy.illbh.BHConstants
-# from illpy.illbh.BHConstants import MERGERS, \
-#     GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
-
-from . bhconstants import DTYPE, GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_FILENAME
+from constants import DTYPE, GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_FILENAME, \
+    MERGERS
 
 import zcode.inout as zio
 
-__version__ = '1.0'
+__version__ = '1.0.1'
 
-VERSION_MAP = 0.21
-VERSION_FIX = 0.31
+# VERSION_MAP = 0.21
+# VERSION_FIX = 0.31
 
 
-def processMergers(run, output_dir, input_dir, verbose=True):
-
-    if verbose: print(" - - BHMergers.processMergers")
-
+def main(run=1, output_dir=None, verbose=True, ):
     # Load Mapped Mergers ###
     # re-creates them if needed
-    mergersMapped = loadMappedMergers(run, verbose=verbose)
+    # mergersMapped = loadMappedMergers(run, verbose=verbose)
 
     # Load Fixed Mergers ###
-    mergersFixed = loadFixedMergers(run, verbose=verbose)
+    # mergersFixed = loadFixedMergers(run, verbose=verbose)
 
     return
 
@@ -179,6 +172,7 @@ def process_raw_mergers(run, verbose=True, recombine=False):
     if verbose: print(" - Mergers: {}, Unique BH: {}".format(inds.size, all_ids.size))
 
     # Build merger tree
+    '''
     mnext = -1*np.ones(num_lines, dtype=int)
     mprev_in = -1*np.ones(num_lines, dtype=int)
     mprev_out = -1*np.ones(num_lines, dtype=int)
@@ -219,10 +213,11 @@ def process_raw_mergers(run, verbose=True, recombine=False):
                 raise ValueError("`this` = {}, `next_out` = {}, mprev_out = `{}`".format(
                     this, next_out, mprev_out[this]))
             mprev_out[next_out] = this
+    '''
 
     # Write Raw data to hdf5 file
     hdf5_fname = GET_MERGERS_RAW_FILENAME(run, type='hdf5')
-    if verbose: print("Saving merger data to '{}'".foramt(hdf5_fname))
+    if verbose: print("Saving merger data to '{}'".format(hdf5_fname))
     with h5py.File(hdf5_fname, 'w') as h5file:
         # Add metadata in "Header" dataset
         head = h5file.create_group('Header')
@@ -230,7 +225,6 @@ def process_raw_mergers(run, verbose=True, recombine=False):
         head.attrs['script_version'] = str(__version__)
         head.attrs['created'] = str(datetime.now().ctime())
         head.attrs['simulation'] = 'Illustris-{}'.format(run)
-        head.attrs['unique_ids'] = all_ids
         head.attrs['description'] = (
             "Illustris blackhole merger data, combined from all of the "
             "individual blackhole (BH) merger text files.  The content of the "
@@ -240,24 +234,28 @@ def process_raw_mergers(run, verbose=True, recombine=False):
             "given correspond to the total cell (dynamical) mass, instead of the BH "
             "mass itself."
         )
+        head['unique_ids'] = all_ids
 
         # Add merger data
-        time_dset = h5file.create_dataset('time', data=scales)
+        time_dset = h5file.create_dataset(MERGERS.SCALE, data=scales)
         time_dset.attrs['units'] = 'Cosmological scale factor'
-        h5file.create_dataset('id_in', data=id_in)
-        h5file.create_dataset('id_out', data=id_out)
-        h5file.create_dataset('mass_in', data=mass_in)
-        h5file.create_dataset('mass_out', data=mass_out)
+        h5file.create_dataset(MERGERS.ID_IN, data=id_in)
+        h5file.create_dataset(MERGERS.ID_OUT, data=id_out)
+        h5file.create_dataset(MERGERS.MASS_IN, data=mass_in)
+        h5file.create_dataset(MERGERS.MASS_OUT, data=mass_out)
+
+        '''
         # Merger tree data
-        h5file.create_dataset('next', data=mnext)
-        h5file.create_dataset('prev_in', data=mprev_in)
-        h5file.create_dataset('prev_out', data=mprev_out)
+        h5file.create_dataset(MERGERS.NEXT, data=mnext)
+        h5file.create_dataset(MERGERS.PREV_IN, data=mprev_in)
+        h5file.create_dataset(MERGERS.PREV_OUT, data=mprev_out)
+        '''
 
     if verbose:
         fsize = os.path.getsize(hdf5_fname)/1024/1024
         print(" - Saved to '{}', Size: '{}' MB".format(hdf5_fname, fsize))
 
-    return scales, id_in, id_out, mass_in, mass_out, hdf5_fname
+    return  # scales, id_in, id_out, mass_in, mass_out, hdf5_fname
 
 
 def loadMappedMergers(run, verbose=True, loadsave=True):
