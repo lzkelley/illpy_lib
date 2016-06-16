@@ -1,5 +1,6 @@
 """
 """
+from collections import namedtuple
 from glob import glob
 import numpy as np
 import os
@@ -71,13 +72,14 @@ _SNAPSHOT_COSMOLOGY_DATA_FILENAME = "illustris-snapshot-cosmology-data.npz"
 _OUTPUT_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/"
 _OUTPUT_DETAILS_DIR = os.path.join(_OUTPUT_DIR, "blackholes/details/")
 _OUTPUT_DETAILS_ORGANIZED_DIR = os.path.join(_OUTPUT_DETAILS_DIR, "organized")
-_OUTPUT_DETAILS_ORGANIZED_FILENAME = "ill-%d_blackhole_details_temp_snap-%d"
+_OUTPUT_DETAILS_ORGANIZED_FILENAME = "ill-%d_blackhole_details_snap-%03d"
 _OUTPUT_DETAILS_FILENAME = "ill-%d_blackhole_details.hdf5"
 
 _OUTPUT_MERGERS_DIR = os.path.join(_OUTPUT_DIR, "blackholes/mergers/")
 
 _OUTPUT_MERGERS_RAW_FILENAME = "ill-%d_blackhole_mergers_raw"
 _OUTPUT_MERGERS_RAW_FILENAME_INTERMEDIATE = "ill-%d_blackhole_mergers_raw.txt"
+_OUTPUT_MERGERS_DETAILS_FILENAME = "ill-%d_blackhole_merger_details.hdf5"
 
 
 class DTYPE:
@@ -98,6 +100,23 @@ class DETAILS:
     RHO    = 'rho'
     CS     = 'cs'
 
+    UNIQUE_IDS = 'unique/id'
+    UNIQUE_FIRST = 'unique/first_index'
+    UNIQUE_NUM_PER = 'unique/num_entries'
+
+
+class MERGERS:
+    SCALE = 'time'
+    ID_IN = 'id_in'
+    ID_OUT = 'id_out'
+    MASS_IN = 'mass_in'
+    MASS_OUT = 'mass_out'
+
+    NEXT = 'next'
+    PREV_IN = 'prev_in'
+    PREV_OUT = 'prev_out'
+
+    UNIQUE = 'Header/unique_ids'
 
 def _all_exist(files):
     retval = all([os.path.exists(fil) for fil in files])
@@ -126,6 +145,19 @@ def GET_DETAILS_ORGANIZED_FILENAME(run, snap, type='txt'):
     return fname
 
 
+def GET_OUTPUT_DETAILS_FILENAME(run):
+    """
+    /n/home00/lkelley/ghernquistfs1/illustris/data/%s/blackhole/details/organized/
+        ill-%d_blackhole_details_temp_snap-%d.%s
+    """
+    use_dir = _OUTPUT_DETAILS_ORGANIZED_DIR % (_ILLUSTRIS_RUN_NAMES[run])
+    use_fname = _OUTPUT_DETAILS_FILENAME % (run)
+    fname = os.path.join(use_dir, use_fname)
+    return fname
+
+
+
+
 def GET_MERGERS_RAW_FILENAME(run, type='txt'):
     """
     /n/home00/lkelley/ghernquistfs1/illustris/data/%s/blackhole/details/organized/
@@ -136,6 +168,14 @@ def GET_MERGERS_RAW_FILENAME(run, type='txt'):
     fname = os.path.join(use_dir, use_fname)
     return fname
 
+
+def GET_MERGERS_DETAILS_FILENAME(run):
+    """
+    """
+    use_dir = _OUTPUT_MERGERS_DIR % (_ILLUSTRIS_RUN_NAMES[run])
+    use_fname = _OUTPUT_MERGERS_DETAILS_FILENAME % (run)
+    fname = os.path.join(use_dir, use_fname)
+    return fname
 
 
 def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run):
@@ -175,7 +215,7 @@ def GET_SUBBOX_TIMES(run):
     if not os.path.isfile(times_fname):
         raise ValueError("Subbox times file '{}' does not exist.".format(times_fname))
 
-    times = np.zeros(1e4)
+    times = np.zeros(int(4e4))
     count = 0
     for line in open(times_fname, 'r'):
         num, scale = line.split(" ")
