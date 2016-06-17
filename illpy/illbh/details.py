@@ -364,7 +364,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
     count = 0
     match_count = {val: 0 for val in _MTYPE._VALS()}
     # for snap in range(NUM_SNAPS):
-    for snap in range(130, 132):
+    for snap in range(128, 134):
         with h5py.File(fnames_hdf5[snap], 'r') as h5file_in:
             s_num_entries = h5file_in['Header'].attrs['num_entries']
             # If there are no details in this snapshot, skip
@@ -452,12 +452,13 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
                 # Select only unique entries
                 src = np.unique(src)
                 # If this is the first time seeing the BH, make sure first entry is stored
-                if src[0] != lo and num_det_ids > 0:
-                    if det_ids[np.searchsorted(det_ids, qid).clip(max=num_det_ids-1)] != qid:
+                if src[0] != lo:
+                    if ((num_det_ids == 0 or
+                         det_ids[np.searchsorted(det_ids, qid).clip(max=num_det_ids-1)] != qid)):
                         src = np.append(lo, src)
                 # If this BH not in the next snapshot (or this is last snap), store last entry
                 if src[-1] != hi-1:
-                    if (next_q_ids is None or
+                    if (next_q_ids is None or len(det_ids) == 0 or
                         det_ids[np.searchsorted(next_q_ids, qid).clip(
                             max=num_det_ids-1)] != qid):
                         src = np.append(src, hi-1)
@@ -491,6 +492,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
 
     # Process Details Data
     # --------------------
+    if verbose: print("\nDetails")
     beg = datetime.now()
     num_cut = np.count_nonzero(scale)
     if count != num_cut:
@@ -522,7 +524,8 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
     if os.path.exists(dets_fname):
         backup_fname = dets_fname + '.bak'
         shutil.move(dets_fname, backup_fname)
-        warnings.warn("Moved existing file: '{}' ==> '{}'".format(dets_fname, backup_fname))
+        warnings.warn("Moved existing file:\n\tfrom: '{}'\n\tto: '{}'".format(
+            dets_fname, backup_fname))
 
     with h5py.File(dets_fname, 'w') as dets_h5file:
         # Create Header with meta/summary data
@@ -562,12 +565,13 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
         dets_h5file.create_dataset(DETAILS.CS, data=cs)
 
     if verbose:
-        det_fsize = os.path.getsize(dets_fname)
+        det_fsize = os.path.getsize(dets_fname)/1024/1024
         print(" - Saved {} entries for {} unique BH after {}, filesize = {:.3e} MB".format(
             num_cut, num_uniq, datetime.now()-beg, det_fsize))
 
     # Process Merger-Details Data
     # ---------------------------
+    if verbose: print("\nMerger-Details")
     beg = datetime.now()
     # Wrap this in a try so it doesn't break everything... just in case
     try:
@@ -583,7 +587,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
             # Count the nonzero elements in each column (i.e. each merger)
             num_found = np.apply_along_axis(np.count_nonzero, 1, md_scale)
             print(" - Matches:")
-            for ii in range(3):
+            for ii in range(4):
                 numf = np.sum(num_found == ii)
                 print(" - - {}: {}/{} = {:.4f}".format(
                     ii, numf, num_mergers, numf/num_mergers))
@@ -594,7 +598,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
     num_mdet_ids = 0
     try:
         all_merger_ids = set(m_ids_in).union(m_ids_out)
-        all_mdet_ids = set(md_id[:, 0]).union(md_id[:, 1]).union(md_id[:, 2])
+        all_mdet_ids = set(md_id[:, 0]).union(md_id[:, 1]).union(md_id[:, 2]) - 0
         num_merger_ids = len(all_merger_ids)
         num_mdet_ids = len(all_mdet_ids)
         extra_ids = all_mdet_ids - all_merger_ids
@@ -616,7 +620,8 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
     if os.path.exists(mdet_fname):
         backup_fname = mdet_fname + '.bak'
         shutil.move(mdet_fname, backup_fname)
-        warnings.warn("Moved existing file: '{}' ==> '{}'".format(mdet_fname, backup_fname))
+        warnings.warn("Moved existing file:\n\tfrom: '{}'\n\tto: '{}'".format(
+            mdet_fname, backup_fname))
 
     with h5py.File(mdet_fname, 'w') as mdet_h5file:
         # Create Header with meta/summary data
@@ -644,16 +649,16 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
         )
 
         # Details entries
-        time_dset = mdet_h5file.create_dataset(DETAILS.SCALE, data=scale)
-        time_dset.attrs['desc'] = 'Cosmological scale factor'
         mdet_h5file.create_dataset(DETAILS.ID, data=md_id)
+        time_dset = mdet_h5file.create_dataset(DETAILS.SCALE, data=md_scale)
+        time_dset.attrs['desc'] = 'Cosmological scale factor'
         mdet_h5file.create_dataset(DETAILS.MASS, data=md_mass)
         mdet_h5file.create_dataset(DETAILS.MDOT, data=md_mdot)
         mdet_h5file.create_dataset(DETAILS.RHO, data=md_rho)
         mdet_h5file.create_dataset(DETAILS.CS, data=md_cs)
 
     if verbose:
-        mdet_fsize = os.path.getsize(dets_fname)
+        mdet_fsize = os.path.getsize(mdet_fname)/1024/1024
         print(" - Saved {} entries for {} unique BH after {}, filesize = {:.3e} MB".format(
             tot_num_found, num_mdet_ids, datetime.now()-beg, mdet_fsize))
 

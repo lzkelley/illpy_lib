@@ -118,6 +118,7 @@ class MERGERS:
 
     UNIQUE = 'Header/unique_ids'
 
+
 def _all_exist(files):
     retval = all([os.path.exists(fil) for fil in files])
     return retval
