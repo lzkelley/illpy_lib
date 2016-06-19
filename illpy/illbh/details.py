@@ -42,7 +42,7 @@ import h5py
 import os
 import numpy as np
 import shutil
-import sys
+# import sys
 import warnings
 
 # import zcode.inout as zio
@@ -187,7 +187,7 @@ def organize_txt_by_snapshot(run, verbose=True, clean_overwrites=True):
         raw_scales = []   # Stores the scale-factor of each entry (each line)
         last_scale = 0.0  # Stores the previous scale-factor (time)
         # Load all lines and entry scale-factors from raw details file
-        for dline in open(raw_fn):
+        for dline in open(raw_fn, 'r'):
             # Extract scale-factor from line
             det_scale = DTYPE.SCALAR(dline.split()[1])
 
@@ -197,14 +197,12 @@ def organize_txt_by_snapshot(run, verbose=True, clean_overwrites=True):
             if clean_overwrites and det_scale < last_scale:
                 # Find the beginning of the overlap
                 time_mask = (det_scale < raw_scales) | np.isclose(raw_scales, det_scale)
-                # ids_mask = (det_id == raw_ids)
-                # bads = np.where(time_mask & ids_mask)[0]
                 bads = np.where(time_mask)[0]
                 if bads.size:
+                    # Reverse through so that subsequent indices are still correct
                     for idx in reversed(bads):
                         del raw_lines[idx]
                         del raw_scales[idx]
-                        # del raw_ids[idx]
                     num_deleted += bads.size
 
             # Store each line and scale-factor
