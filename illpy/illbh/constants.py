@@ -1,9 +1,10 @@
 """
 """
-from collections import namedtuple
+# from collections import namedtuple
 from glob import glob
 import numpy as np
 import os
+import shutil
 
 NUM_SNAPS = 136
 
@@ -77,8 +78,8 @@ _OUTPUT_DETAILS_FILENAME = "ill-%d_blackhole_details.hdf5"
 
 _OUTPUT_MERGERS_DIR = os.path.join(_OUTPUT_DIR, "blackholes/mergers/")
 
-_OUTPUT_MERGERS_RAW_FILENAME = "ill-%d_blackhole_mergers_raw"
-_OUTPUT_MERGERS_RAW_FILENAME_INTERMEDIATE = "ill-%d_blackhole_mergers_raw.txt"
+_OUTPUT_MERGERS_COMBINED_FILENAME = "ill-{:d}_blackhole_mergers_combined_{:s}.{:.s}"
+# _OUTPUT_MERGERS_RAW_FILENAME_INTERMEDIATE = "ill-%d_blackhole_mergers_raw.txt"
 _OUTPUT_MERGERS_DETAILS_FILENAME = "ill-%d_blackhole_merger_details.hdf5"
 
 
@@ -157,15 +158,17 @@ def GET_OUTPUT_DETAILS_FILENAME(run):
     return fname
 
 
-
-
-def GET_MERGERS_RAW_FILENAME(run, type='txt'):
+def GET_MERGERS_COMBINED_FILENAME(run, filtered=False, type='txt'):
     """
-    /n/home00/lkelley/ghernquistfs1/illustris/data/%s/blackhole/details/organized/
-        ill-%d_blackhole_details_temp_snap-%d.%s
+    /n/home00/lkelley/ghernquistfs1/illustris/data/%s/blackhole/mergers/
+        ill-%d_blackhole_mergers_combined_{:s}.{:.s}
     """
     use_dir = _OUTPUT_MERGERS_DIR % (_ILLUSTRIS_RUN_NAMES[run])
-    use_fname = _OUTPUT_MERGERS_RAW_FILENAME % (run) + '.%s' % format(type)
+    if filtered:
+        ending = 'filtered'
+    else:
+        ending = 'raw'
+    use_fname = _OUTPUT_MERGERS_COMBINED_FILENAME.format(run, ending, type)
     fname = os.path.join(use_dir, use_fname)
     return fname
 
@@ -227,3 +230,12 @@ def GET_SUBBOX_TIMES(run):
 
     times = times[:count]
     return times
+
+
+def _backup_exists(fname, verbose=True, append='.bak'):
+    if os.path.isfile(fname):
+        back_fname = fname + '.bak'
+        shutil.move(fname, back_fname)
+        if verbose:
+            print(" - Moved existing file\n\tFrom: '{}'\n\tTo: '{}'".format(fname, back_fname))
+    return

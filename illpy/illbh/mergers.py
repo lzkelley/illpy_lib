@@ -12,56 +12,16 @@ variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mergers.
 
 Internal Parameters
 -------------------
-VERSION_MAP <flt> : version number for 'mapped' mergers, and associated save files
-VERSION_FIX <flt> : version number for 'fixed'  mergers, and associated save files
 
 Functions
 ---------
-processMergers                : perform all processing methods, assures that save files are all
-                                constructed.
-load_raw_mergers                : load all merger entries, sorted by scalefactor, directly from
-                                illustris merger files - without any processing/filtering.
-loadMappedMergers             : load dictionary of merger events with associated mappings to and
-                                from snapshots.
-loadFixedMergers              : load dictionary of merger events with mappings, which have been
-                                processed and filtered.  These mergers also have the 'out' mass
-                                entry corrected (based on inference from ``BHDetails`` entries).
-
-
-_findBoundingBins
 
 
 Mergers Dictionary
 ------------------
-   { MERGERS_RUN       : <int>, illustris simulation number in {1, 3}
-     MERGERS_NUM       : <int>, total number of mergers `N`
-     MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
-     MERGERS_CREATED   : <str>,
-     MERGERS_VERSION   : <float>,
-
-     MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
-     MERGERS_IDS       : <ulong>[N, 2],
-     MERGERS_MASSES    : <double>[N, 2],
-
-     MERGERS_MAP_MTOS  : <int>[N],
-     MERGERS_MAP_STOM  : <int>[136, list],
-     MERGERS_MAP_ONTOP : <int>[136, list],
-   }
 
 Examples
 --------
-
->>> # Load mergers from Illustris-2
->>> mergers = BHMergers.loadMergers(run=2, verbose=True)
->>> # Print the number of mergers
->>> print mergers[BHMergers.MERGERS_NUM]
->>> # Print the first 10 merger times
->>> print mergers[BHMergers.MERGERS_TIMES][:10]
-
-
-Raises
-------
-
 
 Notes
 -----
@@ -84,15 +44,16 @@ Notes
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 from datetime import datetime
-import numpy as np
 import h5py
+import numpy as np
+import os
+import shutil
 
-from constants import DTYPE, GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_FILENAME, \
-    MERGERS
+from constants import DTYPE, GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_COMBINED_FILENAME, \
+    MERGERS, _backup_exists
 
-import zcode.inout as zio
+# import zcode.inout as zio
 
 __version__ = '1.0.1'
 
@@ -111,21 +72,103 @@ def main(run=1, output_dir=None, verbose=True, ):
     return
 
 
-def process_raw_mergers(run, verbose=True, recombine=False):
+# def combine_raw_merger_files(in_fnames, out_fname, verbose=False):
+def combine_raw_merger_files(run, verbose=False):
+    """Concatenate the contents of a set of input files into a single output file.
+
+    Arguments
+    ---------
+    in_fnames : iterable<str>, list of input file names
+    out_fname : <str>, output file name
+    verbose : <bool> (optional=_VERBOSE), print verbose output
+
+    Returns
+
+    """
+    beg = datetime.now()
+    print(" - Combining merger files")
+    # Raw illustris merger filenames
+    in_filenames = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
+    # Filename for combined mergers file, raw = unfiltered
+    out_raw_fname = GET_MERGERS_COMBINED_FILENAME(run, filtered=False, type='txt')
+    # Filename for combined mergers file, filtered (try to remove duplicates)
+    out_filtered_fname = GET_MERGERS_COMBINED_FILENAME(run, filtered=True, type='txt')
+    if verbose:
+        print(" - - Writing   raw    combined mergers to '{}'".format(out_raw_fname))
+        print(" - - Writing filtered combined mergers to '{}'".format(out_filtered_fname))
+
+    # Make backups of existing output files
+    _backup_exists(out_raw_fname, verbose=verbose)
+    _backup_exists(out_filtered_fname, verbose=verbose)
+
+    nums_in = len(in_filenames)
+    interv = int(np.floor(nums_in/10))
+    count_raw = 0
+    count_filt = 0
+    num_deleted = 0
+    # Open output file for writing
+    with open(out_raw_fname, 'w') as out_raw, open(out_filtered_fname, 'w') as out_filt:
+        # Iterate over input files
+        if verbose: print(" - Iterating over {} input merger files".format(nums_in))
+        for ii, in_name in enumerate(in_filenames):
+            filt_lines = []    # Stores each line from input file
+            filt_scales = []   # Stores the scale-factor of each entry (each line)
+            last_scale = 0.0  # Stores the previous scale-factor (time)
+
+            # Iterate over lines in input file
+            for mline in open(in_name, 'r'):
+                # Write *all* lines to 'raw' output file
+                out_raw.write(mline)
+                count_raw += 1
+
+                # Scale factor is second, space-separated entry in each line
+                this_scale = DTYPE.SCALAR(mline.split()[1])
+
+                # If times go backwards, simulation was restarted.  Erase (previous) overlap segment
+                if this_scale < last_scale:
+                    # Find lines matching or following the newest read scale-factor
+                    time_mask = (this_scale < filt_scales) | np.isclose(filt_scales, this_scale)
+                    bads = np.where(time_mask)[0]
+                    # Delete these lines
+                    if bads.size:
+                        # Reverse through so that subsequent indices are still correct
+                        for idx in reversed(bads):
+                            del filt_lines[idx]
+                            del filt_scales[idx]
+                        num_deleted += bads.size
+
+                # Store new line
+                filt_scales.append(this_scale)
+                filt_lines.append(mline)
+                count_filt += 1
+                last_scale = this_scale
+
+            # Write all stored (filtered) lines to filtered file
+            out_filt.writelines(filt_lines)
+
+            if verbose and ii % interv == 0:
+                dur = datetime.now()-beg
+                print("\t{:5d}/{} = {:.4f} after {}.  Raw: {:5d}; Filtered: {:5d}, Deleted: {:5d}"
+                      "".format(ii, nums_in, ii/nums_in, dur, count_raw, count_filt, num_deleted))
+
+    return count_raw, count_filt
+
+
+def convert_txt_to_hdf5(run, verbose=True, recombine=False):
     """
 
     Raw mergers are the data directly from illustris without modification.
     """
     # Intermediate filename to store all mergers in single text file
     #    Mergers will be in effectively random order
-    intermed_fname = GET_MERGERS_RAW_FILENAME(run, type='txt')
-    if recombine or not os.path.exists(intermed_fname):
+    combined_txt_fname = GET_MERGERS_RAW_FILENAME(run, type='txt')
+    if recombine or not os.path.exists(combined_txt_fname):
         merger_fnames = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
         if verbose:
             print(" - Combining Merger Data from {} files".format(len(merger_fnames)))
-        num_lines = _concat_files(merger_fnames, intermed_fname, verbose)
+        num_lines = combine_raw_merger_files(merger_fnames, combined_txt_fname, verbose)
     else:
-        num_lines = sum(1 for line in open(intermed_fname))
+        num_lines = sum(1 for line in open(combined_txt_fname))
 
     scales = np.zeros(num_lines, dtype=DTYPE.SCALAR)
     id_in = np.zeros(num_lines, dtype=DTYPE.ID)
@@ -134,12 +177,12 @@ def process_raw_mergers(run, verbose=True, recombine=False):
     mass_out = np.zeros(num_lines, dtype=DTYPE.SCALAR)
 
     count = 0
-    # Go through each merger (each line) in intermediate file
-    if verbose: print("Loading merger data")
-    for line in open(intermed_fname, 'r'):
-        if count >= scales.size:
-            raise ValueError("More lines than `num_lines` = '{}'".format(num_lines))
-        # Get target elements from each line of file
+    # Go through each merger (each line) in combined file, store parsed values
+    if verbose:
+        print(" - Loading combined merger data from '{}'".format(combined_txt_fname))
+    beg = datetime.now()
+    for line in open(combined_txt_fname, 'r'):
+        # Get target elements, as appropriate data types, from each line of file
         #    NOTE: `out_mass` is incorrect in illustris
         time, out_id, out_mass, in_id, in_mass = _parse_line_merger(line)
         # Store values
@@ -151,7 +194,8 @@ def process_raw_mergers(run, verbose=True, recombine=False):
         count += 1
 
     # Resize arrays for the number of values actually read
-    if verbose: print(" - Lines read: {}".format(count))
+    if verbose:
+        print(" - Read {} lines after {}".format(count, datetime.now()-beg))
     if count != num_lines:
         raise ValueError("`count` = {} != `num_lines` = {}".format(count, num_lines))
 
@@ -257,7 +301,7 @@ def process_raw_mergers(run, verbose=True, recombine=False):
 
     return  # scales, id_in, id_out, mass_in, mass_out, hdf5_fname
 
-
+'''
 def loadMappedMergers(run, verbose=True, loadsave=True):
     """Load or create Mapped Mergers Dictionary as needed.
     """
@@ -458,7 +502,7 @@ def _fixMergers(run, mergers, verbose=True):
     if verbose: print(" - - - - Ave mass:  %.4e ===> %.4e" % (aveBef, aveAft))
 
     return fixedMergers
-
+'''
 
 def _parse_line_merger(line):
     """Process quantities from each line of the illustris merger files.
@@ -491,7 +535,7 @@ def _parse_line_merger(line):
     in_mass  = DTYPE.SCALAR(strs[5])
     return time, out_id, out_mass, in_id, in_mass
 
-
+'''
 def _mapToSnapshots(scales, verbose=True):
     """Find the snapshot during which, or following each merger
     """
@@ -550,43 +594,9 @@ def _mapToSnapshots(scales, verbose=True):
     if verbose: print(" - - - %d (%.2f) ontop mergers" % (numOntop, 1.0*numOntop/nums))
 
     return mapM2S, mapS2M, ontop
+'''
 
-
-def _concat_files(in_fnames, out_fname, verbose=False):
-    """Concatenate the contents of a set of input files into a single output file.
-
-    Arguments
-    ---------
-    in_fnames : iterable<str>, list of input file names
-    out_fname : <str>, output file name
-    verbose : <bool> (optional=_VERBOSE), print verbose output
-
-    Returns
-
-    """
-    beg = datetime.now()
-    # Make sure outfile path exists
-    nums = len(in_fnames)
-    count = 0
-    interv = int(np.floor(nums/10))
-    # Open output file for writing
-    with open(out_fname, 'w') as outfil:
-        # Iterate over input files
-        for ii, inname in enumerate(in_fnames):
-            with open(inname, 'r') as infil:
-                # Iterate over input file lines
-                for line in infil:
-                    outfil.write(line)
-                    count += 1
-
-            if verbose and ii%interv == 0:
-                dur = datetime.now()-beg
-                print("\t{:5d}/{} = {:.4f} after {}, {:5d} lines".format(
-                    ii, nums, ii/nums, dur, count))
-
-    return count
-
-
+'''
 def _findBoundingBins(target, bins, thresh=1.0e-5):
     """
     Find the array indices (of "bins") bounding the "target"
@@ -639,6 +649,6 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
         raise RuntimeError("Could not find bins!")
 
     return [low, high, dlo, dhi]
-
+'''
 if __name__ == "__main__":
     main()
