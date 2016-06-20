@@ -66,7 +66,8 @@ _ILLUSTRIS_RUN_NAMES   = {1: "L75n1820FP",
                           2: "L75n910FP",
                           3: "L75n455FP"}
 
-_ILLUSTRIS_SUBBOX_TIMES_FILENAMES = "/n/ghernquist/Illustris/Runs/%s/postprocessing/subboxes_times.txt"
+_ILLUSTRIS_SUBBOX_TIMES_FILENAMES = \
+    "/n/ghernquist/Illustris/Runs/%s/postprocessing/subboxes_times.txt"
 
 _SNAPSHOT_COSMOLOGY_DATA_FILENAME = "illustris-snapshot-cosmology-data.npz"
 
@@ -81,6 +82,8 @@ _OUTPUT_MERGERS_DIR = os.path.join(_OUTPUT_DIR, "blackholes/mergers/")
 _OUTPUT_MERGERS_COMBINED_FILENAME = "ill-{:d}_blackhole_mergers_combined_{:s}.{:s}"
 # _OUTPUT_MERGERS_RAW_FILENAME_INTERMEDIATE = "ill-%d_blackhole_mergers_raw.txt"
 _OUTPUT_MERGERS_DETAILS_FILENAME = "ill-%d_blackhole_merger_details.hdf5"
+
+_PUBLIC_MERGERS_FILENAME = "ill-{:d}_blackhole_mergers.hdf5"
 
 
 class DTYPE:
@@ -113,11 +116,19 @@ class MERGERS:
     MASS_IN = 'mass_in'
     MASS_OUT = 'mass_out'
 
-    NEXT = 'next'
-    PREV_IN = 'prev_in'
-    PREV_OUT = 'prev_out'
+    _TREE = 'tree'
+    NEXT = 'tree/next'
+    PREV_IN = 'tree/prev_in'
+    PREV_OUT = 'tree/prev_out'
 
     UNIQUE = 'Header/unique_ids'
+
+    _DETAILS = 'details'
+    DET_SCALE = 'details/' + DETAILS.SCALE
+    DET_MASS = 'details/' + DETAILS.MASS
+    DET_MDOT = 'details/' + DETAILS.MDOT
+    DET_RHO = 'details/' + DETAILS.RHO
+    DET_CS = 'details/' + DETAILS.CS
 
 
 def _all_exist(files):
@@ -150,7 +161,7 @@ def GET_DETAILS_ORGANIZED_FILENAME(run, snap, type='txt'):
 def GET_OUTPUT_DETAILS_FILENAME(run):
     """
     /n/home00/lkelley/ghernquistfs1/illustris/data/%s/blackhole/details/organized/
-        ill-%d_blackhole_details_temp_snap-%d.%s
+        "ill-%d_blackhole_details.hdf5"
     """
     use_dir = _OUTPUT_DETAILS_ORGANIZED_DIR % (_ILLUSTRIS_RUN_NAMES[run])
     use_fname = _OUTPUT_DETAILS_FILENAME % (run)
@@ -178,6 +189,13 @@ def GET_MERGERS_DETAILS_FILENAME(run):
     """
     use_dir = _OUTPUT_MERGERS_DIR % (_ILLUSTRIS_RUN_NAMES[run])
     use_fname = _OUTPUT_MERGERS_DETAILS_FILENAME % (run)
+    fname = os.path.join(use_dir, use_fname)
+    return fname
+
+
+def GET_PUBLIC_MERGERS_FILENAME(run):
+    use_dir = _OUTPUT_MERGERS_DIR % (_ILLUSTRIS_RUN_NAMES[run])
+    use_fname = _PUBLIC_MERGERS_FILENAME.format(run)
     fname = os.path.join(use_dir, use_fname)
     return fname
 
@@ -239,3 +257,7 @@ def _backup_exists(fname, verbose=True, append='.bak'):
         if verbose:
             print(" - Moved existing file\n\tFrom: '{}'\n\tTo: '{}'".format(fname, back_fname))
     return
+
+
+def _zero_pad_end(arr, add_len):
+    return np.pad(arr, (0, add_len), mode='constant', constant_values=0)
