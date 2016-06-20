@@ -51,7 +51,8 @@ import warnings
 # from . import BHConstants
 # from . BHConstants import DETAILS
 from constants import _all_exist, DETAILS, DTYPE, GET_DETAILS_ORGANIZED_FILENAME, \
-    GET_ILLUSTRIS_BH_DETAILS_FILENAMES, GET_MERGERS_DETAILS_FILENAME, GET_MERGERS_RAW_FILENAME, \
+    GET_ILLUSTRIS_BH_DETAILS_FILENAMES, GET_MERGERS_DETAILS_FILENAME, \
+    GET_MERGERS_COMBINED_FILENAME, \
     GET_OUTPUT_DETAILS_FILENAME, GET_SNAPSHOT_SCALES, GET_SUBBOX_TIMES, MERGERS, NUM_SNAPS
 
 __version__ = '1.0'
@@ -386,7 +387,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
     if verbose: print(" - {} Target times.".format(target_scales.size))
 
     # Load mergers data
-    with h5py.File(GET_MERGERS_RAW_FILENAME(run, type='hdf5'), 'r') as mergs_in:
+    with h5py.File(GET_MERGERS_COMBINED_FILENAME(run, filtered=True, type='hdf5'), 'r') as mergs_in:
         mscales = mergs_in[MERGERS.SCALE][:]      # Scalefactors of mergers
         m_mass_in = mergs_in[MERGERS.MASS_IN][:]  # Mass of the 'in' BH ('out' is incorrect)
         m_ids_in = mergs_in[MERGERS.ID_IN][:]     # IDs of the 'in' BH
@@ -578,7 +579,7 @@ def combine_downsample_and_mergers_hdf5(run, verbose=True, error_in_aft=False):
         num_cut = np.max([num_cut, count])
 
     # Trim empty elements
-    id, scale, mass, mdot, rho, cs = _trim_arrays(num_cut, id, scale, mass, mdot, rho, cs)
+    id, scale, mass, mdot, rho, cs = _trim_details_arrays(num_cut, id, scale, mass, mdot, rho, cs)
     # Sort by ID, then scalefactor
     id, scale, mass, mdot, rho, cs = _sort_details(id, scale, mass, mdot, rho, cs)
     # Find unique IDs, what index they first occur at, and how many entries there are
@@ -777,7 +778,7 @@ def _load_details_txt(txt_file):
 
     # Trim excess (shouldn't be needed)
     if count < num_lines:
-        id, scale, mass, mdot, rho, cs = _trim_arrays(count, id, scale, mass, mdot, rho, cs)
+        id, scale, mass, mdot, rho, cs = _trim_details_arrays(count, id, scale, mass, mdot, rho, cs)
 
     return id, scale, mass, mdot, rho, cs
 
@@ -1092,7 +1093,7 @@ def _sort_details(id, scale, mass, mdot, rho, cs):
     return id, scale, mass, mdot, rho, cs
 
 
-def _trim_arrays(trim, id, scale, mass, mdot, rho, cs):
+def _trim_details_arrays(trim, id, scale, mass, mdot, rho, cs):
     """Remove excess elements in the given arrrays.
     """
     if trim >= id.size:
