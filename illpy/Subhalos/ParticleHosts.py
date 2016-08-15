@@ -69,7 +69,7 @@ import numpy as np
 from datetime import datetime
 
 from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
-                         GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
+    GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS
 from . Constants import SNAPSHOT
 
 import zcode.inout as zio
@@ -97,13 +97,14 @@ class OFFTAB():
     BH_SUBHALOS = 'bh_subhalos'
 
     @staticmethod
-    def snapDictKey(snap): return "%03d" % (snap)
+    def snapDictKey(snap):
+        return "%03d" % (snap)
 
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
 
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
-    if(version is None): version = _VERSION
+    if version is None: version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _OFFSET_TABLE_FILENAME_BASE % (run, snap, version)
     return fname
@@ -112,7 +113,7 @@ def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
 _BH_HOSTS_SNAP_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%03d_bh-hosts_v%.2f.npz"
 
 def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
-    if(version is None): version = _VERSION
+    if version is None: version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_SNAP_TABLE_FILENAME_BASE % (run, snap, version)
     return fname
@@ -121,7 +122,7 @@ def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
 _BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_bh-hosts_v%.2f.npz"
 
 def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
-    if(version is None): version = _VERSION
+    if version is None: version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
@@ -144,27 +145,27 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 
     """
 
-    if(verbose): print " - - ParticleHosts.loadOffsetTable()"
+    if verbose: print " - - ParticleHosts.loadOffsetTable()"
 
     saveFile = _GET_OFFSET_TABLE_FILENAME(run, snap)
 
-    ## Load Existing Save
-    #  ------------------
-    if(loadsave):
-        if(verbose): print " - - - Loading from save '%s'" % (saveFile)
+    # Load Existing Save
+    # ------------------
+    if loadsave:
+        if verbose: print " - - - Loading from save '%s'" % (saveFile)
         # Make sure path exists
-        if(os.path.exists(saveFile)):
+        if os.path.exists(saveFile):
             offsetTable = zio.npzToDict(saveFile)
-            if(verbose): print " - - - - Table loaded"
+            if verbose: print " - - - - Table loaded"
         else:
-            if(verbose): print " - - - - File does not Exist, reconstructing offsets"
+            if verbose: print " - - - - File does not Exist, reconstructing offsets"
             loadsave = False
 
 
-    ## Reconstruct Offset Table
-    #  ------------------------
-    if(not loadsave):
-        if(verbose): print " - - - Constructing Offset Table"
+    # Reconstruct Offset Table
+    # ------------------------
+    if not loadsave:
+        if verbose: print " - - - Constructing Offset Table"
         start = datetime.now()
 
         # Construct Offset Data
@@ -175,7 +176,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 
         # Find BH Subhalos
         binInds = np.digitize(bhInds, offsets[:, PARTICLE.BH]).astype(DTYPE.INDEX)-1
-        if(any(binInds < 0)): raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
+        if any(binInds < 0): raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
         bhHalos = haloNums[binInds]
         bhSubhs = subhNums[binInds]
 
@@ -204,7 +205,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         zio.dictToNPZ(offsetTable, saveFile, verbose=verbose)
 
         stop = datetime.now()
-        if(verbose): print " - - - - Done after %s" % (str(stop-start))
+        if verbose: print " - - - - Done after %s" % (str(stop-start))
 
 
     return offsetTable
@@ -230,36 +231,36 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
     bhHosts <dict> : table of hosts for all snapshots
 
     """
-    if(verbose): print(" - - ParticleHosts.loadBHHosts()")
-    if(bar is None): bar = bool(verbose)
+    if verbose: print(" - - ParticleHosts.loadBHHosts()")
+    if bar is None: bar = bool(verbose)
 
-    ## Load Existing Save
-    #  ==================
-    if(loadsave):
+    # Load Existing Save
+    # ==================
+    if loadsave:
         saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run, version=version)
 
-        if(verbose): print(" - - - Loading from save '%s'" % (saveFile))
+        if verbose: print(" - - - Loading from save '%s'" % (saveFile))
         # Make sure path exists
-        if(os.path.exists(saveFile)):
+        if os.path.exists(saveFile):
             bhHosts = zio.npzToDict(saveFile)
-            if(verbose): print(" - - - - Table loaded")
+            if verbose: print(" - - - - Table loaded")
         else:
-            if(verbose): print(" - - - - File does not Exist, reconstructing BH Hosts")
+            if verbose: print(" - - - - File does not Exist, reconstructing BH Hosts")
             loadsave = False
 
     # Reconstruct Hosts Table
     # =======================
-    if(not loadsave):
+    if not loadsave:
 
-        if(verbose): print(" - - - Constructing Hosts Table")
+        if verbose: print(" - - - Constructing Hosts Table")
         start = datetime.now()
 
-        if(version is not None): raise RuntimeError("Can only create version '%s'" % _VERSION)
+        if version is not None: raise RuntimeError("Can only create version '%s'" % _VERSION)
         saveFile = _GET_BH_HOSTS_TABLE_FILENAME(run)
 
         # Create progress-bar
         pbar = zio.getProgressBar(NUM_SNAPS)
-        if(bar): pbar.start()
+        if bar: pbar.start()
 
         # Select the dict-keys for snapshot hosts to transfer
         hostKeys = [OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS]
@@ -282,15 +283,15 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
             # Extract and store target data
             snapStr = OFFTAB.snapDictKey(snap)
             bhHosts[snapStr] = {hkey: hdict[hkey] for hkey in hostKeys}
-            if(bar): pbar.update(snap)
+            if bar: pbar.update(snap)
 
-        if(bar): pbar.finish()
+        if bar: pbar.finish()
 
         # Save to file
         zio.dictToNPZ(bhHosts, saveFile, verbose=verbose)
 
         stop = datetime.now()
-        if(verbose): print(" - - - - Done after %s" % (str(stop-start)))
+        if verbose: print(" - - - - Done after %s" % (str(stop-start)))
 
     return bhHosts
 
@@ -310,40 +311,40 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
     offsetTable <dict> : particle offset table, see `ParticleHosts` docs for more info.
 
     """
-    if(verbose): print(" - - ParticleHosts.loadBHHostsSnap()")
-    if(bar is None): bar = bool(verbose)
+    if verbose: print(" - - ParticleHosts.loadBHHostsSnap()")
+    if bar is None: bar = bool(verbose)
 
     # Load Existing Save
     # ==================
-    if(loadsave):
+    if loadsave:
         saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version)
 
-        if(verbose): print(" - - - Loading from save '%s'" % (saveFile))
+        if verbose: print(" - - - Loading from save '%s'" % (saveFile))
         # Make sure path exists
-        if(os.path.exists(saveFile)):
+        if os.path.exists(saveFile):
             hostTable = zio.npzToDict(saveFile)
-            if(verbose): print(" - - - - Table loaded")
+            if verbose: print(" - - - - Table loaded")
         else:
-            if(verbose): print(" - - - - File does not Exist, reconstructing BH Hosts")
+            if verbose: print(" - - - - File does not Exist, reconstructing BH Hosts")
             loadsave = False
 
     # Reconstruct Hosts Table
     # =======================
-    if(not loadsave):
-        if(verbose): print(" - - - Constructing Offset Table")
+    if not loadsave:
+        if verbose: print(" - - - Constructing Offset Table")
         start = datetime.now()
 
-        if(version is not None): raise RuntimeError("Can only create version '%s'" % _VERSION)
+        if version is not None: raise RuntimeError("Can only create version '%s'" % _VERSION)
         saveFile = _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap)
 
         offsetFile = ''
-        if(convert is not None):
+        if convert is not None:
             offsetFile = _GET_OFFSET_TABLE_FILENAME(run, snap, version=convert)
-            if(verbose): print(" - - - Trying to convert from existing '%s'" % (offsetFile))
+            if verbose: print(" - - - Trying to convert from existing '%s'" % (offsetFile))
 
         # Convert an Existing (Full) Offset Table into BH Hosts
         # -----------------------------------------------------
-        if(os.path.exists(offsetFile)):
+        if os.path.exists(offsetFile):
             offsetTable = zio.npzToDict(offsetFile)
 
             bhInds  = offsetTable[OFFTAB.BH_INDICES]
@@ -352,7 +353,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             bhSubhs = offsetTable[OFFTAB.BH_SUBHALOS]
 
         else:
-            if(verbose): print(" - - - Reconstructing offset table")
+            if verbose: print(" - - - Reconstructing offset table")
 
             # Construct Offset Data
             haloNums, subhNums, offsets = _constructOffsetTable(run, snap, verbose=verbose)
@@ -363,8 +364,8 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
                 bhInds, bhIDs = _constructBHIndexTable(run, snap, verbose=verbose)
             except:
                 # If this is a known bad snapshot, set values to None
-                if(snap in GET_BAD_SNAPS(run)):
-                    if(verbose): print(" - - - BAD SNAPSHOT: RUN %d, Snap %d" % (run, snap))
+                if snap in GET_BAD_SNAPS(run):
+                    if verbose: print(" - - - BAD SNAPSHOT: RUN %d, Snap %d" % (run, snap))
                     bhInds  = None
                     bhIDs   = None
                     bhHalos = None
@@ -377,7 +378,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             # On success, Find BH Subhalos
             else:
                 binInds = np.digitize(bhInds, offsets[:, PARTICLE.BH]).astype(DTYPE.INDEX)-1
-                if(any(binInds < 0)):
+                if any(binInds < 0):
                     raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
 
                 bhHalos = haloNums[binInds]
@@ -404,7 +405,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
         zio.dictToNPZ(hostTable, saveFile, verbose=verbose)
 
         stop = datetime.now()
-        if(verbose): print(" - - - - Done after %s" % (str(stop-start)))
+        if verbose: print(" - - - - Done after %s" % (str(stop-start)))
 
     return hostTable
 
@@ -424,12 +425,12 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     foundSubh <int>[N] : subhalo index numbers (`-1` for invalid)
 
     """
-    if(verbose): print(" - - ParticleHosts.subhalosForBHIDs()")
+    if verbose: print(" - - ParticleHosts.subhalosForBHIDs()")
 
     # Load (Sub)Halo Offset Table
     # ---------------------------
-    if(bhHosts is None):
-        if(verbose): print(" - - - Loading offset table")
+    if bhHosts is None:
+        if verbose: print(" - - - Loading offset table")
         bhHosts = loadBHHostsSnap(run, snap, loadsave=True, verbose=verbose)
 
     outIDs  = bhHosts[OFFTAB.BH_IDS]
@@ -460,9 +461,9 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     numIDs = len(bhIDs)
     numBad = len(inds)
     numGood = numIDs-numBad
-    if(verbose): print(" - - - Matched %d/%d Good, %d/%d Bad" % (numGood, numIDs, numBad, numIDs))
+    if verbose: print(" - - - Matched %d/%d Good, %d/%d Bad" % (numGood, numIDs, numBad, numIDs))
     # Set incorrect matches to '-1'
-    if(len(inds) > 0):
+    if len(inds) > 0:
         foundIDs[inds]  = -1
         foundInds[inds] = -1
         foundSubh[inds] = -1
@@ -495,27 +496,27 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
     import illustris_python as ill
 
-    if(verbose): print(" - - ParticleHosts._constructOffsetTable()")
+    if verbose: print(" - - ParticleHosts._constructOffsetTable()")
 
-    if(bar is None): bar = bool(verbose)
+    if bar is None: bar = bool(verbose)
 
-    ## Load (Sub)Halo Catalogs
-    #  -----------------------
+    # Load (Sub)Halo Catalogs
+    # -----------------------
 
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
-    if(verbose): print(" - - - Loading Catalogs from '%s'" % (illpath))
+    if verbose: print(" - - - Loading Catalogs from '%s'" % (illpath))
     haloCat = ill.groupcat.loadHalos(illpath, snap, fields=None)
     numHalos    = haloCat['count']
-    if(verbose): print(" - - - - Halos    Loaded (%7d)" % (numHalos))
+    if verbose: print(" - - - - Halos    Loaded (%7d)" % (numHalos))
     subhCat = ill.groupcat.loadSubhalos(illpath, snap, fields=None)
     numSubhs = subhCat['count']
-    if(verbose): print(" - - - - Subhalos Loaded (%7d)" % (numSubhs))
+    if verbose: print(" - - - - Subhalos Loaded (%7d)" % (numSubhs))
 
 
-    ## Initialize Storage
-    #  ------------------
+    # Initialize Storage
+    # ------------------
 
     tableSize = numHalos + numSubhs + 1
 
@@ -532,21 +533,21 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     cumSubhParts = np.zeros(PARTICLE._NUM, dtype=DTYPE.ID)
 
     pbar = zio.getProgressBar(tableSize)
-    if(bar): pbar.start()
+    if bar: pbar.start()
 
-    ## Iterate Over Each Halo
-    #  ----------------------
+    # Iterate Over Each Halo
+    # ----------------------
     for ii in range(numHalos):
 
         # Add the number of particles in this halo
         cumHaloParts[:] += haloCat['GroupLenType'][ii, :]
 
-        ## Iterate over each Subhalo, in halo ``ii``
-        #  -----------------------------------------
+        # Iterate over each Subhalo, in halo ``ii``
+        # -----------------------------------------
         for jj in range(haloCat['GroupNsubs'][ii]):
 
             # Consistency check: make sure subhalo number is as expected
-            if(jj == 0 and subh != haloCat['GroupFirstSub'][ii]):
+            if jj == 0 and subh != haloCat['GroupFirstSub'][ii]:
                 print("ii = %d, jj = %d, subh = %d" % (ii, jj, subh))
                 raise RuntimeError("Subhalo iterator doesn't match Halo's first subhalo!")
 
@@ -561,7 +562,7 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
             # Increment subhalo and entry number
             subh += 1
             offs += 1
-            if(bar): pbar.update(offs)
+            if bar: pbar.update(offs)
 
         # Add Entry for particles with NO subhalo
         haloNum[offs] = ii                        # Still part of halo ``ii``
@@ -573,14 +574,14 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
         # Increment entry number
         offs += 1
-        if(bar): pbar.update(offs)
+        if bar: pbar.update(offs)
 
     # Add entry for particles with NO halo and NO subhalo
     haloNum[offs] = -1
     subhNum[offs] = -1
     offsets[offs, :] = cumSubhParts
 
-    if(bar): pbar.finish()
+    if bar: pbar.finish()
 
     return haloNum, subhNum, offsets
 
@@ -602,16 +603,16 @@ def _constructBHIndexTable(run, snap, verbose=True):
 
     """
 
-    if(verbose): print(" - - ParticleHosts._constructBHIndexTable()")
+    if verbose: print(" - - ParticleHosts._constructBHIndexTable()")
 
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
     # Load all BH ID numbers from snapshot (single ``fields`` parameters loads array, not dict)
-    if(verbose): print(" - - - Loading BHs from Snapshot %d in '%s'" % (snap, illpath))
+    if verbose: print(" - - - Loading BHs from Snapshot %d in '%s'" % (snap, illpath))
     bhIDs = ill.snapshot.loadSubset(illpath, snap, PARTICLE.BH, fields=SNAPSHOT.IDS)
     numBHs = len(bhIDs)
-    if(verbose): print(" - - - - BHs Loaded (%7d)" % (numBHs))
+    if verbose: print(" - - - - BHs Loaded (%7d)" % (numBHs))
     # Create 'indices' of BHs
     inds = np.arange(numBHs)
     return inds, bhIDs
@@ -658,4 +659,5 @@ def main():
 
     return
 
-if(__name__ == "__main__"): main()
+if __name__ == "__main__":
+    main()

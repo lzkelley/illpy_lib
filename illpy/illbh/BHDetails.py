@@ -141,8 +141,8 @@ def formatDetails(run, loadsave=True, verbose=True):
     if(loadsave):
         saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
         if(not saveExist):
-            print(("BHDetails.formatDetails() : Save files do not exist e.g. '%s'" % \
-                (saveFilenames[0])))
+            print(("BHDetails.formatDetails() : Save files do not exist e.g. '%s'" %
+                   (saveFilenames[0])))
             print("BHDetails.formatDetails() : converting raw Details files !!!")
             loadsave = False
 
