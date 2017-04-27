@@ -103,6 +103,7 @@ class OFFTAB():
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
 
+
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
     if version is None: version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
@@ -111,6 +112,7 @@ def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
 
 
 _BH_HOSTS_SNAP_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%03d_bh-hosts_v%.2f.npz"
+
 
 def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
     if version is None: version = _VERSION
@@ -121,11 +123,13 @@ def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
 
 _BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_bh-hosts_v%.2f.npz"
 
+
 def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
     if version is None: version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
+
 
 '''
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
@@ -379,7 +383,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             else:
                 binInds = np.digitize(bhInds, offsets[:, PARTICLE.BH]).astype(DTYPE.INDEX)-1
                 if any(binInds < 0):
-                    raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
+                    raise RuntimeError("Some bhInds not matched!! '{}'".format(str(binInds)))
 
                 bhHalos = haloNums[binInds]
                 bhSubhs = subhNums[binInds]
@@ -513,7 +517,6 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     subhCat = ill.groupcat.loadSubhalos(illpath, snap, fields=None)
     numSubhs = subhCat['count']
     if verbose: print(" - - - - Subhalos Loaded (%7d)" % (numSubhs))
-
 
     # Initialize Storage
     # ------------------
