@@ -24,7 +24,7 @@ _ILLUSTRIS_RUN_NAMES   = {1: "L75n1820FP",
 
 _ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
 
-_PROCESSED_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
+_PROCESSED_DIR = "/n/home00/lkelley/hernquistfs1/illustris/data/%s/output/postprocessing/"
 
 
 # Physical Constants
@@ -54,10 +54,11 @@ class CONV_CGS_TO_SOL(Enum):
 class CONV_ILL_TO_SOL(Enum):
     """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
     """
-    MASS = CONV_ILL_TO_CGS.MASS.value*CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
-    MDOT = CONV_ILL_TO_CGS.MDOT.value*CONV_CGS_TO_SOL.MDOT.value  # to [Msol/yr]
-    DENS = CONV_ILL_TO_CGS.DENS.value*CONV_CGS_TO_SOL.DENS.value  # to [Msol/pc^3]
-    DIST = CONV_ILL_TO_CGS.DIST.value*CONV_CGS_TO_SOL.DIST.value  # to comoving-pc
+    MASS = CONV_ILL_TO_CGS.MASS.value * CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
+    MDOT = CONV_ILL_TO_CGS.MDOT.value * CONV_CGS_TO_SOL.MDOT.value  # to [Msol/yr]
+    DENS = CONV_ILL_TO_CGS.DENS.value * CONV_CGS_TO_SOL.DENS.value  # to [Msol/pc^3]
+    DIST = CONV_ILL_TO_CGS.DIST.value * CONV_CGS_TO_SOL.DIST.value  # to comoving-pc
+    VEL = 1.0
 
 
 # Indices for Different Types of Particles
