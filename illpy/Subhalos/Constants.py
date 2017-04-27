@@ -3,7 +3,6 @@
 import collections
 
 
-
 class SNAPSHOT():
     IDS                  = "ParticleIDs"
     POS                  = "Coordinates"
@@ -19,7 +18,6 @@ class SNAPSHOT():
 
     SUBF_HSML            = "SubfindHsml"
     SUBF_VDISP           = "SubfindVelDisp"
-
 
     '''
     BH_MASS                  = "BH_Mass"
