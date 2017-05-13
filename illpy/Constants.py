@@ -7,6 +7,7 @@ from enum import Enum
 # Illustris Constants
 NUM_SNAPS = 136
 BOX_LENGTH = 75000                          # [ckpc/h]
+BOX_VOLUME_MPC3 = np.power(BOX_LENGTH*1e-3/HPAR, 3.0)
 BOX_VOLUME_CGS = np.power(BOX_LENGTH*KPC/HPAR, 3.0)    # comoving cm^3
 
 
