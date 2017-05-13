@@ -84,10 +84,14 @@ import zcode.inout as zio
 _PROCESSED_DIR = "/n/home00/lkelley/illustris/data/{}/output/postprocessing/"
 
 illustris_python_path = "/n/home00/lkelley/illustris/"
-if illustris_python_path not in sys.path:
+if not os.path.exists(illustris_python_path):
+    print("Path '{}' does not exist...".format(illustris_python_path))
+    illustris_python_path = "/Users/lzkelley/Research/working/arepo/illustris/"
     if not os.path.exists(illustris_python_path):
         raise ImportError("Path to `illustris_python` '{}' does not exist!".format(
             illustris_python_path))
+
+if illustris_python_path not in sys.path:
     sys.path.append(illustris_python_path)
 import illustris_python as ill
 
