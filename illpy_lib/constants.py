@@ -1,13 +1,22 @@
-"""Numerical constants pertaining to the Illustris Simulations and their data.
+"""
 """
 
+
+"""Numerical constants pertaining to the Illustris Simulations and their data.
+"""
 import numpy as np
-from zcode.constants import MSOL, PC, KPC, HPAR, YR
-from enum import Enum
+
+HPAR = 0.704
+KPC = 3.085677581467192e+21   # kpc in cm
+MSOL = 1.9884754153381438e+33   # Solar-mass in grams
+YR = 31557600.0   # year in seconds
 
 # Illustris Constants
 NUM_SNAPS = 136
 BOX_LENGTH = 75000                          # [ckpc/h]
+BOX_VOLUME_MPC3 = np.power(BOX_LENGTH*1e-3/HPAR, 3.0)
+BOX_VOLUME_CGS = np.power(BOX_LENGTH*KPC/HPAR, 3.0)    # comoving cm^3
+
 
 _DM_MASS = {1: 4.408965e-04,
             2: 3.527172e-03,
@@ -23,11 +32,11 @@ _ILLUSTRIS_RUN_NAMES   = {1: "L75n1820FP",
 
 _ILLUSTRIS_OUTPUT_DIR_BASE = "/n/ghernquist/Illustris/Runs/%s/output/"
 
-_PROCESSED_DIR = "/n/home00/lkelley/ghernquistfs1/illustris/data/%s/output/postprocessing/"
+_PROCESSED_DIR = "/n/home00/lkelley/hernquistfs1/illustris/data/%s/output/postprocessing/"
 
 
 # Physical Constants
-class CONV_ILL_TO_CGS(Enum):
+class CONV_ILL_TO_CGS(object):
     """Convert from illustris units to physical [cgs] units (multiply).
     """
     MASS = 1.0e10*MSOL/HPAR               # Convert from e10 Msol to [g]
@@ -38,41 +47,42 @@ class CONV_ILL_TO_CGS(Enum):
     CS   = 1.0                            # ??????? FIX
 
 
-class CONV_CGS_TO_SOL(Enum):
+class CONV_CGS_TO_SOL(object):
     """Convert from cgs units to (standard) solar units, e.g. Msol, PC, etc, by multiplication
     """
     MASS  = 1.0/MSOL                       # [g] ==> Msol
     MDOT  = YR/MSOL                        # [g/s] ==> [Msol/yr]
-    DENS  = np.power(PC, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
-    NDENS = np.power(PC, 3.0)               # [1/cm^3] ==> [1/pc^3]
-    DIST  = 1.0/PC                         # [cm] ==> [pc]
+    DENS  = np.power(KPC/1000.0, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
+    NDENS = np.power(KPC/1000.0, 3.0)               # [1/cm^3] ==> [1/pc^3]
+    DIST  = 1000.0/KPC                         # [cm] ==> [pc]
     VEL   = 1.0e-5                         # [cm/s] ==> [km/s]
     ENER  = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
 
 
-class CONV_ILL_TO_SOL(Enum):
+class CONV_ILL_TO_SOL(object):
     """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
     """
-    MASS = CONV_ILL_TO_CGS.MASS.value*CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
-    MDOT = CONV_ILL_TO_CGS.MDOT.value*CONV_CGS_TO_SOL.MDOT.value  # to [Msol/yr]
-    DENS = CONV_ILL_TO_CGS.DENS.value*CONV_CGS_TO_SOL.DENS.value  # to [Msol/pc^3]
-    DIST = CONV_ILL_TO_CGS.DIST.value*CONV_CGS_TO_SOL.DIST.value  # to comoving-pc
+    MASS = CONV_ILL_TO_CGS.MASS * CONV_CGS_TO_SOL.MASS  # e10 Msol to [Msol]
+    MDOT = CONV_ILL_TO_CGS.MDOT * CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
+    DENS = CONV_ILL_TO_CGS.DENS * CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
+    DIST = CONV_ILL_TO_CGS.DIST * CONV_CGS_TO_SOL.DIST  # to comoving-pc
+    VEL = 1.0
 
 
 # Indices for Different Types of Particles
-class PARTICLE():
+class PARTICLE(object):
     GAS  = 0
     DM   = 1
     TRAC = 3
     STAR = 4
     BH   = 5
 
-    _NAMES = ["Gas", "DM", "-", "Tracer", "Star", "BH"]
-    _NUM  = 6
+    # _NAMES = ["Gas", "DM", "-", "Tracer", "Star", "BH"]
+    # _NUM  = 6
 
 
 # Numerical Constants
-class DTYPE():
+class DTYPE(object):
     ID     = np.uint64
     SCALAR = np.float64
     INDEX  = np.int64
