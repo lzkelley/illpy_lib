@@ -88,14 +88,14 @@ import sys
 from datetime import datetime
 import numpy as np
 
-from illpy.illbh import BHDetails
-import illpy.illbh.BHConstants
-from illpy.illbh.BHConstants import MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, \
+from illpy_lib.illbh import BHDetails
+import illpy_lib.illbh.BHConstants
+from illpy_lib.illbh.BHConstants import MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, \
     GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
 
-from illpy.Constants import DTYPE
-# from illpy import Cosmology
-# import illpy.illcosmo
+from illpy_lib.Constants import DTYPE
+# from illpy_lib import Cosmology
+# import illpy_lib.illcosmo
 
 import zcode.inout as zio
 
@@ -292,7 +292,7 @@ def _fixMergers(run, mergers, verbose=True):
            merger entry is the only one that is preserved in ``fixedMergers``
 
     """
-    from illpy.illbh import BHMatcher
+    from illpy_lib.illbh import BHMatcher
 
     if(verbose): print " - - BHMergers._fixMergers()"
 
@@ -471,8 +471,8 @@ def _mapToSnapshots(scales, verbose=True):
     numMergers = len(scales)
 
     # Load Cosmology
-    import illpy.illcosmo
-    cosmo = illpy.illcosmo.cosmology.Cosmology()
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()
 
     # Map Mergers-2-Snapshots: snapshot before (or ontop) of each merger

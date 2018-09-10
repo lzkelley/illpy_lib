@@ -2,12 +2,12 @@
 
 To load the data from the illustris simulation files into intermediate data products (required to
 import data), Run with something like:
-    $ mpirun -n 4 python -m illpy.illbh.BHSnapshotData --verbose
+    $ mpirun -n 4 python -m illpy_lib.illbh.BHSnapshotData --verbose
 
 Once the intermediate data files exist, they can be loaded via the python API as,
-    >>> import illpy.illbh.BHSnapshotData
-    >>> bhData = illpy.illbh.BHSnapshotData(1)      # Load for illustris-1
-    >>> from illpy.illbh.BHConstants import BH_SNAP
+    >>> import illpy_lib.illbh.BHSnapshotData
+    >>> bhData = illpy_lib.illbh.BHSnapshotData(1)      # Load for illustris-1
+    >>> from illpy_lib.illbh.BHConstants import BH_SNAP
     >>> print(bhData[BH_SNAP.]
 
 Functions

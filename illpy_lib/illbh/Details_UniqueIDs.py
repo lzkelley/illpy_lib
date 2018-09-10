@@ -1,7 +1,7 @@
 """
 
 Create all intermediate save-files using something like:
-    $ mpirun -n 64 python -m illpy.illbh.Details_UniqueIDs
+    $ mpirun -n 64 python -m illpy_lib.illbh.Details_UniqueIDs
 
 
 Objects
@@ -33,9 +33,9 @@ from argparse import ArgumentParser
 import zcode.inout as zio
 import zcode.math as zmath
 
-from illpy.Constants import NUM_SNAPS, DTYPE
-from illpy.illbh import BHDetails, BHConstants
-from illpy.illbh.BHConstants import DETAILS, _LOG_DIR, _distributeSnapshots, \
+from illpy_lib.Constants import NUM_SNAPS, DTYPE
+from illpy_lib.illbh import BHDetails, BHConstants
+from illpy_lib.illbh.BHConstants import DETAILS, _LOG_DIR, _distributeSnapshots, \
     GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave
 
 

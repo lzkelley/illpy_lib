@@ -619,7 +619,7 @@ def _constructBHIndexTable(run, snap, verbose=True):
 
 
 def main():
-    titleStr = "illpy.Subhalos.ParticleHosts.main()"
+    titleStr = "illpy_lib.Subhalos.ParticleHosts.main()"
     print "\n%s\n%s\n" % (titleStr, "="*len(titleStr))
 
     import sys

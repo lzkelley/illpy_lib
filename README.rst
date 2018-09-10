@@ -1,7 +1,7 @@
-illpy - Python Package for Illustris simulation data
+illpy_lib - Python Package for Illustris simulation data
 ====================================================
 
-**illpy** is a package designed to access and analyze data produced from the Illustris Simulations
+**illpy_lib** is a package designed to access and analyze data produced from the Illustris Simulations
 http://www.illustris-project.org/w/index.php/The_Simulations
 
 The package contains two primary modules,  
@@ -19,7 +19,7 @@ Installation
 ------------
 
 The full git repository can be cloned (with permission) from:
-https://bitbucket.org/lzkelley/illpy
+https://bitbucket.org/lzkelley/illpy_lib
 
 The base directory contains the setup script 'setup.py' which can be run as::
 
@@ -66,8 +66,8 @@ ie. once intermediate files are produced, they could be copied off of 'odyssey' 
 illcosmo - Cosmological parameters for the illustris snapshots
 --------------------------------------------------------------
 
-The **illcosmo** module is a class, **illcosmo.Cosmology** (illpy/illcosmo/Cosmology.py), 
-and a data set, **illpy/illcosmo/data/illustris-snapshot-cosmology-data.npz**.  The data set is
+The **illcosmo** module is a class, **illcosmo.Cosmology** (illpy_lib/illcosmo/Cosmology.py), 
+and a data set, **illpy_lib/illcosmo/data/illustris-snapshot-cosmology-data.npz**.  The data set is
 a table of cosmological measures (e.g. redshift, scalefactor, comoving and lum distance, etc)
 obtained by numerically integrating the FLRW equations with appropriate parameters (densities).
 The **Cosmology** class can be used to access those parameters at the scale-factor (time)
@@ -92,7 +92,7 @@ which accepts either
 
 - Examples::
 
-    >> import illpy.illcosmo as illcosmo      # Import 'illcosmo' module  
+    >> import illpy_lib.illcosmo as illcosmo      # Import 'illcosmo' module  
     >> cosmo = illcosmo.Cosmology()           # Initialize the 'Cosmology' object  
     >> firstRedshift = cosmo.redshift(0)      # Get the redshift of the first snapshot, number '0'  
     >> halfRedshift = cosmo.redshift(0.5)     # Get the redshift at a scalefactor of '0.5'; z = 1.0  
@@ -119,13 +119,13 @@ Note that BHs do not exist in illustris until a few dozen snapshots in.
 Each file type is handled by the submodules **BHDetails** and **BHMergers** respectively.  The
 strategy for both submodules is to process the raw illustris data files into *'intermediate'*
 post-process files, which can then be accessed much more easily (and faster).  The script
-**BuildFiles.py** in the **illpy** top-level directory will build and test these intermediate
+**BuildFiles.py** in the **illpy_lib** top-level directory will build and test these intermediate
 files, see the ***Installation*** section above for more information.  Once the intermediate
 files are produced, data access is quite rapid.
 
 BHDetails  
   For detailed explanations, see the documentation in the **BHDetails** file,  
-  (illpy/illbh/BHDetails.py)  
+  (illpy_lib/illbh/BHDetails.py)  
   The *'details'* intermediate files are organized into snapshots, for convenience.  If time
   (scale-factors) `t_i` corresponds to snapshot number `i`, then all details entries between
   [t_i, t_{i+1}] are saved in the intermediate *'details'* file number `i`.  Thus the last
@@ -137,7 +137,7 @@ BHDetails
 
 BHMergers  
   For detailed explanations, see the documentation in the **BHMergers** file,
-  (illpy/illbh/BHMergers.py)  
+  (illpy_lib/illbh/BHMergers.py)  
   The *'mergers'* intermediate files each contain all mergers for an entire illustris simulation.
   There are however, numerous intermediate files.  In particular a *'raw'* file, and a *'fixed'*
   file.  The former contains exactly the information in the original illustris data files, while
@@ -146,7 +146,7 @@ BHMergers
 
   Usage::
 
-    >> from illpy.illbh import BHMergers            # import the BHMergers submodule  
+    >> from illpy_lib.illbh import BHMergers            # import the BHMergers submodule  
     >> mergers = BHMergers.loadMergers()            # load all mergers
     >> print mergers[BHMergers.MERGERS_NUM]         # print the total number of mergers
     >> masses = mergers[BHMergers.MERGERS_MASSES]   # get the masses of both BHs in each merger
@@ -166,8 +166,8 @@ Source Structure
 
 Contents::  
 
-    illpy  
-    |-- illpy  
+    illpy_lib  
+    |-- illpy_lib  
     |   |-- AuxFuncs.py  
     |   |-- Constants.py                              : Physical and numerical constants  
     |   |-- illbh  

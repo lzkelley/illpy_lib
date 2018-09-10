@@ -8,15 +8,15 @@ requirements = [
 ]
 
 setup(
-    name = "illpy",
+    name = "illpy_lib",
     version = "0.0.1",
     author = "Luke Zoltan Kelley",
     author_email = "lkelley@cfa.harvard.edu",
     description = ("General functions for dealing with the illustris simulations."),
     license = "MIT",
     keywords = "",
-    url = "https://bitbucket.org/lzkelley/illpy",
-    packages=['illpy'],
+    url = "https://bitbucket.org/lzkelley/illpy_lib",
+    packages=['illpy_lib'],
     include_package_data=True,
     install_requires=requirements,
     long_description=readme,

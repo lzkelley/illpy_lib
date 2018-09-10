@@ -16,10 +16,10 @@ from matplotlib import pyplot as plt
 import os
 
 
-import illpy
-from illpy import AuxFuncs as aux
-from illpy.Constants import *
-from illpy.illbh.BHConstants import *
+import illpy_lib
+from illpy_lib import AuxFuncs as aux
+from illpy_lib.Constants import *
+from illpy_lib.illbh.BHConstants import *
 
 import Basics
 

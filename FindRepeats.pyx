@@ -6,8 +6,8 @@
 import numpy as np
 cimport numpy as np
 
-import illpy
-from illpy.illbh.BHConstants import IN_BH, OUT_BH
+import illpy_lib
+from illpy_lib.illbh.BHConstants import IN_BH, OUT_BH
 
 def findRepeats(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
                 np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,  

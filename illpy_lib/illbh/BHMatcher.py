@@ -3,7 +3,7 @@
 The matched details files should be precomputed by executing this file as a script,
 for example:
 
-    $ mpirun -n 64 python -m illpy.illbh.BHMatcher
+    $ mpirun -n 64 python -m illpy_lib.illbh.BHMatcher
 
 This will create the 'merger-details' and 'remnant-details' files respectively, which can then be
 loaded via the API functions `loadMergerDetails` and `loadRemnantDetails` respectively.
@@ -38,16 +38,16 @@ from datetime import datetime
 
 from mpi4py import MPI
 
-import illpy.illbh.BHDetails
-import illpy.illbh.BHMergers
-import illpy.illbh.BHTree
-import illpy.illbh.BHConstants
-from illpy.illbh.Details_UniqueIDs import loadAllUniqueIDs
-from illpy.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
+import illpy_lib.illbh.BHDetails
+import illpy_lib.illbh.BHMergers
+import illpy_lib.illbh.BHTree
+import illpy_lib.illbh.BHConstants
+from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
+from illpy_lib.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
     _distributeSnapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
-import illpy.Constants
-from illpy.Constants import DTYPE, NUM_SNAPS
+import illpy_lib.Constants
+from illpy_lib.Constants import DTYPE, NUM_SNAPS
 
 import zcode.inout as zio
 import zcode.math as zmath
@@ -70,7 +70,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     comm.Barrier()
 
     # Initialize log
-    log = illpy.illbh.BHConstants._loadLogger(
+    log = illpy_lib.illbh.BHConstants._loadLogger(
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
     log.debug(header)
     if(rank == 0):
@@ -161,7 +161,7 @@ def loadMergerDetails(run, verbose=True, log=None):
 
     """
     if(log is None):
-        log = illpy.illbh.BHConstants._loadLogger(
+        log = illpy_lib.illbh.BHConstants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadMergerDetails()")
@@ -200,7 +200,7 @@ def loadRemnantDetails(run, verbose=True, log=None):
 
     """
     if(log is None):
-        log = illpy.illbh.BHConstants._loadLogger(
+        log = illpy_lib.illbh.BHConstants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadRemnantDetails()")
@@ -242,7 +242,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
         unique = loadAllUniqueIDs(run, log=log)
         log.debug(" - Loaded %d unique ID numbers" % (len(unique[DETAILS.IDS])))
         # get the final merger number, the unique BH IDs, and the merger indices of this tree
-        finMerger, bhIDs, mrgInds = illpy.illbh.BHTree.allIDsForTree(run, mrg)
+        finMerger, bhIDs, mrgInds = illpy_lib.illbh.BHTree.allIDsForTree(run, mrg)
         # Construct the appropriate file-name
         fname = GET_BLACKHOLE_TREE_DETAILS_FILENAME(run, finMerger, __version__)
         log.debug(" - Merger %d ==> Final merger %d, filename: '%s'" % (mrg, finMerger, fname))
@@ -453,14 +453,14 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
 
     """
     if(log is None):
-        log = illpy.illbh.BHConstants._loadLogger(
+        log = illpy_lib.illbh.BHConstants._loadLogger(
             __file__, verbose=True, debug=False, run=run, tofile=False)
 
     log.debug("inferMergerOutMasses()")
 
     # Load Mergers
     if(mergers is None):
-        mergers = illpy.illbh.BHMergers.loadFixedMergers(run, verbose=False)
+        mergers = illpy_lib.illbh.BHMergers.loadFixedMergers(run, verbose=False)
     m_scales = mergers[MERGERS.SCALES]
     m_masses = mergers[MERGERS.MASSES]
     numMergers = mergers[MERGERS.NUM]
@@ -540,7 +540,7 @@ def _matchMergerDetails(run, log):
     if rank == 0:
         # Load Mergers
         log.debug("Loading Mergers")
-        mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
+        mergers = illpy_lib.illbh.BHMergers.loadFixedMergers(run)
         numMergers = mergers[MERGERS.NUM]
         mergerIDs = mergers[MERGERS.IDS]
 
@@ -758,7 +758,7 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     """
 
     if log is None:
-        log = illpy.illbh.BHConstants._loadLogger(
+        log = illpy_lib.illbh.BHConstants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_createRemnantDetails()")
@@ -770,13 +770,13 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
 
     if mergers is None:
         log.debug("Loading Mergers.")
-        mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
+        mergers = illpy_lib.illbh.BHMergers.loadFixedMergers(run)
     if mdets is None:
         log.debug("Loading Merger-Details.")
         mdets = loadMergerDetails(run, log=log)
     if tree is None:
         log.debug("Loading BHTree.")
-        tree = illpy.illbh.BHTree.loadTree(run)
+        tree = illpy_lib.illbh.BHTree.loadTree(run)
 
     # Create 'remnant' profiles ('RemnantDetails') based on tree and MergerDetails
     ids, scales, masses, dens, mdots, csnds = \
@@ -852,7 +852,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
 
     """
     if log is None:
-        log = illpy.illbh.BHConstants._loadLogger(
+        log = illpy_lib.illbh.BHConstants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_matchRemnantDetails()")
@@ -860,7 +860,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     # Load Mergers
     log.debug("Loading Mergers")
     if mergers is None:
-        mergers = illpy.illbh.BHMergers.loadFixedMergers(run)
+        mergers = illpy_lib.illbh.BHMergers.loadFixedMergers(run)
     m_scales = mergers[MERGERS.SCALES]
     m_ids = mergers[MERGERS.IDS]
     numMergers = np.int(mergers[MERGERS.NUM])     # Convert from ``np.array(int)``
@@ -883,7 +883,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     # Load BH Merger Tree
     if tree is None:
         log.debug("Loading BHTree")
-        tree = illpy.illbh.BHTree.loadTree(run)
+        tree = illpy_lib.illbh.BHTree.loadTree(run)
     nextMerger = tree[BH_TREE.NEXT]
 
     # Initialize data for results
@@ -1245,7 +1245,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
         numStoredSnap = np.zeros(numUniqueBHs, dtype=int)     # Num entries stored in a snapshot
 
         # Load `BHDetails`
-        dets = illpy.illbh.BHDetails.loadBHDetails(run, snap, verbose=False)
+        dets = illpy_lib.illbh.BHDetails.loadBHDetails(run, snap, verbose=False)
         numDets = dets[DETAILS.NUM]
         log.debug(" - %d Details" % (numDets))
         detIDs = dets[DETAILS.IDS]
@@ -1482,7 +1482,7 @@ def _logStats(name, prop, log, lvl=logging.DEBUG):
 def _detailsForBHLineage(run, mrg, log, rdets=None, tree=None, mergers=None):
     log.debug("_detailsForBHLineage()")
     # Get all merger indices in this tree
-    finMerger, bhIDs, mrgInds = illpy.illbh.BHTree.allIDsForTree(
+    finMerger, bhIDs, mrgInds = illpy_lib.illbh.BHTree.allIDsForTree(
         run, mrg, tree=tree, mergers=mergers)
 '''
 

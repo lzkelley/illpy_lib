@@ -68,7 +68,7 @@ from datetime import datetime
 
 import zcode.inout as zio
 
-from illpy.Constants import DTYPE, NUM_SNAPS
+from illpy_lib.Constants import DTYPE, NUM_SNAPS
 import BHConstants
 from BHConstants import DETAILS
 
@@ -166,10 +166,10 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
     if(verbose): print " - - BHDetails._reorganizeBHDetailsFiles()"
 
     # Load cosmology
-    # from illpy import illcosmo
+    # from illpy_lib import illcosmo
     # cosmo = illcosmo.Cosmology()
-    import illpy.illcosmo
-    cosmo = illpy.illcosmo.cosmology.Cosmology()
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()
 
     # Open new ASCII, Temp details files

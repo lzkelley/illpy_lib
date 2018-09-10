@@ -1,10 +1,10 @@
 
 
 import numpy as np
-import illpy
-from illpy import illcosmo
-from illpy.illbh import BHMergers
-from illpy.illbh import BHDetails
+import illpy_lib
+from illpy_lib import illcosmo
+from illpy_lib.illbh import BHMergers
+from illpy_lib.illbh import BHDetails
 
 
 RUN = 3
@@ -29,7 +29,7 @@ def main(run=RUN, verbose=VERBOSE):
     for ii, tval in enumerate([t1, t2, t3]):
 
         if(tval <= 0.0 or tval >= 1.0):
-            raise RuntimeError("ERROR: illpy.illcosmo.Cosmology - Test %d" % ii)
+            raise RuntimeError("ERROR: illpy_lib.illcosmo.Cosmology - Test %d" % ii)
 
     print "\n\nCosmology looks good.\n"
 
@@ -54,13 +54,13 @@ def main(run=RUN, verbose=VERBOSE):
 
 
     if(t1 <= 0):
-        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 1 = %d!" % t1)
+        raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 1 = %d!" % t1)
 
     if(t2 <= 0):
-        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 2 = %d!" % t2)
+        raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 2 = %d!" % t2)
 
     if(t3 < cosmo[-2] or t3 > cosmo[-1]):
-        raise RuntimeError("ERROR: illpy.illbh.BHDetails - Test 3 = %f!" % t3)
+        raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 3 = %f!" % t3)
 
 
     print "\n\nBHDetails looks good.\n"
@@ -86,7 +86,7 @@ def main(run=RUN, verbose=VERBOSE):
     # Check each test value
     for ii, tval in enumerate([t1, t2, t3]):
         if(tval <= 0):
-            raise RuntimeError("ERROR: illpy.illbh.BHMergers - Test %d" % ii)
+            raise RuntimeError("ERROR: illpy_lib.illbh.BHMergers - Test %d" % ii)
 
 
     print "\n\nBHMergers looks good.\n"

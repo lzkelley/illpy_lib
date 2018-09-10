@@ -3,4 +3,4 @@ inspector_gadget/
 *.pyc
 .*~
 *.egg-info
-illpy/illbh/data
+illpy_lib/illbh/data

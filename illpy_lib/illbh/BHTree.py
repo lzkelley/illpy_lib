@@ -21,7 +21,7 @@ from datetime import datetime
 
 from ..Constants import DTYPE
 # from .. import Cosmology
-import illpy.illcosmo
+import illpy_lib.illcosmo
 import BHConstants
 from BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
 import BHMergers
@@ -239,8 +239,8 @@ def _constructBHTree(run, mergers, verbose=True):
     if verbose: print " - - BHTree.constructBHTree()"
 
     # cosmo = Cosmology()
-    import illpy.illcosmo
-    cosmo = illpy.illcosmo.cosmology.Cosmology()
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
 
     numMergers = mergers[MERGERS.NUM]
     last     = -1*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
