@@ -18,7 +18,7 @@ import os
 
 import illpy_lib
 from illpy_lib import AuxFuncs as aux
-from illpy_lib.Constants import *
+from illpy_lib.constants import *
 from illpy_lib.illbh.BHConstants import *
 
 import Basics
@@ -73,7 +73,7 @@ def main(run=RUN, load=LOAD, verbose=VERBOSE):
 
     return interval, lowerInter, numPast, numFuture
 
-    
+
     ### Plot Repeat Data ###
     gwplot.plotFig4_RepeatedMergers(interval, lowerInter, numFuture)
 
@@ -114,7 +114,7 @@ def getRepeats(run, base, load=False, verbose=VERBOSE):
 
     fname = FILE_NAME(run)
     # Try to load precalculated repeat data
-    if(os.path.exists(fname) and not load): 
+    if(os.path.exists(fname) and not load):
         if(verbose) : print " - - - Loading Repeated Merger Data from '%s'" % (fname)
         start = datetime.now()
         repeats = np.load(fname)
@@ -227,7 +227,7 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
     """
 
     if(verbose): print " - - RepeatedMergers.analyzeRepeats()"
-    
+
     numMergers   = base.numMergers
 
     last         = repeats[REPEAT_LAST]
@@ -255,14 +255,14 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
     numTwoIsolated = len(inds[0])
     inds = np.where(((last[:, IN_BH] < 0) ^ (last[:, OUT_BH] < 0)) & (next[:] < 0))                 # 'xor' comparison
     numOneIsolated = len(inds[0])
-    
-    if(verbose): 
+
+    if(verbose):
         print " - - - Mergers with neither  BH previously merged = %d" % (numTwoIsolated)
         print " - - - Mergers with only one BH previously merged = %d" % (numOneIsolated)
 
 
     ### Go back through All Mergers to Count Repeats ###
-    
+
     for ii in xrange(numMergers):
 
         ## Count Forward from First Mergers ##
@@ -276,7 +276,7 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
             aveFuture += numFuture[ii]
             aveFutureNum += 1
 
-                
+
         ## Count Backward from Last Mergers ##
         # If this is a final merger
         if(next[ii] < 0):
@@ -324,10 +324,10 @@ def countFutureMergers(next, ind):
 
 
 def countPastMergers(last, ind):
-    
+
     last_in  = last[ind, IN_BH]
     last_out = last[ind, OUT_BH]
-    
+
     num_in   = 0
     num_out  = 0
 
@@ -342,4 +342,3 @@ def countPastMergers(last, ind):
 
 
 if __name__ == "__main__": main()
-

@@ -1,7 +1,7 @@
 # ==================================================================================================
 # ObjMergers.py
 # ------------
-# 
+#
 #
 #
 # ------------------
@@ -13,7 +13,7 @@ import numpy as np
 from glob import glob
 from datetime import datetime
 import cPickle as pickle
-from Constants import *
+from constants import *
 
 import AuxFuncs as aux
 
@@ -28,7 +28,7 @@ class Mergers(object):
     This class is just a wrapper for 5 numpy arrays storing the time,
     IDs and masses of both blackholes ('in' the accreted, and 'out'
     the accretor).  Each constituent array can be accessed as if this
-    object was a dict, e.g. 
+    object was a dict, e.g.
       times = mergers[MERGER_TIME]
     or the values for a single merger can be accessed, e.g.
       merger100 = mergers[100]
@@ -37,7 +37,7 @@ class Mergers(object):
     e.g.
       del mergers[100]
       mergers.delete([100, 200, 221])
-    
+
     Individual mergers can be added using either the Mergers.add()
     method, or by accessing the last+1 memeber, e.g. if len(mergers) = N
       mergers[N+1] = [TIME, IN_ID, ...]
@@ -57,7 +57,7 @@ class Mergers(object):
     MERGER_IN_ID    = 3
     MERGER_IN_MASS  = 4
 
-    
+
     def __init__(self, nums):
         ''' Initialize object with empty arrays for 'num' entries '''
         self.time     = np.zeros(nums, dtype=DBL)
@@ -80,8 +80,8 @@ class Mergers(object):
             e.g. MERGER_TIME = 'time' for the time array
         '''
 
-        if(  type(key) == int): 
-            return [self.time[key], self.in_id[key], self.in_mass[key], 
+        if(  type(key) == int):
+            return [self.time[key], self.in_id[key], self.in_mass[key],
                      self.out_id[key], self.out_mass[key]]
         elif(key == Mergers.MERGER_TIME    ): return self.time
         elif(key == Mergers.MERGER_OUT_ID  ): return self.out_id
@@ -99,23 +99,23 @@ class Mergers(object):
         For a particular array, key is appropriate string argument.
             e.g. MERGER_TIME = 'time' for the time array
         '''
-        if(  type(key) == int): 
+        if(  type(key) == int):
             if(key == self.__len): self.add(vals)
-            else: 
+            else:
                 self.time[key]     = vals[Mergers.MERGER_TIME]
                 self.out_id[key]   = vals[Mergers.MERGER_OUT_ID]
                 self.out_mass[key] = vals[Mergers.MERGER_OUT_MASS]
                 self.in_id[key]    = vals[Mergers.MERGER_IN_ID]
                 self.in_mass[key]  = vals[Mergers.MERGER_IN_MASS]
-        elif(key == Mergers.MERGER_TIME    ): 
+        elif(key == Mergers.MERGER_TIME    ):
             self.time = vals
-        elif(key == Mergers.MERGER_OUT_ID  ): 
+        elif(key == Mergers.MERGER_OUT_ID  ):
             self.out_id = vals
-        elif(key == Mergers.MERGER_OUT_MASS): 
+        elif(key == Mergers.MERGER_OUT_MASS):
             self.out_mass = vals
-        elif(key == Mergers.MERGER_IN_ID   ): 
+        elif(key == Mergers.MERGER_IN_ID   ):
             self.in_id = vals
-        elif(key == Mergers.MERGER_IN_MASS ): 
+        elif(key == Mergers.MERGER_IN_MASS ):
             self.in_mass = vals
         else: raise KeyError("Unrecozgnized key '%s'!" % (str(key)))
 
@@ -141,7 +141,7 @@ class Mergers(object):
         self.in_mass  = np.delete(self.in_mass,  keys)
         self.__len    = len(self.time)
 
-        
+
     def add(self, vals):
         ''' Append the given merger information as a new last element '''
 
@@ -152,7 +152,7 @@ class Mergers(object):
         self.in_mass  = np.append(self.in_mass,  vals[2])
         self.__len    = len(self.time)
 
-    
+
 
 
 
@@ -183,14 +183,14 @@ def getIllustrisMergerFilenames(runNum, runsDir, log=None):
 
 def loadAllIllustrisMergers(runNum, runsDir, log=None):
 
-    if(log): 
+    if(log):
         log += 1
         log.log("loadAllIllustrisMergers()")
-    
+
     # Load list of merger filenames for this simulation run (runNum)
     if(log): log += 1
     mergerFiles = getIllustrisMergerFilenames(runNum, runsDir, log=log)
-    if(log): 
+    if(log):
         log -= 1
         log.log("Found %d illustris merger files" % (len(mergerFiles)), 1)
 
@@ -211,7 +211,7 @@ def loadAllIllustrisMergers(runNum, runsDir, log=None):
 
 def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
 
-    if(log): 
+    if(log):
         log += 1
         log.log("loadMergers()")
         log.log("Loading Mergers from run %d" % (runNum), 1)
@@ -243,10 +243,10 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
         if(log): log -= 1
 
 
-    if(log): 
+    if(log):
         log.log("Loaded %d mergers." % (len(mergers)), 2)
         log += 1
-        
+
     # Save Mergers to save-file if desired
     if(save and len(mergers) > 0): saveMergers(mergers, saveFile, log=log)
     if(log): log -= 2
@@ -301,4 +301,3 @@ def loadMergersFromSave(loadFilename):
     loadFile = open(loadFilename, 'rb')
     mergers = pickle.load(loadFile)
     return mergers
-

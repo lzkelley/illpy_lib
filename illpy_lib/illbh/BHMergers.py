@@ -93,7 +93,7 @@ import illpy_lib.illbh.BHConstants
 from illpy_lib.illbh.BHConstants import MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, \
     GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
 
-from illpy_lib.Constants import DTYPE
+from illpy_lib.constants import DTYPE
 # from illpy_lib import Cosmology
 # import illpy_lib.illcosmo
 

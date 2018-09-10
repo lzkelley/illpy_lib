@@ -33,7 +33,7 @@ from argparse import ArgumentParser
 import zcode.inout as zio
 import zcode.math as zmath
 
-from illpy_lib.Constants import NUM_SNAPS, DTYPE
+from illpy_lib.constants import NUM_SNAPS, DTYPE
 from illpy_lib.illbh import BHDetails, BHConstants
 from illpy_lib.illbh.BHConstants import DETAILS, _LOG_DIR, _distributeSnapshots, \
     GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave

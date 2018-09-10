@@ -37,7 +37,8 @@ import argparse
 
 from mpi4py import MPI
 
-from ..Constants import NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, DTYPE, GET_BAD_SNAPS
+from illpy_lib.constants import (NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR,
+                                 DTYPE, GET_BAD_SNAPS)
 import BHMergers
 import BHConstants
 from BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES

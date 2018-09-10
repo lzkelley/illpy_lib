@@ -46,8 +46,7 @@ from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
 from illpy_lib.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
     _distributeSnapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
-import illpy_lib.Constants
-from illpy_lib.Constants import DTYPE, NUM_SNAPS
+from illpy_lib.constants import DTYPE, NUM_SNAPS
 
 import zcode.inout as zio
 import zcode.math as zmath

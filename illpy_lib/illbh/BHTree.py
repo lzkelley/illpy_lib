@@ -19,7 +19,7 @@ import warnings
 import numpy as np
 from datetime import datetime
 
-from ..Constants import DTYPE
+from illpy_lib.constants import DTYPE
 # from .. import Cosmology
 import illpy_lib.illcosmo
 import BHConstants

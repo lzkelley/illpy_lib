@@ -68,7 +68,7 @@ from datetime import datetime
 
 import zcode.inout as zio
 
-from illpy_lib.Constants import DTYPE, NUM_SNAPS
+from illpy_lib.constants import DTYPE, NUM_SNAPS
 import BHConstants
 from BHConstants import DETAILS
 

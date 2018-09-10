@@ -29,7 +29,7 @@ import numpy as np
 
 import zcode.inout as zio
 
-from .. Constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, NUM_SNAPS
+from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, NUM_SNAPS
 
 
 # Illustris Parameters

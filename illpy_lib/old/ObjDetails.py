@@ -1,7 +1,7 @@
 # ==================================================================================================
 # ObjDetails.py
 # -------------
-# 
+#
 #
 #
 # ------------------
@@ -13,7 +13,7 @@ import numpy as np
 from glob import glob
 from datetime import datetime
 
-from Constants import *
+from constants import *
 
 
 class Details(object):
@@ -33,7 +33,7 @@ class Details(object):
     e.g.
       del details[100]
       details.delete([100, 200, 221])
-    
+
     Individual details can be added using either the Details.add()
     method, or by accessing the last+1 memeber, e.g. if len(details) = N
       details[N+1] = [ID, TIME, ...]
@@ -47,7 +47,7 @@ class Details(object):
     DETAIL_MDOT     = 3
     DETAIL_RHO      = 4
     DETAIL_CS       = 5
-    
+
     def __init__(self, nums):
         ''' Initialize object with empty arrays for 'nums' entries '''
         self.id    = np.zeros(nums, dtype=LONG)
@@ -80,9 +80,9 @@ class Details(object):
         # If normal int, Convert to numpy int
         if(type(key) == int): key = np.int(key)
 
-        
-        if(np.issubdtype(type(key), int)): 
-            return [self.id[key], self.time[key], self.mass[key], 
+
+        if(np.issubdtype(type(key), int)):
+            return [self.id[key], self.time[key], self.mass[key],
                      self.mdot[key], self.rho[key], self.cs[key]]
         elif(key == Details.DETAIL_ID  ): return self.id
         elif(key == Details.DETAIL_TIME): return self.time
@@ -101,26 +101,26 @@ class Details(object):
         For a particular array, key is appropriate string argument.
             e.g. DETAIL_TIME = 'time' for the time array
         '''
-        if(  type(key) == int): 
+        if(  type(key) == int):
             if(key == self.__len): self.add(vals)
-            else: 
+            else:
                 self.id[key]   = vals[Details.DETAIL_ID]
                 self.time[key] = vals[Details.DETAIL_TIME]
                 self.mass[key] = vals[Details.DETAIL_MASS]
                 self.mdot[key] = vals[Details.DETAIL_MDOT]
                 self.rho[key]  = vals[Details.DETAIL_RHO]
                 self.cs[key]   = vals[Details.DETAIL_CS]
-        elif(key == DETAIL_ID  ): 
+        elif(key == DETAIL_ID  ):
             self.id = vals
-        elif(key == DETAIL_TIME): 
+        elif(key == DETAIL_TIME):
             self.time = vals
-        elif(key == DETAIL_MASS): 
+        elif(key == DETAIL_MASS):
             self.mass = vals
-        elif(key == DETAIL_MDOT): 
+        elif(key == DETAIL_MDOT):
             self.mdot = vals
-        elif(key == DETAIL_RHO ): 
+        elif(key == DETAIL_RHO ):
             self.rho = vals
-        elif(key == DETAIL_CS  ): 
+        elif(key == DETAIL_CS  ):
             self.cs = vals
         else: raise KeyError("Unrecozgnized key '%s'!" % (str(key)))
 
@@ -148,7 +148,7 @@ class Details(object):
         self.cs    = np.delete(self.cs,   keys)
         self.__len = len(self.id)
 
-        
+
     def add(self, vals):
         ''' Append the given detail information as a new last element '''
 
@@ -159,5 +159,3 @@ class Details(object):
         self.rho   = np.append(self.rho,  vals[Details.DETAIL_RHO])
         self.cs    = np.append(self.cs,   vals[Details.DETAIL_CS])
         self.__len = len(self.id)
-
-    

@@ -12,8 +12,9 @@ from datetime import datetime
 import numpy as np
 
 import illpy_lib
-from illpy_lib.Constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
-from Constants import SUBHALO
+from illpy_lib.constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
+
+from . Constants import SUBHALO
 
 VERBOSE = True
 
@@ -25,7 +26,7 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
     Import particle data for a given Subhalo from the illustris snapshot files.
 
     The target particle types are the standard, e.g. 0-gas, 1-dm, etc described by the constants in
-    ``illpy_lib.Constants.PARTICLE``.  Each particle type has a different set of parameters returned in
+    ``illpy_lib.constants.PARTICLE``.  Each particle type has a different set of parameters returned in
     the resulting dictionaries in the ``data`` output.
 
     Arguments
@@ -110,7 +111,7 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
 
     Returns
     -------
-       subcat   <dict>     : dictionary of catalog properties (see ``illpy_lib.Constants.SUBHALO``)
+       subcat   <dict>     : dictionary of catalog properties (see ``illpy_lib.constants.SUBHALO``)
 
     """
 

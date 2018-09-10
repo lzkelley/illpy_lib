@@ -55,7 +55,7 @@ import zcode.math as zmath
 # from zcode.constants import PC
 
 from illpy_lib.Subhalos.Constants import SUBHALO
-from illpy_lib.Constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
+from illpy_lib.constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
 
 from . import Subhalo
 from . import Profiler

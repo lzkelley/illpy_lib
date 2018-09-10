@@ -10,7 +10,7 @@ from scipy import interpolate
 import astropy as ap
 import astropy.cosmology
 
-from ..Constants import BOX_LENGTH
+from illpy_lib.constants import BOX_LENGTH
 from zcode.constants import HPAR, H0, SPLC, KPC
 
 # Get local path, and data directory
@@ -66,7 +66,7 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         min_scale = np.min(self.snapshot_scales)
         max_redz = self._scale_to_z(min_scale)
         z_grid_pnts = np.append(max_redz, self._Z_GRID)
-        
+
         #    Create a grid in redshift (float64)
         zgrid = self._init_interp_grid(z_grid_pnts, interp_points)
         self._grid_z = zgrid
@@ -84,7 +84,7 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
 
     def _init_interp_grid(self, z_pnts, num_pnts):
         """Create a grid in redshift for interpolation.
-        
+
         Arguments
         ---------
         z_pnts : (N,) array_like of scalar
@@ -116,7 +116,7 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
             else:
                 zgrid = np.append(zgrid, temp)
             z0 = z1
-        
+
         # Linearly space from the last point up to `0.0` (cant reach `0.0` with log-spacing)
         zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=num_pnts))
         return zgrid

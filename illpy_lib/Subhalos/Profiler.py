@@ -12,19 +12,16 @@ import warnings
 from datetime import datetime
 import numpy as np
 
+from illpy_lib.constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
 
-from illpy_lib.Constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
+from . import Subhalo
+# import constants
+from . Constants import SNAPSHOT, SUBHALO
 
-import Subhalo
-import Constants
-from Constants import SNAPSHOT, SUBHALO
-
-import zcode.math     as zmath
-import zcode.inout    as zio
-
+import zcode.math as zmath
+import zcode.inout as zio
 
 NUM_RAD_BINS = 100
-
 
 
 def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BINS,
@@ -49,7 +46,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     -------
        radBins   <flt>[N]   : coordinates of right-edges of ``N`` radial bins
        posRef    <flt>[3]   : coordinates in simulation box of most-bound particle (used as C.O.M.)
-       partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy_lib.Constants.PARTICLE``)
+       partTypes <int>[M]   : particle type numbers for ``M`` types, (``illpy_lib.constants.PARTICLE``)
        partNames <str>[M]   : particle type strings for each type
        numsBins  <int>[M, N] : binned number of particles for ``M`` particle types, ``N`` bins each
        massBins  <flt>[M, N] : binned radial mass profile
