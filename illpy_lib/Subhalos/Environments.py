@@ -2,10 +2,10 @@
 Load Subhalo and environmental data corresponding to Merger BHs.
 
 To load all merger environments
-    `env = illpy_lib.Subhalos.Environments.loadMergerEnvironments(1)`
+    `env = illpy_lib.subhalos.Environments.loadMergerEnvironments(1)`
 
 To process all environments (i.e. for all Subhalos) into individual files, run with:
-    `mpirun -n NP python -m illpy_lib.Subhalos.Environments RUN`
+    `mpirun -n NP python -m illpy_lib.subhalos.Environments RUN`
     arguments:
         NP  <int> : num processors
         RUN <int> : illustris simulation number, {1, 3}
@@ -54,7 +54,7 @@ import zcode.inout as zio
 import zcode.math as zmath
 # from zcode.constants import PC
 
-from illpy_lib.Subhalos.Constants import SUBHALO
+from illpy_lib.subhalos.Constants import SUBHALO
 from illpy_lib.constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
 
 from . import Subhalo

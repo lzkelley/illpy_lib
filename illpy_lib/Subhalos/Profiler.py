@@ -9,7 +9,6 @@ Functions
 """
 
 import warnings
-from datetime import datetime
 import numpy as np
 
 from illpy_lib.constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
@@ -56,12 +55,11 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
     """
 
-
     if verbose: print(" - - Profiler.subhaloRadialProfiles()")
 
     if verbose: print(" - - - Loading subhalo partile data")
     # Redirect output during this call
-    with zio.StreamCapture() as strCap:
+    with zio.StreamCapture():
         partData, partTypes = Subhalo.importSubhaloParticles(run, snapNum, subhalo, verbose=False)
 
     partNums = [pd['count'] for pd in partData]
@@ -76,8 +74,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     # If no particle ID is given, find it
     if (mostBound is None):
         # Get group catalog
-        mostBound = Subhalo.importGroupCatalogData(run, snapNum, subhalos=subhalo, \
-                                                   fields=[SUBHALO.MOST_BOUND])
+        mostBound = Subhalo.importGroupCatalogData(
+            run, snapNum, subhalos=subhalo, fields=[SUBHALO.MOST_BOUND])
 
     if (mostBound is None):
         warnStr  = "Could not find mostBound particle ID Number!"
@@ -85,9 +83,8 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         warnings.warn(warnStr, RuntimeWarning)
         return None
 
-
     thisStr = "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
-    if verbose: print((" - - - - %s : Loaded %s particles".format(thisStr, str(partNums))))
+    if verbose: print((" - - - - {:s} : Loaded {:s} particles".format(thisStr, str(partNums))))
 
     # Find the most-bound particle, store its position
     for pdat, pname in zip(partData, partNames):
@@ -95,7 +92,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         if (pdat['count'] == 0): continue
         inds = np.where(pdat[SNAPSHOT.IDS] == mostBound)[0]
         if (len(inds) == 1):
-            if verbose: print((" - - - Found Most Bound Particle in '%s'".format(pname)))
+            if verbose: print((" - - - Found Most Bound Particle in '{:s}'".format(pname)))
             posRef = pdat[SNAPSHOT.POS][inds[0]]
             break
 
@@ -113,7 +110,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     disp = np.zeros(numPartTypes, dtype=object)
     radExtrema = None
 
-
     # Iterate over all particle types and their data
     #  ==============================================
 
@@ -127,7 +123,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
             warnStr += "Expecting %d, Retrieved %d" % (partNums[ii], data['count'])
             warnings.warn(warnStr, RuntimeWarning)
             return None
-
 
         # Skip if this particle type has no elements
         #    use empty lists so that call to ``np.concatenate`` below works (ignored)
@@ -150,9 +145,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         pots[ii] = data[SNAPSHOT.POT]
         disp[ii] = data[SNAPSHOT.SUBF_VDISP]
         radExtrema = zmath.minmax(rads[ii], prev=radExtrema, nonzero=True)
-
-    # } for data, ptype
-
 
     # Create Radial Bins
     #  ------------------
@@ -187,15 +179,14 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         # Skip if this particle type has no elements
         if (data['count'] == 0): continue
 
-
         # Get the total mass in each bin
         numsBins[ii, :], massBins[ii, :] = zmath.histogram(rads[ii], radBins, weights=mass[ii],
-                                                         edges='right', func='sum', stdev=False)
+                                                           edges='right', func='sum', stdev=False)
 
         # Divide by volume to get density
         densBins[ii, :] = massBins[ii, :]/binVols
 
-    if verbose: print((" - - - - Binned %s particles".format(str(np.sum(numsBins, axis=1)))))
+    if verbose: print((" - - - - Binned {:s} particles".format(str(np.sum(numsBins, axis=1)))))
 
     # Consistency check on numbers of particles
     # -----------------------------------------
@@ -241,7 +232,6 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
     dispBins[:, 0] = aves
     dispBins[:, 1] = stds
 
-
     return radBins, posRef, mostBound, partTypes, partNames, \
         numsBins, massBins, densBins, potsBins, dispBins
 
@@ -277,7 +267,7 @@ def reflectPos(pos, center=None):
     offsets = fix - center
 
     # Reflect positions which are more than half a box away
-    fix[offsets >  HALF] -= FULL
+    fix[offsets > +HALF] -= FULL
     fix[offsets < -HALF] += FULL
 
     return fix

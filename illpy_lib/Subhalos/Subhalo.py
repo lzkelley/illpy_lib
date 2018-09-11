@@ -1,5 +1,5 @@
 """
-Submodule to import particle data from illustris snapshots.  Wrappers for `illustris_python`.
+Submodule to import particle data from illustris snapshots.  Wrappers for `illpy_lib`.
 
 Functions
 ---------
@@ -11,7 +11,7 @@ Functions
 from datetime import datetime
 import numpy as np
 
-import illpy_lib
+import illpy_lib as ill
 from illpy_lib.constants import GET_ILLUSTRIS_OUTPUT_DIR, PARTICLE
 
 from . Constants import SUBHALO
@@ -53,9 +53,7 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
 
     """
 
-    import illustris_python as ill
-
-    if verbose: print(" - - Subhalos._importSubhaloParticles()")
+    if verbose: print(" - - subhalos._importSubhaloParticles()")
 
     # Prepare Particle Types to Import
     #  --------------------------------
@@ -114,8 +112,6 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
        subcat   <dict>     : dictionary of catalog properties (see ``illpy_lib.constants.SUBHALO``)
 
     """
-
-    import illustris_python as ill
 
     if verbose: print(" - - Subhalo.importGroupCatalogData()")
 

@@ -102,7 +102,7 @@ def organizeDetails(run, loadsave=True, verbose=True):
         tempExist = all([os.path.exists(tfil) for tfil in tempFiles])
         if not tempExist:
             if verbose:
-                print((" - - - Temp files do not exist '%s'".format(tempFiles[0])))
+                print((" - - - Temp files do not exist '{:s}'".format(tempFiles[0])))
             loadsave = False
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
@@ -124,7 +124,7 @@ def organizeDetails(run, loadsave=True, verbose=True):
 
     # If files are missing, raise error
     if not tempExist:
-        print(("Temporary Files still missing!  '%s'".format(tempFiles[0])))
+        print(("Temporary Files still missing!  '{:s}'".format(tempFiles[0])))
         raise RuntimeError("Temporary Files missing!")
 
     return tempFiles
@@ -140,7 +140,7 @@ def formatDetails(run, loadsave=True, verbose=True):
     if (loadsave):
         saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
         if (not saveExist):
-            print(("BHDetails.formatDetails() : Save files do not exist e.g. '%s'".format(
+            print(("BHDetails.formatDetails() : Save files do not exist e.g. '{:s}'".format(
                 saveFilenames[0])))
             print("BHDetails.formatDetails() : converting raw Details files !!!")
             loadsave = False
@@ -155,7 +155,7 @@ def formatDetails(run, loadsave=True, verbose=True):
 
     # If files are missing, raise error
     if (not saveExist):
-        print(("Save Files missing!  e.g. '%s'".format(saveFilenames[0])))
+        print(("Save Files missing!  e.g. '{:s}'".format(saveFilenames[0])))
         raise RuntimeError("Save Files missing!")
 
     return saveFilenames
@@ -180,7 +180,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
     numTemp = len(tempFiles)
     numRaw  = len(rawFilenames)
-    if verbose: print((" - - - Organizing %d raw files into %d temp files".format(numRaw, numTemp)))
+    if verbose: print((" - - - Organizing {:d} raw files into {:d} temp files".format(numRaw, numTemp)))
 
     # Iterate over all Illustris Details Files
     # ----------------------------------------
@@ -210,8 +210,8 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
             prec = _getPrecision(detScales)
         # Set to a default value on error (not sure what's causing it)
         except ValueError as err:
-            print(("BHDetails._reorganizeBHDetailsFiles() : caught error '%s'".format(str(err))))
-            print(("\tii = %d; file = '%s'".format(ii, rawName)))
+            print(("BHDetails._reorganizeBHDetailsFiles() : caught error '{:s}'".format(str(err))))
+            print(("\tii = {:d}; file = '{:s}'".format(ii, rawName)))
             print(("\tlen(detScales) = ",  len(detScales)))
             prec = _DEF_PRECISION
 
@@ -243,13 +243,13 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
         aveSize = fileSizes/(1.0*len(tempFiles))
         sizeStr = zio.bytesString(fileSizes)
         aveSizeStr = zio.bytesString(aveSize)
-        print((" - - - - Total temp size = '%s', average = '%s'".format(sizeStr, aveSizeStr)))
+        print((" - - - - Total temp size = '{:s}', average = '{:s}'".format(sizeStr, aveSizeStr)))
 
     if verbose:
         print(" - - - Counting lines")
     inLines = zio.countLines(rawFilenames, progress=True)
     outLines = zio.countLines(tempFilenames, progress=True)
-    if verbose: print((" - - - - Input lines = %d, Output lines = %d".format(inLines, outLines)))
+    if verbose: print((" - - - - Input lines = {:d}, Output lines = {:d}".format(inLines, outLines)))
     if (inLines != outLines):
         print(("in  file: ",  rawFilenames[0]))
         print(("out file: ",  tempFilenames[0]))
@@ -287,7 +287,7 @@ def _convertDetailsASCIItoNPZ(run, verbose=True):
         pbar.finish()
         totSize = zio.bytesString(filesSize)
         aveSize = zio.bytesString(filesSize/NUM_SNAPS)
-        print((" - - - Total size = %s, Ave Size = %s".format(totSize, aveSize)))
+        print((" - - - Total size = {:s}, Ave Size = {:s}".format(totSize, aveSize)))
 
     return
 
@@ -313,17 +313,17 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
 
     # Make Sure Temporary Files exist, Otherwise re-create them
     if (not os.path.exists(tmp)):
-        print(("BHDetails._convertDetailsASCIItoNPZ_snapshot(): no temp file '%s' ".format(tmp)))
+        print(("BHDetails._convertDetailsASCIItoNPZ_snapshot(): no temp file '{:s}' ".format(tmp)))
         print("BHDetails._convertDetailsASCIItoNPZ_snapshot(): Reloading all temp files!!")
         organizeDetails(run, loadsave=loadsave, verbose=verbose)
 
     # Try to load from existing save
     if (loadsave):
-        if verbose: print((" - - - Loading from save '%s'".format(sav)))
+        if verbose: print((" - - - Loading from save '{:s}'".format(sav)))
         if (os.path.exists(sav)):
             details = zio.npzToDict(sav)
         else:
-            if verbose: print((" - - - '%s' does not exist!".format(sav)))
+            if verbose: print((" - - - '{:s}' does not exist!".format(sav)))
             loadsave = False
 
     # Load Details from ASCII, Convert to Dictionary and Save to NPZ
@@ -442,7 +442,7 @@ def loadBHDetails(run, snap, loadsave=True, verbose=True):
 
     # Load Existing Save File
     if (loadsave):
-        if verbose: print((" - - - Loading details from '%s'".format(detsName)))
+        if verbose: print((" - - - Loading details from '{:s}'".format(detsName)))
         if (os.path.exists(detsName)):
             dets = zio.npzToDict(detsName)
         else:

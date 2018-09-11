@@ -43,7 +43,7 @@ from . import BHMergers
 from . import BHConstants
 from .BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
-import illustris_python as ill
+import illpy_lib as ill
 import zcode.inout as zio
 
 MPI_TAGS = zio.MPI_TAGS
@@ -69,7 +69,7 @@ def main():
 
     if (rank == 0):
         NAME = sys.argv[0]
-        print(("\n%s\n%s\n%s".format(NAME, '='*len(NAME), str(datetime.now()))))
+        print(("\n{:s}\n{:s}\n{:s}".format(NAME, '='*len(NAME), str(datetime.now()))))
         zio.checkPath(BHConstants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
