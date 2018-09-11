@@ -8,7 +8,7 @@
 #readhaloHDF5.reset()
 #pos=readhaloHDF5.readhalo(base, "snap", snapnum, "POS ", type, grpnr, subnr, long_ids=True, double_output=False)
 
-import readsubfHDF5
+from . import readsubfHDF5
 import snapHDF5
 import numpy as np
 import os
@@ -34,7 +34,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 		Parttype.append(parttype)
 
 		if verbose:
-			print("READHALO: Parttype = ",  Parttype)
+			print(("READHALO: Parttype = ",  Parttype))
 
 		#read in catalog
 		cat = readsubfHDF5.subfind_catalog(base, num, long_ids=long_ids, double_output=double_output, keysel=["GroupLenType", "GroupNsubs", "GroupFirstSub", "SubhaloLenType", "SubhaloMassType"])
@@ -55,7 +55,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
                         	filename = base+"/snapdir_"+str(num).zfill(3)+"/"+snapbase+"_"+str(num).zfill(3)+"."+str(0)
 	                        multiple=True
         	        if (os.path.exists(filename+".hdf5")==False):
-                	        print("READHALO: [error] file not found : ",  filename)
+                	        print(("READHALO: [error] file not found : ",  filename))
                         	sys.exit()
 
 			FlagRead=True
@@ -73,7 +73,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 		       		        HaloOffset[k, parttype] =  HaloOffset[k-1, parttype] + cat.SubhaloLenType[k-1, parttype]
 					k+=1
 		if (k!=cat.nsubs):
-			print("READHALO: problem with offset table",  k, cat.nsubs)
+			print(("READHALO: problem with offset table",  k, cat.nsubs))
 			sys.exit()
 
 		#construct file tables
@@ -95,7 +95,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 				filename = base+"/"+snapbase+"_"+str(num).zfill(3)
 
 			if verbose:
-				print("READHALO: initial reading file :",  filename)
+				print(("READHALO: initial reading file :",  filename))
 
 			head = snapHDF5.snapshot_header(filename)
 
@@ -107,18 +107,18 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 		off = HaloOffset[sub_num, parttype]
         	left = cat.SubhaloLenType[sub_num, parttype]
 		if verbose:
-			print("READHALO: nr / particle # / mass :",  sub_num, cat.SubhaloLenType[sub_num, parttype], cat.SubhaloMassType[sub_num, parttype].astype("float64"))
+			print(("READHALO: nr / particle # / mass :",  sub_num, cat.SubhaloLenType[sub_num, parttype], cat.SubhaloMassType[sub_num, parttype].astype("float64")))
 	if (fof_num>=0) & (sub_num < 0):
                 off = GroupOffset[fof_num, parttype]
                 left = cat.GroupLenType[fof_num, parttype]
 		if verbose:
-			print("READHALO: nr / particle # / mass :",  fof_num, cat.GroupLenType[fof_num, parttype], cat.GroupMassType[fof_num, parttype].astype("float64"))
+			print(("READHALO: nr / particle # / mass :",  fof_num, cat.GroupLenType[fof_num, parttype], cat.GroupMassType[fof_num, parttype].astype("float64")))
 	if (sub_num>=0) & (fof_num>=0):
 		real_sub_num = sub_num + cat.GroupFirstSub[fof_num]
 		off = HaloOffset[real_sub_num, parttype]
 		left = cat.SubhaloLenType[real_sub_num, parttype]
                 if verbose:
-                        print("READHALO: nr / particle # / mass :",  real_sub_num, cat.SubhaloLenType[real_sub_num, parttype], cat.SubhaloMassType[real_sub_num, parttype].astype("float64"))
+                        print(("READHALO: nr / particle # / mass :",  real_sub_num, cat.SubhaloLenType[real_sub_num, parttype], cat.SubhaloMassType[real_sub_num, parttype].astype("float64")))
 
 
         if (left==0):
@@ -134,7 +134,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 		findex = FileNum - 1
 
 	if verbose:
-		print("READHALO: first file that contains particles =",  findex)
+		print(("READHALO: first file that contains particles =",  findex))
 
 	for fnr in range(0, findex):
 		off -= FileTypeNumbers[fnr+1, parttype] - FileTypeNumbers[fnr, parttype]
@@ -148,7 +148,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
                         filename = base+"/"+snapbase+"_"+str(num).zfill(3)
 
 		if verbose:
-			print("READHALO: reading file :",  filename)
+			print(("READHALO: reading file :",  filename))
 
 		head = snapHDF5.snapshot_header(filename)
 		nloc = head.npart[parttype]

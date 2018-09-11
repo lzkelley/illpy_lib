@@ -21,7 +21,7 @@ Functions
 -   _checkLog            - Create a default logging object if one is not given.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import os
 import numpy as np
@@ -75,7 +75,7 @@ class Settings:
 
         # Move parameters from dictionary to attributes
         if kwargs:
-            for key, item in kwargs.items():
+            for key, item in list(kwargs.items()):
                 setattr(self, key, item)
 
         return
@@ -316,7 +316,7 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
     n_test = test_ids.size
     if len(old_ids) != n_test or n_test != len(old_scales) or n_test != len(snaps):
         dups = Counter(old_ids) - Counter(test_ids)
-        print("Duplicates = %s" % (str(dups.keys())))
+        print("Duplicates = %s" % (str(list(dups.keys()))))
         errStr = "ERROR: num unique should be %d" % (n_test)
         errStr += "\nBut len(old_ids) = %d" % (len(old_ids))
         errStr += "\nBut len(old_scales) = %d" % (len(old_scales))
@@ -365,7 +365,7 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
         DETAILS.NUM: uids.size,
         }
 
-    for key, val in data.items():
+    for key, val in list(data.items()):
         data[key] = np.asarray(val)
 
     zio.dictToNPZ(data, fname, verbose=False, log=log)

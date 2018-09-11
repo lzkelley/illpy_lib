@@ -87,7 +87,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
 
 
     thisStr = "Run %d, Snap %d, Subhalo %d, Bound ID %d" % (run, snapNum, subhalo, mostBound)
-    if verbose: print(" - - - - %s : Loaded %s particles".format(thisStr, str(partNums)))
+    if verbose: print((" - - - - %s : Loaded %s particles".format(thisStr, str(partNums))))
 
     # Find the most-bound particle, store its position
     for pdat, pname in zip(partData, partNames):
@@ -95,7 +95,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         if (pdat['count'] == 0): continue
         inds = np.where(pdat[SNAPSHOT.IDS] == mostBound)[0]
         if (len(inds) == 1):
-            if verbose: print(" - - - Found Most Bound Particle in '%s'".format(pname))
+            if verbose: print((" - - - Found Most Bound Particle in '%s'".format(pname)))
             posRef = pdat[SNAPSHOT.POS][inds[0]]
             break
 
@@ -195,7 +195,7 @@ def subhaloRadialProfiles(run, snapNum, subhalo, radBins=None, nbins=NUM_RAD_BIN
         # Divide by volume to get density
         densBins[ii, :] = massBins[ii, :]/binVols
 
-    if verbose: print(" - - - - Binned %s particles".format(str(np.sum(numsBins, axis=1))))
+    if verbose: print((" - - - - Binned %s particles".format(str(np.sum(numsBins, axis=1)))))
 
     # Consistency check on numbers of particles
     # -----------------------------------------

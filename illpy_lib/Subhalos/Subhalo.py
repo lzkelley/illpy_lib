@@ -83,13 +83,13 @@ def importSubhaloParticles(run, snapNum, subhalo, partTypes=None, verbose=VERBOS
         data.append(partData)
         if verbose: stop = datetime.now()
         numParts = partData['count']
-        numParams = len(partData.keys())-1
+        numParams = len(list(partData.keys()))-1
         if verbose:
-            print("         {:8d} {:6s}, {:2d} pars, after {:s}".format(
-                numParts, pname, numParams, str(stop-start)))
+            print(("         {:8d} {:6s}, {:2d} pars, after {:s}".format(
+                numParts, pname, numParams, str(stop-start))))
 
     if verbose: stop_all = datetime.now()
-    if verbose: print(" - - - - All After {:s}".format(str(stop_all-start_all)))
+    if verbose: print((" - - - - All After {:s}".format(str(stop_all-start_all))))
 
     # If single particle, don't both with list
     if (len(data) == 1): data = data[0]
@@ -125,17 +125,17 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
     # Load Group Catalog
     # ------------------
     path_output = GET_ILLUSTRIS_OUTPUT_DIR(run)
-    if verbose: print(" - - - Loading group catalog from '{:s}'".format(path_output))
+    if verbose: print((" - - - Loading group catalog from '{:s}'".format(path_output)))
     try:
         gcat = ill.groupcat.loadSubhalos(path_output, snapNum, fields=fields)
     except:
-        print("\n\nFailed at snapNum = '{}'\n\tpath = '{}'\n\tfields = '{}'".format(
-            snapNum, path_output, fields))
+        print(("\n\nFailed at snapNum = '{}'\n\tpath = '{}'\n\tfields = '{}'".format(
+            snapNum, path_output, fields)))
         raise
 
     if isinstance(gcat, dict): numSubhalos = gcat['count']
     else:                      numSubhalos = len(gcat)
-    if verbose: print(" - - - - Loaded {:d} subhalos".format(numSubhalos))
+    if verbose: print((" - - - - Loaded {:d} subhalos".format(numSubhalos)))
 
     # If no subhalos selected, return full catalog
     if subhalos is None: return gcat
@@ -144,7 +144,7 @@ def importGroupCatalogData(run, snapNum, subhalos=None, fields=None, verbose=VER
     # -----------------------
     if isinstance(gcat, dict):
         subcat = {}
-        for key in gcat.keys():
+        for key in list(gcat.keys()):
             if (key is not 'count'): subcat[key] = gcat[key][subhalos]
     else:
         subcat = gcat[subhalos]

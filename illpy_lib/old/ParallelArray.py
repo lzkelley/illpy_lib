@@ -56,20 +56,20 @@ class ParallelArray(object):
         # Get length of each array
         length = len(arrs[0])
 
-        print("num = ",  length)
+        print(("num = ",  length))
 
         # Get types from given arrays
         types = [type(ar[0]) for ar in arrs]
 
-        print("TYPES = ",  types)
+        print(("TYPES = ",  types))
 
         # Initialize object using default constructor
         pararr = cls(length, names, types, zero=False)
 
-        print pararr
-        print pararr.num
-        print getattr(pararr, names[0])
-        print pararr[names[0]]
+        print(pararr)
+        print(pararr.num)
+        print(getattr(pararr, names[0]))
+        print(pararr[names[0]])
         
 
         # Set each array in object to given array
@@ -82,7 +82,7 @@ class ParallelArray(object):
 
     def keys(self): 
         ''' List of array 'keys' (names) for each array, and their index for each row '''
-        return sorted(self.__keys.items(), key=lambda x:x[1])
+        return sorted(list(self.__keys.items()), key=lambda x:x[1])
 
     def __len__(self): return self.__len
 
@@ -99,7 +99,7 @@ class ParallelArray(object):
 
         # If int, return slice across all arrays
         if (np.issubdtype(type(key), int)):
-            return [getattr(self, name)[key] for name, ind in self.keys()]
+            return [getattr(self, name)[key] for name, ind in list(self.keys())]
         # If str, try to return that attribute
         elif (type(key) == str): 
             if (hasattr(self, key)): return getattr(self, key)
@@ -126,7 +126,7 @@ class ParallelArray(object):
         # If int, set same element of each array
         if (isInt(key)):
             # name is the array name, ind is the corresponding index of 'vals' 
-            for (name, ind), aval in zip(self.keys(), vals):
+            for (name, ind), aval in zip(list(self.keys()), vals):
                 getattr(self, name)[key] = aval                                                      # set element 'key' of array 'name' to aval (at ind)
 
         # If str, set full array
@@ -149,7 +149,7 @@ class ParallelArray(object):
         """ Delete target indices of each array """
 
         # In each array, delete target element
-        for name, ind in self.keys():
+        for name, ind in list(self.keys()):
             setattr(self, name, np.delete(getattr(self, name), key))
             if (ind == 0): self.__len = len(getattr(self, name))
 
@@ -160,7 +160,7 @@ class ParallelArray(object):
         """ Append the given merger information as a new last element """
 
         # In each array, delete target element
-        for (name, ind), aval in zip(self.keys(), vals):
+        for (name, ind), aval in zip(list(self.keys()), vals):
             setattr(self, name, np.append(getattr(self, name), aval))
             if (ind == 0): self.__len = len(getattr(self, name))
 

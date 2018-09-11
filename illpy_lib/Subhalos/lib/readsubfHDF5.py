@@ -11,7 +11,7 @@
 import numpy as np
 import os
 import sys
-import hdf5lib 
+from . import hdf5lib 
 
 #
 #SUBHALO DATABLOCKS#
@@ -106,7 +106,7 @@ class subfind_catalog:
 				self.filebase = basedir + "/" + name + "_" + str(snapnum).zfill(3)
 				curfile = self.filebase + ".hdf5"
 			if (not os.path.exists(curfile)):
-				print("file not found:",  curfile)
+				print(("file not found:",  curfile))
 				sys.exit()
 
 			f=hdf5lib.OpenFile(curfile)     
@@ -120,7 +120,7 @@ class subfind_catalog:
 				#GROUPS
 				if (grpcat==True):
 					if (keysel == None):
-					       	for key, val in grp_datablocks.items():
+					       	for key, val in list(grp_datablocks.items()):
 							if hdf5lib.Contains(f, "Group", key):
 						                type = val[0]
         						        dim = val[1]
@@ -153,7 +153,7 @@ class subfind_catalog:
 				#SUBHALOS
 				if (subcat==True):
 					if (keysel == None):
-						for key, val in sub_datablocks.items():
+						for key, val in list(sub_datablocks.items()):
 							if hdf5lib.Contains(f, "Subhalo", key):
 					                        type = val[0]
 				        	                dim = val[1]
@@ -186,7 +186,7 @@ class subfind_catalog:
       			if (grpcat==True):
 				if ngroups > 0:
 					if (keysel == None):
-			                	for key, val in grp_datablocks.items():
+			                	for key, val in list(grp_datablocks.items()):
 							if hdf5lib.Contains(f, "Group", key):
 				                        	type = val[0]
 	                				        dim = val[1]
@@ -214,7 +214,7 @@ class subfind_catalog:
 			if (subcat==True): 
 				if nsubs > 0:
 					if (keysel == None):
-						for key, val in sub_datablocks.items():
+						for key, val in list(sub_datablocks.items()):
 							if hdf5lib.Contains(f, "Subhalo", key):
 								type = val[0]
 								dim = val[1]

@@ -39,9 +39,9 @@ from mpi4py import MPI
 
 from illpy_lib.constants import (NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR,
                                  DTYPE, GET_BAD_SNAPS)
-import BHMergers
-import BHConstants
-from BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
+from . import BHMergers
+from . import BHConstants
+from .BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
 import illustris_python as ill
 import zcode.inout as zio
@@ -69,7 +69,7 @@ def main():
 
     if (rank == 0):
         NAME = sys.argv[0]
-        print("\n%s\n%s\n%s".format(NAME, '='*len(NAME), str(datetime.now())))
+        print(("\n%s\n%s\n%s".format(NAME, '='*len(NAME), str(datetime.now()))))
         zio.checkPath(BHConstants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
@@ -503,7 +503,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         with zio.StreamCapture() as output:
             snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
 
-        snap_keys = snapshot.keys()
+        snap_keys = list(snapshot.keys())
         if ('count' in snap_keys):
             snap_keys.remove('count')
             logger.debug("- - Loaded %d particles" % (snapshot['count']))

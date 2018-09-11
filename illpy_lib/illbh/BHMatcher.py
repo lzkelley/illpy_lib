@@ -29,7 +29,7 @@ Functions
 -   _indBefAft               - Retrieve the index matching the minimum greater-than zero of input.
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import os
 import logging
@@ -1378,7 +1378,7 @@ def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log, **kwa
 
     # Add any additional parameters
     #    Make sure all values are arrays
-    for key, val in kwargs.items():
+    for key, val in list(kwargs.items()):
         kwargs[key] = np.asarray(val)
     data.update(kwargs)
 

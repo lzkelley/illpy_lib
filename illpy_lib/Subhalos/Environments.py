@@ -39,7 +39,7 @@ Functions
    - _GET_MERGER_ENVIRONMENT_FILENAME   - get filename for dictionary of all subhalos
 
 """
-from __future__ import absolute_import, division, print_function, unicode_literals
+
 
 import numpy as np
 from datetime import datetime
@@ -668,7 +668,7 @@ def _in_merger_environments(run, verbose=True, version=_VERSION):
     numGood = 0
     numBad = 0
     # Iterate over each Snapshot
-    for snap, (merg, subh_in) in zmath.renumerate(zip(snap_mergers, snap_subh_in)):
+    for snap, (merg, subh_in) in zmath.renumerate(list(zip(snap_mergers, snap_subh_in))):
         # Get indices of valid subhalos
         inds_subh_in = np.where(subh_in >= 0)[0]
         # Skip this snapshot if no valid subhalos
@@ -811,7 +811,7 @@ def _collectMergerEnvironments(run, fixFails=True, verbose=True, version=_VERSIO
         pbar.start()
         # Iterate over each Snapshot
         # ==========================
-        for snap, (merg, subh_out, subh_in) in zmath.renumerate(zip(snap_mergers, snap_subh_out, snap_subh_in)):
+        for snap, (merg, subh_out, subh_in) in zmath.renumerate(list(zip(snap_mergers, snap_subh_out, snap_subh_in))):
             # Get indices of valid subhalos
             inds_subh_out = np.where(subh_out >= 0)[0]
             inds_subh_in = np.where(subh_in >= 0)[0]
@@ -1056,11 +1056,11 @@ def _initStorage(run, snap, subhalos, numMergers, verbose=True, version=_VERSION
     # ------------------------------------
     if verbose: print(" - - - Loading Catalog for Sample: Snap %d, Subhalo %d" % (snap, sample))
     gcat = Subhalo.importGroupCatalogData(run, snap, subhalos=sample, verbose=True)
-    if verbose: print(" - - - Loading Group-Cat Keys: '%s'" % (str(gcat.keys())))
+    if verbose: print(" - - - Loading Group-Cat Keys: '%s'" % (str(list(gcat.keys()))))
 
     # Initialize catalog properties automatically
-    env[ENVIRON.GCAT_KEYS] = gcat.keys()
-    for key in gcat.keys():
+    env[ENVIRON.GCAT_KEYS] = list(gcat.keys())
+    for key in list(gcat.keys()):
         dat = gcat[key]
         shape = np.concatenate([[numMergers], np.shape(dat)])
         env[key] = np.zeros(shape)

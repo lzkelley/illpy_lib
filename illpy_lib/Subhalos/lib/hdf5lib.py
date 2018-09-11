@@ -33,7 +33,7 @@
 #
 # Mark Vogelsberger (mvogelsb@cfa.harvard.edu)
 import sys
-import hdf5lib_param
+from . import hdf5lib_param
 
 try:
 	hdf5libname = hdf5lib_param.libname

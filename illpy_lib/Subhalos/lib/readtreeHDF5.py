@@ -72,7 +72,7 @@ class _AdjacentRows(object):
 
         # Find out which fields to add
         if keysel == None:
-            self._fields = treefile.keys()
+            self._fields = list(treefile.keys())
         else:
             self._fields = keysel
         
@@ -116,10 +116,10 @@ class TreeDB:
         # Check that a few files/paths exist
         for rel_path in ['tree_extended.hdf5', 'offsets']:
             if not os.path.exists(treedir + '/' + rel_path):
-                print 'Path not found: ' + treedir + '/' + rel_path
+                print('Path not found: ' + treedir + '/' + rel_path)
                 sys.exit()
         if filenum != -1:
-            print 'Currently no support for individual tree files.'
+            print('Currently no support for individual tree files.')
             sys.exit()
 
         # Open tree file
@@ -137,7 +137,7 @@ class TreeDB:
         Close files. All open objects become invalid.
         """
         self._treefile.close()
-        for f in self._offset_files.values():
+        for f in list(self._offset_files.values()):
             f.close()
 
     def _get_offset_file(self, snapnum):
@@ -145,7 +145,7 @@ class TreeDB:
         If necessary, add new entry to offset files dictionary.
         Otherwise, return existing one.
         """
-        if snapnum not in self._offset_files.keys():
+        if snapnum not in list(self._offset_files.keys()):
             self._offset_files[snapnum] = h5py.File(
                     '%s/offsets/offsets_%s.hdf5' % (
                     self._treedir, str(snapnum).zfill(3)), 'r')
@@ -172,7 +172,7 @@ class TreeDB:
         subhalo_id = f['SubhaloID'][subfind_id]
         main_leaf_progenitor_id = f['MainLeafProgenitorID'][subfind_id]
         if rownum == -1:
-            print 'Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id)
+            print('Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id))
             return None
 
         # Create branch instance
@@ -204,7 +204,7 @@ class TreeDB:
         subhalo_id = f['SubhaloID'][subfind_id]
         last_progenitor_id = f['LastProgenitorID'][subfind_id]
         if rownum == -1:
-            print 'Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id)
+            print('Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id))
             return None
 
         # Create branch instance
@@ -234,7 +234,7 @@ class TreeDB:
         rownum = f['RowNum'][subfind_id]
         subhalo_id = f['SubhaloID'][subfind_id]
         if rownum == -1:
-            print 'Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id)
+            print('Subhalo not found: snapnum = %d, subfind_id = %d.' % (snapnum, subfind_id))
             return None
 
         # Get root_descendant_id from merger tree
