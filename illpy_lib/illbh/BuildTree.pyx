@@ -65,7 +65,7 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
     # Iterate Over Each Merger, In Order of Merger Time
     # -------------------------------------------------
     for ii in xrange(numMergers):
-        if( ii > 0 and ii%hunth == 0 ): print "%5d/%d" % (ii, numMergers)
+        if ( ii > 0 and ii%hunth == 0 ): print("%5d/%d".format(ii, numMergers))
 
         # Convert to sorted merger index
         last_ind = sort_inds[ii]
@@ -83,7 +83,7 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
             # If previous merger goes into this one; save relationships
             for BH in [BH_IN, BH_OUT]:
 
-                if(ids[next_ind, BH] == outid):
+                if (ids[next_ind, BH] == outid):
 
                     # For the 'next' Merger
                     #    set index of previous merger

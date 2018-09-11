@@ -13,7 +13,7 @@ VERBOSE = True
 
 def main(run=RUN, verbose=VERBOSE):
 
-    ### COSMOLOGY ###
+    # COSMOLOGY #
     try:
         cosmo = illcosmo.Cosmology()
         t1 = cosmo[10]                                                                              # Test direct access to scalefactor list
@@ -21,22 +21,22 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = cosmo.lumDist(0.8)/cosmo.lumDist(0.5)                                                  # Test interpolation
 
     except Exception as ex:
-        print "ERROR: could not calculate Cosmology test values!"
+        print("ERROR: could not calculate Cosmology test values!")
         raise ex
 
 
     # Check each test value
     for ii, tval in enumerate([t1, t2, t3]):
 
-        if(tval <= 0.0 or tval >= 1.0):
+        if (tval <= 0.0 or tval >= 1.0):
             raise RuntimeError("ERROR: illpy_lib.illcosmo.Cosmology - Test %d" % ii)
 
-    print "\n\nCosmology looks good.\n"
+    print("\n\nCosmology looks good.\n")
 
 
 
 
-    ### BHDETAILS ###
+    # BHDETAILS #
 
     # Build Details Intermediate Files
     BHDetails.main(run=run, verbose=verbose)
@@ -49,24 +49,24 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = np.average(dets[BHDetails.DETAIL_TIMES])
 
     except Exception as ex:
-        print "ERROR: could not calculate BHDetails test values!"
+        print("ERROR: could not calculate BHDetails test values!")
         raise ex
 
 
-    if(t1 <= 0):
+    if (t1 <= 0):
         raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 1 = %d!" % t1)
 
-    if(t2 <= 0):
+    if (t2 <= 0):
         raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 2 = %d!" % t2)
 
-    if(t3 < cosmo[-2] or t3 > cosmo[-1]):
+    if (t3 < cosmo[-2] or t3 > cosmo[-1]):
         raise RuntimeError("ERROR: illpy_lib.illbh.BHDetails - Test 3 = %f!" % t3)
 
 
-    print "\n\nBHDetails looks good.\n"
+    print("\n\nBHDetails looks good.\n")
 
 
-    ### BHMERGERS ###
+    # BHMERGERS #
 
     # Build Mergers Intermediate Files
     BHMergers.main(run=run, verbose=verbose)
@@ -79,17 +79,17 @@ def main(run=RUN, verbose=VERBOSE):
         t3 = np.average(dets[BHMergers.MERGERS_TIMES])
 
     except Exception as ex:
-        print "ERROR: could not calculate BHMergers test values!"
+        print("ERROR: could not calculate BHMergers test values!")
         raise ex
 
 
     # Check each test value
     for ii, tval in enumerate([t1, t2, t3]):
-        if(tval <= 0):
+        if (tval <= 0):
             raise RuntimeError("ERROR: illpy_lib.illbh.BHMergers - Test %d" % ii)
 
 
-    print "\n\nBHMergers looks good.\n"
+    print("\n\nBHMergers looks good.\n")
 
     return
 

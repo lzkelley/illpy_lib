@@ -122,7 +122,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
         # Initialize log
         log = BHConstants._loadLogger(
             __file__, debug=True, verbose=True, run=run, rank=rank, version=__version__)
-        if(rank == 0):
+        if (rank == 0):
             print("Log filename = ", log.filename)
     log.debug("loadUniqueIDs()")
 
@@ -275,7 +275,7 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
     if np.isscalar(snaps):
         old = snaps
         snaps = n_old * [None]
-        for ii in xrange(n_old):
+        for ii in range(n_old):
             snaps[ii] = [old]
 
     oo = 0
@@ -379,7 +379,7 @@ def _mergeAllUnique(run, log):
     first = True
     newDets = None
     oldDets = None
-    for ii in xrange(NUM_SNAPS):
+    for ii in range(NUM_SNAPS):
         newDets = loadUniqueIDs(run, ii, None, log=log)
         if oldDets is not None:
             if first:

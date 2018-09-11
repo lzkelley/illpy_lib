@@ -104,6 +104,7 @@ class MERGERS():
     MAP_MTOS  = 'm2s'
     MAP_ONTOP = 'ontop'
 
+
 MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
 
 
@@ -131,6 +132,7 @@ class BH_TYPE():
     IN  = 0
     OUT = 1
 
+
 NUM_BH_TYPES = 2
 
 
@@ -138,6 +140,7 @@ class BH_TIME():
     BEFORE  = 0                                   # Before merger time (MUST = 0!)
     AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
     FIRST   = 2                                   # First matching details entry (MUST = 2!)
+
 
 NUM_BH_TIMES = 3
 
@@ -167,6 +170,7 @@ class BH_SNAP():
     FIELDS  = 'snapshot_fields'
     DTYPES  = 'snapshot_dtypes'
 
+
 SNAPSHOT_FIELDS = ['ParticleIDs', 'BH_Hsml', 'BH_Mass', 'Masses',
                    'SubfindHsml', 'BH_Mdot', 'BH_Density']
 SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR,
@@ -176,7 +180,7 @@ SNAPSHOT_DTYPES = [DTYPE.ID, DTYPE.SCALAR, DTYPE.SCALAR, DTYPE.SCALAR,
 def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run):
     filesDir = _ILLUSTRIS_MERGERS_DIRS[run]
     files = []
-    if(type(filesDir) != list): filesDir = [filesDir]
+    if (type(filesDir) != list): filesDir = [filesDir]
 
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_MERGERS_FILENAME_REGEX
@@ -189,7 +193,7 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run):
 def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run):
     filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
     files = []
-    if(type(filesDir) != list): filesDir = [filesDir]
+    if (type(filesDir) != list): filesDir = [filesDir]
 
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_DETAILS_FILENAME_REGEX
@@ -267,8 +271,8 @@ def GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, version):
 
 def _GET_STATUS_FILENAME(name, run=None, version=None):
     statFilename = os.path.splitext(os.path.basename(name)) + "_stat"
-    if(run): statFilename += "_ill%d" % (run)
-    if(version): statFilename += "_v%s" % (str(version))
+    if (run): statFilename += "_ill%d" % (run)
+    if (version): statFilename += "_v%s" % (str(version))
     statFilename = os.path.join(_LOG_DIR, statFilename + ".txt")
     return statFilename
 
@@ -291,12 +295,12 @@ def _GET_LOG_NAMES(name, run=None, rank=None, version=None):
     logName = os.path.splitext(os.path.basename(name))[0]
     logFilename = str(logName)
     logName += "_log"
-    if(rank): logName += "_rank%04d"
+    if (rank): logName += "_rank%04d"
 
     # Setup name of `logger` output file
-    if(run): logFilename += "_ill%d" % (run)
-    if(version): logFilename += "_v%s" % (str(version))
-    if(rank): logFilename += "_%04d" % (rank)
+    if (run): logFilename += "_ill%d" % (run)
+    if (version): logFilename += "_v%s" % (str(version))
+    if (rank): logFilename += "_%04d" % (rank)
     logFilename += ".log"
     logFilename = os.path.join(_LOG_DIR, logFilename)
     logFilename = os.path.abspath(logFilename)
@@ -392,8 +396,8 @@ def _checkLoadSave(fname, loadsave, log):
             log.debug(logStr)
             try:
                 data = zio.npzToDict(fname)
-            except Exception, e:
-                log.warning(" - Load Failed: %s." % (str(e)))
+            except Exception as err:
+                log.warning(" - Load Failed: %s." % (str(err)))
             else:
                 log.debug(" - Loaded data.")
 

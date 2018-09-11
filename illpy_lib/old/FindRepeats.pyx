@@ -57,11 +57,11 @@ def findRepeats(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] 
     # Get indices to sort mergers by time
     cdef np.ndarray sort_inds = np.argsort(times)
 
-    ### Iterate Over Each Merger, In Order of Merger Time ###
+    # Iterate Over Each Merger, In Order of Merger Time #
 
     for ii in xrange(numMergers):
 
-        if( ii > 0 and ii%hunth == 0 ): print "%5d/%d" % (ii, numMergers)
+        if ( ii > 0 and ii%hunth == 0 ): print("%5d/%d".format(ii, numMergers))
 
         # Conver to sorted merger index
         last_ind = sort_inds[ii]
@@ -69,7 +69,7 @@ def findRepeats(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] 
         # Get the output ID from this merger
         outid = ids[last_ind, OUT_BH]
 
-        ## Iterate over all Later Mergers ##
+        # Iterate over all Later Mergers #
         #  use a while loop so we can break out of it
         jj = ii+1
         while( jj < numMergers ):
@@ -79,15 +79,15 @@ def findRepeats(np.ndarray[long,   ndim=2] ids,      np.ndarray[double, ndim=1] 
             # If previous merger goes into this one; save relationships
             for BH in [IN_BH, OUT_BH]:
 
-                if( ids[next_ind,BH] == outid ):
+                if ( ids[next_ind,BH] == outid ):
 
-                    ## For the 'next' Merger
+                    # For the 'next' Merger
                     # set index of previous merger
                     last[next_ind,BH] = last_ind
                     # set time since previous merger
                     lastTime[next_ind,BH] = times[next_ind] - times[last_ind]
 
-                    ## For the 'previous' Merger
+                    # For the 'previous' Merger
                     # set index of next merger
                     next[last_ind] = next_ind
                     # set time until merger

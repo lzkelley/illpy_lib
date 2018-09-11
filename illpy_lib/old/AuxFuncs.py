@@ -4,9 +4,9 @@ import numpy as np
 import os
 
 
-###  ======================================  ###
-###  =============  PHYSICS  ==============  ###
-###  ======================================  ###
+#  ======================================  #
+#  =============  PHYSICS  ==============  #
+#  ======================================  #
 
 def aToZ(a, a0=1.0):
     """ Convert a scale-factor to a redshift """
@@ -20,9 +20,9 @@ def zToA(z, a0=1.0):
 
 
 
-###  ===================================  ###
-###  =============  MATH  ==============  ###
-###  ===================================  ###
+#  ===================================  #
+#  =============  MATH  ==============  #
+#  ===================================  #
 
 
 
@@ -51,7 +51,7 @@ def incrementRollingStats(avevar, count, val):
 def finishRollingStats(avevar, count):
     """ Finish a rolling average and stdev calculation by find the stdev """
 
-    if(count > 1): avevar[1] = np.sqrt(avevar[1]/(count-1))
+    if (count > 1): avevar[1] = np.sqrt(avevar[1]/(count-1))
     else:            avevar[1] = 0.0
 
     return avevar
@@ -100,9 +100,9 @@ def stringArray(arr, format='%.2f'):
 
 
 
-###  ====================================  ###
-###  =============  FILES  ==============  ###
-###  ====================================  ###
+#  ====================================  #
+#  =============  FILES  ==============  #
+#  ====================================  #
 
 
 
@@ -124,7 +124,7 @@ def getFileSize(fnames, precision=1):
     """
 
     ftype = type(fnames)
-    if(ftype is not list and ftype is not np.ndarray): fnames = [fnames]
+    if (ftype is not list and ftype is not np.ndarray): fnames = [fnames]
 
     byteSize = 0.0
     for fil in fnames: byteSize += os.path.getsize(fil)
@@ -140,7 +140,7 @@ def filesExist(files):
     allExist = True
     # Iterate over each, if any dont exist, break
     for fil in files:
-        if(not os.path.exists(fil)):
+        if (not os.path.exists(fil)):
             allExist = False
             break
 
@@ -150,9 +150,9 @@ def filesExist(files):
 
 
 
-###  ====================================  ###
-###  =============  OTHER  ==============  ###
-###  ====================================  ###
+#  ====================================  #
+#  =============  OTHER  ==============  #
+#  ====================================  #
 
 
 
@@ -164,9 +164,9 @@ def iterableNotString(args):
     import types
 
     # if NOT iterable, return false
-    if(not np.iterable(args)): return False
+    if (not np.iterable(args)): return False
     # if string, return False
-    if(isinstance(args, types.StringTypes)): return False
+    if (isinstance(args, types.StringTypes)): return False
 
     return True
 

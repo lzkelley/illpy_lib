@@ -6,9 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import numpy as np
 import scipy as sp
-from scipy import interpolate
+from scipy import interpolate  # noqa
 import astropy as ap
-import astropy.cosmology
+import astropy.cosmology  # noqa
 
 from illpy_lib.constants import BOX_LENGTH
 from zcode.constants import HPAR, H0, SPLC, KPC
@@ -120,7 +120,6 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         # Linearly space from the last point up to `0.0` (cant reach `0.0` with log-spacing)
         zgrid = np.append(zgrid, np.linspace(z0, 0.0, num=num_pnts))
         return zgrid
-
 
     @staticmethod
     def _scale_to_z(sf):
@@ -238,7 +237,6 @@ class Cosmology(object):
 
     __NUM       = 'num'
 
-
     def __init__(self):
 
         # Construct path to data file
@@ -251,21 +249,17 @@ class Cosmology(object):
 
         return
 
-
     def __getitem__(self, it):
         """ Get scalefactor for a given snapshot number """
         return self.scales(it)
-
 
     def __len__(self):
         """ Return number of snapshots """
         return self.num
 
-
     def __initInterp(self, key):
         """ Initialize an interpolation function """
         return sp.interpolate.interp1d(self.__cosmo[self.__SCALEFACT], self.__cosmo[key], kind=INTERP)
-
 
     def __validSnap(self, snap):
         """
@@ -278,10 +272,10 @@ class Cosmology(object):
         nsnap = np.array(snap)
 
         # If this is not an integer, false
-        if(not np.issubdtype(nsnap.dtype, int)):
+        if (not np.issubdtype(nsnap.dtype, int)):
             return False
         # If this is within number of snapshots, true
-        elif(nsnap >= 0 and nsnap <= self.num):
+        elif (nsnap >= 0 and nsnap <= self.num):
             return True
         # outside range, false
         else:
@@ -290,27 +284,28 @@ class Cosmology(object):
     '''
     def snapshotTimes(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
-        if(num == None): return self.__cosmo[self.__SCALEFACT]
+        if (num == None): return self.__cosmo[self.__SCALEFACT]
         else:              return self.__cosmo[self.__SCALEFACT][num]
     '''
 
     def scales(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
-        if(num is None): return self.__cosmo[self.__SCALEFACT]
-        else:              return self.__cosmo[self.__SCALEFACT][num]
+        if (num is None):
+            return self.__cosmo[self.__SCALEFACT]
+        else:
+            return self.__cosmo[self.__SCALEFACT][num]
 
     def redshift(self, sf):
         """ Calculate redshift analytically from the given scalefactor """
         return (1.0/sf) - 1.0
 
+    @staticmethod
+    def zToA(redz):
+        return 1.0/(1.0+redz)
 
     @staticmethod
-    def zToA(redz): return 1.0/(1.0+redz)
-
-    @staticmethod
-    def aToZ(sf): return (1.0/sf) - 1.0
-
-
+    def aToZ(sf):
+        return (1.0/sf) - 1.0
 
     def __parameter(self, sf, key):
         """
@@ -339,7 +334,7 @@ class Cosmology(object):
         """
 
         # If this is a snapshot number, return value from that snapshot
-        if(self.__validSnap(sf)):
+        if (self.__validSnap(sf)):
             return self.__cosmo[key][sf]
         # Otherwise, interpolate to given scale-factor
         else:
@@ -347,12 +342,11 @@ class Cosmology(object):
             #     initialized, initialize it now.
             #     Use uppercase attributes
             attrKey = "__" + key.upper()
-            if(not hasattr(self, attrKey)):
+            if (not hasattr(self, attrKey)):
                 setattr(self, attrKey, self.__initInterp(key))
 
             # Return interpolated value
             return getattr(self, attrKey)(sf)
-
 
     def hubbleConstant(self, sf):
         """ Get Hubble Constant for given snapshot or scalefactor """
@@ -390,8 +384,6 @@ class Cosmology(object):
         """ Get distance modulus for given snapshot or scalefactor """
         return self.__parameter(sf, self.__DIST_MOD)
 
-
-
     def cosmologicalCorrection(self, sf):
         """
         Simulations only sample a small volume, must compensate and extrapolate to
@@ -410,9 +402,10 @@ class Cosmology(object):
         """
 
         # Generalize argument to always be iterable
-        if(not np.iterable(sf)): sf = np.array([sf])
+        if (not np.iterable(sf)):
+            sf = np.array([sf])
 
-        ### Get Cosmological Parameters ###
+        # Get Cosmological Parameters #
         nums = len(sf)
         comDist = np.zeros(nums, dtype=FLT_TYPE)
         redz    = np.zeros(nums, dtype=FLT_TYPE)
@@ -426,7 +419,6 @@ class Cosmology(object):
             redz[ii] = self.redshift(scale)
             # Get Hubble Function
             hfunc[ii] = self.hubbleFunction(scale)
-
 
         # Get difference in redshift (0th doesn't matter because there are never
         #     mergers there; but assume it is same size as 1st)
@@ -445,7 +437,3 @@ class Cosmology(object):
         cosmoFactor = density*cosmoVolume
 
         return cosmoFactor
-
-    # cosmologicalCorrection()
-
-# } class Cosmology

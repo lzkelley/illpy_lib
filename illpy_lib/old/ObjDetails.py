@@ -78,18 +78,18 @@ class Details(object):
         '''
 
         # If normal int, Convert to numpy int
-        if(type(key) == int): key = np.int(key)
+        if (type(key) == int): key = np.int(key)
 
 
-        if(np.issubdtype(type(key), int)):
+        if (np.issubdtype(type(key), int)):
             return [self.id[key], self.time[key], self.mass[key],
                      self.mdot[key], self.rho[key], self.cs[key]]
-        elif(key == Details.DETAIL_ID  ): return self.id
-        elif(key == Details.DETAIL_TIME): return self.time
-        elif(key == Details.DETAIL_MASS): return self.mass
-        elif(key == Details.DETAIL_MDOT): return self.mdot
-        elif(key == Details.DETAIL_RHO ): return self.rho
-        elif(key == Details.DETAIL_CS  ): return self.cs
+        elif (key == Details.DETAIL_ID  ): return self.id
+        elif (key == Details.DETAIL_TIME): return self.time
+        elif (key == Details.DETAIL_MASS): return self.mass
+        elif (key == Details.DETAIL_MDOT): return self.mdot
+        elif (key == Details.DETAIL_RHO ): return self.rho
+        elif (key == Details.DETAIL_CS  ): return self.cs
         else: raise KeyError("Unrecozgnized key '%s' type %s!" % (str(key), type(key)))
 
 
@@ -101,8 +101,8 @@ class Details(object):
         For a particular array, key is appropriate string argument.
             e.g. DETAIL_TIME = 'time' for the time array
         '''
-        if(  type(key) == int):
-            if(key == self.__len): self.add(vals)
+        if (  type(key) == int):
+            if (key == self.__len): self.add(vals)
             else:
                 self.id[key]   = vals[Details.DETAIL_ID]
                 self.time[key] = vals[Details.DETAIL_TIME]
@@ -110,17 +110,17 @@ class Details(object):
                 self.mdot[key] = vals[Details.DETAIL_MDOT]
                 self.rho[key]  = vals[Details.DETAIL_RHO]
                 self.cs[key]   = vals[Details.DETAIL_CS]
-        elif(key == DETAIL_ID  ):
+        elif (key == DETAIL_ID  ):
             self.id = vals
-        elif(key == DETAIL_TIME):
+        elif (key == DETAIL_TIME):
             self.time = vals
-        elif(key == DETAIL_MASS):
+        elif (key == DETAIL_MASS):
             self.mass = vals
-        elif(key == DETAIL_MDOT):
+        elif (key == DETAIL_MDOT):
             self.mdot = vals
-        elif(key == DETAIL_RHO ):
+        elif (key == DETAIL_RHO ):
             self.rho = vals
-        elif(key == DETAIL_CS  ):
+        elif (key == DETAIL_CS  ):
             self.cs = vals
         else: raise KeyError("Unrecozgnized key '%s'!" % (str(key)))
 

@@ -13,9 +13,9 @@ import os
 import sys
 import hdf5lib 
 
-####################
+#
 #SUBHALO DATABLOCKS#
-####################
+#
 #descriptions of subhalo datablocks -> add new datablocks here!
 #format -> "HDF5_NAME":["DATATYPE", DIMENSION]
 sub_datablocks = {"SubhaloLen":["INT", 1],
@@ -54,9 +54,9 @@ sub_datablocks = {"SubhaloLen":["INT", 1],
                   "SubhaloStellarPhotometricsMassInRad":["FLOAT", 1],
                   "SubhaloStellarPhotometrics":["FLOAT", 8]}  #band luminosities: U, B, V, K, g, r, i, z
 
-##################
+#
 #GROUP DATABLOCKS#
-##################
+#
 #descriptions of subhalo datablocks -> add new datablocks here!
 #format -> "HDF5_NAME":["DATATYPE", DIMENSION]
 grp_datablocks = {"GroupLen":["INT", 1],
@@ -106,7 +106,7 @@ class subfind_catalog:
 				self.filebase = basedir + "/" + name + "_" + str(snapnum).zfill(3)
 				curfile = self.filebase + ".hdf5"
 			if (not os.path.exists(curfile)):
-				print "file not found:", curfile
+				print("file not found:",  curfile)
 				sys.exit()
 
 			f=hdf5lib.OpenFile(curfile)     

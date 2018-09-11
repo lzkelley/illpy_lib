@@ -65,11 +65,11 @@ def main():
     rank = comm.rank
     size = comm.size
 
-    if(size <= 1): raise RuntimeError("Not setup for serial runs!")
+    if (size <= 1): raise RuntimeError("Not setup for serial runs!")
 
-    if(rank == 0):
+    if (rank == 0):
         NAME = sys.argv[0]
-        print "\n%s\n%s\n%s" % (NAME, '='*len(NAME), str(datetime.now()))
+        print("\n%s\n%s\n%s".format(NAME, '='*len(NAME), str(datetime.now())))
         zio.checkPath(BHConstants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
@@ -95,7 +95,7 @@ def main():
 
     # Master Process
     # --------------
-    if(rank == 0):
+    if (rank == 0):
         beg_all = datetime.now()
         try:
             logger.debug("Running Master")
@@ -153,15 +153,15 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
     # Create default logger if needed
     # -------------------------------
-    if(not isinstance(logger, logging.Logger)):
+    if (not isinstance(logger, logging.Logger)):
         logger = zio.defaultLogger(logger, verbose=verbose)
 
     logger.debug("BHSnapshotData.loadBHSnapshotData()")
-    if(version is None): version = _VERSION
+    if (version is None): version = _VERSION
 
     oldVers = False
     # Warn if attempting to use an old version number
-    if(version != _VERSION):
+    if (version != _VERSION):
         oldVers = True
         logger.warning("WARNING: loading v%.2f behind current v%.2f" % (version, _VERSION))
 
@@ -170,9 +170,9 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
     # Load Existing File
     # ------------------
-    if(loadsave):
+    if (loadsave):
         logger.info("Loading from '%s'" % (fname))
-        if(os.path.exists(fname)):
+        if (os.path.exists(fname)):
             data = zio.npzToDict(fname)
         else:
             logger.warning("WARNING: '%s' does not exist!  Recreating!" % (fname))
@@ -180,11 +180,11 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
     # Recreate data (Merge individual snapshot files)
     # -----------------------------------------------
-    if(not loadsave):
+    if (not loadsave):
         logger.info("Recreating '%s'" % (fname))
 
         # Dont allow old versions to be recreated
-        if(oldVers): raise RuntimeError("Cannot recreate outdated version %.2f!!" % (version))
+        if (oldVers): raise RuntimeError("Cannot recreate outdated version %.2f!!" % (version))
 
         data = _mergeBHSnapshotFiles(run, logger)
 
@@ -276,7 +276,7 @@ def _runMaster(run, comm, logger):
         logger.debug("- Received signal from %d" % (src))
 
         # Track number of completed profiles
-        if(tag == MPI_TAGS.DONE):
+        if (tag == MPI_TAGS.DONE):
             durat, pos, neg, new = data
             logger.debug("- - Done after %s, pos %d, neg %d, new %d" % (durat, pos, neg, new))
 
@@ -318,10 +318,10 @@ def _runMaster(run, comm, logger):
         logger.debug("- Received signal from %d" % (src))
 
         # If we're recieving exit confirmation, count it
-        if(tag == MPI_TAGS.EXIT): numActive -= 1
+        if (tag == MPI_TAGS.EXIT): numActive -= 1
         else:
             # If a process just completed, count it
-            if(tag == MPI_TAGS.DONE):
+            if (tag == MPI_TAGS.DONE):
                 durat, pos, neg, new = data
                 logger.debug("- - %d Done after %s, pos %d, neg %d, new %d" %
                              (src, durat, pos, neg, new))
@@ -387,7 +387,7 @@ def _runSlave(run, comm, logger, loadsave=True):
         tag = stat.Get_tag()
         logger.debug("- Received tag %d" % (tag))
 
-        if(tag == MPI_TAGS.START):
+        if (tag == MPI_TAGS.START):
             # Extract parameters
             snap, idxs, bhids, numMergers = task
             logger.debug("- Starting snapshot %d" % (snap))
@@ -401,7 +401,7 @@ def _runSlave(run, comm, logger, loadsave=True):
             durat = (end-beg).total_seconds()
             logger.debug("- Done after %f,  pos %d, neg %d, new %d" % (durat, pos, neg, new))
             comm.send([durat, pos, neg, new], dest=0, tag=MPI_TAGS.DONE)
-        elif(tag == MPI_TAGS.EXIT):
+        elif (tag == MPI_TAGS.EXIT):
             logger.debug("- Received Exit.")
             break
 
@@ -466,7 +466,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
 
     # Load and Return existing save if desired
     # ----------------------------------------
-    if(loadsave and os.path.exists(fname)):
+    if (loadsave and os.path.exists(fname)):
         logger.warning("Loading existing file")
         data = zio.npzToDict(fname)
         return data, pos, neg, new
@@ -483,18 +483,18 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
     # ----------------------------------
     process_snapshot = True
     # Some illustris-1 snapshots are bad
-    if(snapNum in GET_BAD_SNAPS(run)):
+    if (snapNum in GET_BAD_SNAPS(run)):
         logger.warning("Skipping bad snapshot.")
         process_snapshot = False
 
     # Make sure there are mergers in this snapshot
-    if(len(idxs) <= 0 or len(bhids) <= 0):
+    if (len(idxs) <= 0 or len(bhids) <= 0):
         logger.warning("Skipping snap %d with no valid BHs" % (snapNum))
         process_snapshot = False
 
     # Load And Process Snapshot if its good
     # -------------------------------------
-    if(process_snapshot):
+    if (process_snapshot):
         logger.info("Processing Snapshot")
 
         # Load Snapshot
@@ -504,13 +504,13 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
             snapshot = ill.snapshot.loadSubset(illdir, snapNum, 'bh', fields=SNAPSHOT_FIELDS)
 
         snap_keys = snapshot.keys()
-        if('count' in snap_keys):
+        if ('count' in snap_keys):
             snap_keys.remove('count')
             logger.debug("- - Loaded %d particles" % (snapshot['count']))
 
         # Make sure all target keys are present
         union = list(set(snap_keys) & set(SNAPSHOT_FIELDS))
-        if(len(union) != len(SNAPSHOT_FIELDS)):
+        if (len(union) != len(SNAPSHOT_FIELDS)):
             logger.error("snap_keys       = '%s'" % (str(snap_keys)))
             logger.error("SNAPSHOT_FIELDS = '%s'" % (str(SNAPSHOT_FIELDS)))
             errStr = "Field mismatch at Rank %d, Snap %d!" % (rank, snapNum)
@@ -522,7 +522,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         for index, tid in zip(idxs, bhids):
             for BH in [BH_TYPE.IN, BH_TYPE.OUT]:
                 ind = np.where(snapshot['ParticleIDs'] == tid[BH])[0]
-                if(len(ind) == 1):
+                if (len(ind) == 1):
                     pos += 1
                     data[BH_SNAP.VALID][index, BH] = True
                     for key in SNAPSHOT_FIELDS: data[key][index, BH] = snapshot[key][ind[0]]
@@ -622,7 +622,7 @@ def _mergeBHSnapshotFiles(run, logger):
             allData[key][valids] = data[key][valids]
 
         # Collect and log data
-        if(new == 1):
+        if (new == 1):
             newFiles += 1
             logger.debug("- - New")
             logger.debug("- - - pos %d, neg %d, expected %d" % (pos, neg, pos+neg, nums))
@@ -692,4 +692,4 @@ def _GET_BH_SNAPSHOT_FILENAME(run, version=_VERSION):
     return _GET_BH_SNAPSHOT_DIR(run) + _BH_SNAPSHOT_FILENAME.format(run, version)
 
 
-if(__name__ == "__main__"): main()
+if (__name__ == "__main__"): main()

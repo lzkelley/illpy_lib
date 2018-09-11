@@ -21,24 +21,24 @@ class ParallelArray(object):
         self.num = len(names)                                                                       # Number of arrays
 
         # Make sure number of names matches number of types
-        if(self.num != len(types)):
+        if (self.num != len(types)):
             raise RuntimeError("Num names doesn't match num types!")
 
         # Make sure keys (if provided) match number of names
-        if(keys != None):
-            if(len(keys) != self.num):
+        if (keys != None):
+            if (len(keys) != self.num):
                 raise RuntimeError("Num keys doesn't match num names or types!")
 
         # Choose how to initialize arrays
-        if(zero): initFunc = np.zeros                                                             # Initialize arrays to zero  (clean)
+        if (zero): initFunc = np.zeros                                                             # Initialize arrays to zero  (clean)
         else:       initFunc = np.empty                                                             # Initialize arrays to empty (unclean)
 
         # Create dictionary to store keys for each array (for later access)
         self.__keys = {}
         #self.__names = {}
 
-        ### Initialize arrays ###
-        for ii in xrange(self.num):
+        # Initialize arrays #
+        for ii in range(self.num):
             # Add array as attribute
             setattr(self, names[ii], initFunc(length, dtype=types[ii]))
             # Establish an ordering for different arrays
@@ -51,17 +51,17 @@ class ParallelArray(object):
     def initFromArrays(cls, names, arrs):
         
         # Get number of arrays
-        if(len(arrs) != len(names)): raise RuntimeError("Names must match arrays in number!")
+        if (len(arrs) != len(names)): raise RuntimeError("Names must match arrays in number!")
 
         # Get length of each array
         length = len(arrs[0])
 
-        print "num = ", length
+        print("num = ",  length)
 
         # Get types from given arrays
         types = [type(ar[0]) for ar in arrs]
 
-        print "TYPES = ", types
+        print("TYPES = ",  types)
 
         # Initialize object using default constructor
         pararr = cls(length, names, types, zero=False)
@@ -95,14 +95,14 @@ class ParallelArray(object):
             e.g. MERGER_TIME = 'time' for the time array
         """
         
-        if(type(key) == int): key = np.int(key)                                                   # Make sure ints are numpy ints
+        if (type(key) == int): key = np.int(key)                                                   # Make sure ints are numpy ints
 
         # If int, return slice across all arrays
-        if(np.issubdtype(type(key), int)):
+        if (np.issubdtype(type(key), int)):
             return [getattr(self, name)[key] for name, ind in self.keys()]
         # If str, try to return that attribute
-        elif(type(key) == str): 
-            if(hasattr(self, key)): return getattr(self, key)
+        elif (type(key) == str): 
+            if (hasattr(self, key)): return getattr(self, key)
             else: raise KeyError("Unrecognized key '%s' !" % (key))
         # Otherwise, error
         else: 
@@ -110,7 +110,7 @@ class ParallelArray(object):
 
     '''
     def __getattr__(self, key):
-        if(hasattr(self, key)): return getattr(self, key)
+        if (hasattr(self, key)): return getattr(self, key)
         else: raise KeyError("Not attribute '%s'!" % (key))
     '''
 
@@ -124,13 +124,13 @@ class ParallelArray(object):
         """
 
         # If int, set same element of each array
-        if(isInt(key)):
+        if (isInt(key)):
             # name is the array name, ind is the corresponding index of 'vals' 
             for (name, ind), aval in zip(self.keys(), vals):
                 getattr(self, name)[key] = aval                                                      # set element 'key' of array 'name' to aval (at ind)
 
         # If str, set full array
-        elif(type(key) == str): 
+        elif (type(key) == str): 
             getattr(self, key)[:] = vals
 
         # Otherwise, error
@@ -151,7 +151,7 @@ class ParallelArray(object):
         # In each array, delete target element
         for name, ind in self.keys():
             setattr(self, name, np.delete(getattr(self, name), key))
-            if(ind == 0): self.__len = len(getattr(self, name))
+            if (ind == 0): self.__len = len(getattr(self, name))
 
         return self.__len
 
@@ -162,7 +162,7 @@ class ParallelArray(object):
         # In each array, delete target element
         for (name, ind), aval in zip(self.keys(), vals):
             setattr(self, name, np.append(getattr(self, name), aval))
-            if(ind == 0): self.__len = len(getattr(self, name))
+            if (ind == 0): self.__len = len(getattr(self, name))
 
         return self.__len
 
@@ -170,8 +170,8 @@ class ParallelArray(object):
 
 def isInt(val):
     # python int   ==> True
-    if(type(val) == int): return True
+    if (type(val) == int): return True
     # numpy int    ==> True
-    elif(np.issubdtype(type(val), int)): return True
+    elif (np.issubdtype(type(val), int)): return True
     # anyting else ==> False
     else: return False
