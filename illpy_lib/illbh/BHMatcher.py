@@ -36,12 +36,11 @@ import logging
 import numpy as np
 from datetime import datetime
 
-from mpi4py import MPI
-
 import illpy_lib.illbh.BHDetails
 import illpy_lib.illbh.BHMergers
 import illpy_lib.illbh.BHTree
 import illpy_lib.illbh.BHConstants
+
 from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
 from illpy_lib.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
@@ -56,6 +55,8 @@ _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAIL
 
 
 def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, redo_remnants=True):
+    from mpi4py import MPI
+
     # Initialization
     # --------------
     #     MPI Parameters
@@ -119,7 +120,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
 
     # Match Merger BHs to Details entries
     # -----------------------------------
-    if (create_mergerDets):
+    if create_mergerDets:
         log.info("Creating Merger Details")
         beg = datetime.now()
         mdets = _matchMergerDetails(run, log)
@@ -128,11 +129,11 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
 
     # Extend merger-details to account for later mergers
     # --------------------------------------------------
-    if (create_remnantDets):
+    if create_remnantDets:
         comm.Barrier()
         log.info("Creating Remnant Details")
         beg = datetime.now()
-        mrems = _matchRemnantDetails(run, log, mdets=mdets)
+        _matchRemnantDetails(run, log, mdets=mdets)
         end = datetime.now()
         log.debug(" - Done after %s" % (str(end - beg)))
 
@@ -206,7 +207,7 @@ def loadRemnantDetails(run, verbose=True, log=None):
     remnantDetFName = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
     log.info("Remnant Details File '%s'" % (remnantDetFName))
     remnantDets = None
-    if (os.path.exists(remnantDetFName)):
+    if os.path.exists(remnantDetFName):
         remnantDets = zio.npzToDict(remnantDetFName)
         log.info(" - File Loaded.")
     else:
@@ -228,6 +229,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
 
     """
     log.debug("allDetailsForBHLineage()")
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -529,6 +531,7 @@ def _matchMergerDetails(run, log):
     Stores at most ``_MAX_DETAILS_PER_SNAP`` entries per snapshot for each BH.
     """
     log.debug("_matchMergerDetails()")
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -761,6 +764,7 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_createRemnantDetails()")
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     # Only use root-processor
@@ -1216,6 +1220,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
     """
     log.debug("_detailsForMergers_snapshot()")
 
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
 
     # Initialize

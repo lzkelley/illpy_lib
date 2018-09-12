@@ -26,7 +26,7 @@ Functions
 import os
 import numpy as np
 from collections import Counter
-from mpi4py import MPI
+# from mpi4py import MPI
 from datetime import datetime
 from argparse import ArgumentParser
 
@@ -34,10 +34,9 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 from illpy_lib.constants import NUM_SNAPS, DTYPE
-from illpy_lib.illbh import BHDetails, BHConstants
-from illpy_lib.illbh.BHConstants import DETAILS, _LOG_DIR, _distributeSnapshots, \
-    GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave
-
+from illpy_lib.illbh import BHConstants
+from illpy_lib.illbh.BHConstants import (DETAILS, _LOG_DIR, _distributeSnapshots,
+                                         GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave)
 
 __version__ = '0.4'
 
@@ -133,6 +132,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
     # ------------------------------------
     if data is None:
         # Load `BHDetails`
+        from illpy_lib.illbh import BHDetails
         dets = BHDetails.loadBHDetails(run, snap, verbose=False)
         ndets = dets[DETAILS.NUM]
         logStr = " - Snap %d: %d Details" % (snap, ndets)
@@ -194,6 +194,7 @@ def loadAllUniqueIDs(run=Settings.run, loadsave=True, log=None, sets=None):
     log = _checkLog(log, run=run)
     log.debug("loadAllUniqueIDs()")
 
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
 
@@ -238,6 +239,7 @@ def _calculateAllUniqueIDs(run=1, loadsave=True, log=None):
 
     """
     # Load MPI Parameters
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -400,6 +402,7 @@ def _mergeAllUnique(run, log):
 def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
     """Create a default logging object if one is not given.
     """
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     if not rank:

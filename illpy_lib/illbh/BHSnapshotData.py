@@ -35,7 +35,7 @@ import sys
 import logging
 import argparse
 
-from mpi4py import MPI
+# from mpi4py import MPI
 
 from illpy_lib.constants import (NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR,
                                  DTYPE, GET_BAD_SNAPS)
@@ -61,6 +61,7 @@ def main():
 
     # Initialize MPI Parameters
     # -------------------------
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
@@ -222,6 +223,7 @@ def _runMaster(run, comm, logger):
 
     """
 
+    from mpi4py import MPI
     stat = MPI.Status()
     rank = comm.rank
     size = comm.size
@@ -368,6 +370,7 @@ def _runSlave(run, comm, logger, loadsave=True):
 
     """
 
+    from mpi4py import MPI
     stat = MPI.Status()
     rank = comm.rank
     size = comm.size
@@ -692,4 +695,5 @@ def _GET_BH_SNAPSHOT_FILENAME(run, version=_VERSION):
     return _GET_BH_SNAPSHOT_DIR(run) + _BH_SNAPSHOT_FILENAME.format(run, version)
 
 
-if (__name__ == "__main__"): main()
+if (__name__ == "__main__"):
+    main()
