@@ -140,7 +140,7 @@ def loadRawMergers(run, verbose=True, recombine=False):
         mergerFilenames = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
         if verbose:
             print((" - - - Found {:d} merger Files".format(len(mergerFilenames))))
-        zio.combineFiles(mergerFilenames, combinedFilename, verbose=verbose)
+        zio.combine_files(mergerFilenames, combinedFilename, verbose=verbose)
 
     if verbose:
         print((" - - - Merger file '{:s}'".format(combinedFilename)))
@@ -575,7 +575,3 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
         raise RuntimeError("Could not find bins!")
 
     return [low, high, dlo, dhi]
-
-
-# if __name__ == "__main__":
-#     main()
