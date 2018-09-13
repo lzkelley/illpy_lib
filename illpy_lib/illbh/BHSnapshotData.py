@@ -155,7 +155,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
     # Create default logger if needed
     # -------------------------------
     if (not isinstance(logger, logging.Logger)):
-        logger = zio.defaultLogger(logger, verbose=verbose)
+        logger = zio.default_logger(logger, verbose=verbose)
 
     logger.debug("BHSnapshotData.loadBHSnapshotData()")
     if (version is None): version = _VERSION

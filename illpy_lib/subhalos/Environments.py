@@ -622,7 +622,7 @@ def loadMergerEnvironments(run, loadsave=True, verbose=True, version=_VERSION):
     if verbose: print(" - - Environments.loadMergerEnvironments()")
 
     fname_out = _GET_MERGER_ENVIRONMENT_FILENAME(run, version=version)
-    fname_in = zio.modifyFilename(fname_out, append='_in')
+    fname_in = zio.modify_filename(fname_out, append='_in')
 
     # Try to Load Existing Save File
     # ------------------------------
@@ -717,7 +717,7 @@ def _in_merger_environments(run, verbose=True, version=_VERSION):
         print(" - - - Bad     %5d/%5d = %.4f" % (numBad, numMergers, numBad/numMergers))
 
     fname_out = _GET_MERGER_ENVIRONMENT_FILENAME(run, version=version)
-    fname_in = zio.modifyFilename(fname_out, append='_in')
+    fname_in = zio.modify_filename(fname_out, append='_in')
     print("fname_out = '{}'".format(fname_out))
     print("fname_in = '{}'".format(fname_in))
     zio.dictToNPZ(env_in, fname_in, verbose=True)

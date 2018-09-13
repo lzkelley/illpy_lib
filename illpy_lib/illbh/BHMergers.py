@@ -237,9 +237,9 @@ def loadFixedMergers(run, verbose=True, loadsave=True):
     fixedFilename = GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
 
     # Try to Load Existing Mapped Mergers
-    if (loadsave):
+    if loadsave:
         if verbose: print((" - - - Loading from save '{:s}'".format(fixedFilename)))
-        if (os.path.exists(fixedFilename)):
+        if os.path.exists(fixedFilename):
             mergersFixed = zio.npzToDict(fixedFilename)
         else:
             print((" - - - - '{:s}' does not exist.  Recreating.".format(fixedFilename)))
