@@ -20,16 +20,8 @@ import numpy as np
 from datetime import datetime
 
 from illpy_lib.constants import DTYPE
-# from .. import Cosmology
-# import illpy_lib.illcosmo
 from . import BHConstants
 from .BHConstants import MERGERS, BH_TYPE, BH_TREE, NUM_BH_TYPES
-from . import BHMergers
-
-
-import pyximport
-pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
-from . import BuildTree
 
 import zcode.inout as zio
 from zcode.constants import MYR
@@ -75,6 +67,7 @@ def loadTree(run, mergers=None, loadsave=True, verbose=True):
         if verbose: print(" - - - Reconstructing BH Merger Tree")
         # Load Mergers if needed
         if mergers is None:
+            from illpy_lib.illbh import BHMergers
             mergers = BHMergers.loadFixedMergers(run)
             if verbose: print((" - - - - Loaded {:d} mergers".format(mergers[MERGERS.NUM])))
 
@@ -209,10 +202,14 @@ def allIDsForTree(run, mrg, tree=None, mergers=None):
     """
     if not tree:
         tree = loadTree(run)
+
     nextMerg = tree[BH_TREE.NEXT]
     lastMerg = tree[BH_TREE.LAST]
+
     if not mergers:
+        from illpy_lib.illbh import BHMergers
         mergers = BHMergers.loadFixedMergers(run)
+
     m_ids = mergers[MERGERS.IDS]
 
     # Go to the last merger
@@ -245,6 +242,10 @@ def _constructBHTree(run, mergers, verbose=True):
     # cosmo = Cosmology()
     from illpy_lib import illcosmo
     cosmo = illcosmo.cosmology.Cosmology()
+
+    import pyximport
+    pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
+    from . import BuildTree
 
     numMergers = mergers[MERGERS.NUM]
     last     = -1*np.ones([numMergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
