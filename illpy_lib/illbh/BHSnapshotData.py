@@ -237,7 +237,7 @@ def _runMaster(run, comm, logger):
 
     # Load BH Mergers
     logger.info("Loading BH Mergers")
-    mrgs = mergers.loadFixedMergers(run, loadsave=True, verbose=False)
+    mrgs = mergers.load_fixed_mergers(run, loadsave=True, verbose=False)
     numMergers = mrgs[MERGERS.NUM]
     logger.debug("- Loaded %d mrgs" % (numMergers))
 
@@ -587,7 +587,7 @@ def _mergeBHSnapshotFiles(run, logger):
     # Load BH Mergers
     # ---------------
     logger.info("Loading BH Mergers")
-    mrgs = mergers.loadFixedMergers(run, loadsave=True)
+    mrgs = mergers.load_fixed_mergers(run, loadsave=True)
     numMergers = mrgs[MERGERS.NUM]
     logger.debug("Loaded %d mrgs" % (numMergers))
 

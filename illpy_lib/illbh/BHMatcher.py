@@ -460,7 +460,7 @@ def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
     # Load Mergers
     if (mrgs is None):
         from illpy_lib.illbh import mergers
-        mrgs = mergers.loadFixedMergers(run, verbose=False)
+        mrgs = mergers.load_fixed_mergers(run, verbose=False)
     m_scales = mrgs[MERGERS.SCALES]
     m_masses = mrgs[MERGERS.MASSES]
     numMergers = mrgs[MERGERS.NUM]
@@ -542,7 +542,7 @@ def _matchMergerDetails(run, log):
         # Load Mergers
         log.debug("Loading Mergers")
         from illpy_lib.illbh import mergers
-        mrgs = mergers.loadFixedMergers(run)
+        mrgs = mergers.load_fixed_mergers(run)
         numMergers = mrgs[MERGERS.NUM]
         mergerIDs = mrgs[MERGERS.IDS]
 
@@ -774,7 +774,7 @@ def _createRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
     if mrgs is None:
         log.debug("Loading Mergers.")
         from illpy_lib.illbh import mergers
-        mrgs = mergers.loadFixedMergers(run)
+        mrgs = mergers.load_fixed_mergers(run)
     if mdets is None:
         log.debug("Loading Merger-Details.")
         mdets = loadMergerDetails(run, log=log)
@@ -866,7 +866,7 @@ def _matchRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
     log.debug("Loading Mergers")
     if mrgs is None:
         from illpy_lib.illbh import mergers
-        mrgs = mergers.loadFixedMergers(run)
+        mrgs = mergers.load_fixed_mergers(run)
     m_scales = mrgs[MERGERS.SCALES]
     m_ids = mrgs[MERGERS.IDS]
     numMergers = np.int(mrgs[MERGERS.NUM])     # Convert from ``np.array(int)``

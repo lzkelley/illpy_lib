@@ -68,7 +68,7 @@ def loadTree(run, mrgs=None, loadsave=True, verbose=True):
         # Load Mergers if needed
         if mrgs is None:
             from illpy_lib.illbh import mergers
-            mrgs = mergers.loadFixedMergers(run)
+            mrgs = mergers.load_fixed_mergers(run)
             if verbose: print((" - - - - Loaded {:d} mrgs".format(mrgs[MERGERS.NUM])))
 
         # Construct Tree
@@ -208,7 +208,7 @@ def allIDsForTree(run, mrg, tree=None, mrgs=None):
 
     if not mrgs:
         from illpy_lib.illbh import mergers
-        mrgs = mergers.loadFixedMergers(run)
+        mrgs = mergers.load_fixed_mergers(run)
 
     m_ids = mrgs[MERGERS.IDS]
 
