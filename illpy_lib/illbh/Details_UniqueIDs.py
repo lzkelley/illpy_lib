@@ -34,8 +34,8 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 from illpy_lib.constants import NUM_SNAPS, DTYPE
-from illpy_lib.illbh import BHConstants
-from illpy_lib.illbh.BHConstants import (DETAILS, _LOG_DIR, _distributeSnapshots,
+from illpy_lib.illbh import constants
+from illpy_lib.illbh.constants import (DETAILS, _LOG_DIR, _distributeSnapshots,
                                          GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave)
 
 __version__ = '0.4'
@@ -119,7 +119,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
     """
     if log is None:
         # Initialize log
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, debug=True, verbose=True, run=run, rank=rank, version=__version__)
         if (rank == 0):
             print("Log filename = ", log.filename)
@@ -131,9 +131,9 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
     # Recalculate Unique BH IDs and Scales
     # ------------------------------------
     if data is None:
-        # Load `BHDetails`
-        from illpy_lib.illbh import BHDetails
-        dets = BHDetails.loadBHDetails(run, snap, verbose=False)
+        # Load `details`
+        from illpy_lib.illbh import details
+        dets = details.loadBHDetails(run, snap, verbose=False)
         ndets = dets[DETAILS.NUM]
         logStr = " - Snap %d: %d Details" % (snap, ndets)
         if ndets > 0:
@@ -147,7 +147,7 @@ def loadUniqueIDs(run, snap, rank=None, loadsave=True, log=None):
             # Sort by IDs, then by scales
             sind = np.lexsort((scales, ids))
             cnt = 0
-            # For each Unique ID, find the first and last details-entry scale-factor
+            # For each Unique ID, find the first and last dets-entry scale-factor
             for ii, unid in enumerate(ids_uniq):
                 #     Move through sorted IDs to the current target ID number
                 while cnt < ndets-1 and ids[sind[cnt]] < unid:
@@ -198,7 +198,7 @@ def loadAllUniqueIDs(run=Settings.run, loadsave=True, log=None, sets=None):
     comm = MPI.COMM_WORLD
     rank = comm.rank
 
-    fname = BHConstants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
+    fname = constants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
     log.debug(" - Filename '%s'" % (fname))
     if os.path.exists(fname):
         log.debug(" - - File Exists.")
@@ -410,7 +410,7 @@ def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
     comm.Barrier()
 
     if log is None:
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, debug=debug, verbose=debug, run=run, rank=rank, version=__version__)
         header = "\n%s\n%s\n%s" % (__file__, '='*len(__file__), str(datetime.now()))
         log.debug(header)

@@ -1,9 +1,9 @@
-"""Handle Illustris blackhole details files.
+"""Handle Illustris blackhole dets files.
 
 Details are accessed via 'intermediate' files which are reorganized versions of the 'raw' illustris
-files 'blackhole_details_<#>.txt'.  The `main()` function assures that details entries are properly
+files 'blackhole_details_<#>.txt'.  The `main()` function assures that dets entries are properly
 converted from raw to processed form, organized by time of entry instead of processor.  Those
-details can then be accessed by snapshot and blackhole ID number.
+dets can then be accessed by snapshot and blackhole ID number.
 
 Functions
 ---------
@@ -23,10 +23,10 @@ Functions
 Details Dictionary
 ------------------
    { DETAILS_RUN       : <int>, illustris simulation number in {1, 3}
-     DETAILS_NUM       : <int>, total number of mergers `N`
-     DETAILS_FILE      : <str>, name of save file from which mergers were loaded/saved
+     DETAILS_NUM       : <int>, total number of mrgs `N`
+     DETAILS_FILE      : <str>, name of save file from which mrgs were loaded/saved
      DETAILS_CREATED   : <str>, date and time this file was created
-     DETAILS_VERSION   : <flt>, version of BHDetails used to create file
+     DETAILS_VERSION   : <flt>, version of details used to create file
 
      DETAILS_IDS       : <uint64>[N], BH particle ID numbers for each entry
      DETAILS_SCALES    : <flt64> [N], scale factor at which each entry was written
@@ -45,12 +45,12 @@ Notes
     grouped by which snapshot interval the detail entry corresponds to.  The reorganization is
     first done into 'temporary' ASCII files before being converted into numpy `npz` files by the
     method `_convertDetailsASCIItoNPZ()`.  The `npz` files are effectively dictionaries storing
-    the select details parameters (i.e. mass, BH ID, mdot, rho, cs), along with some meta data
-    about the `run` number, and creation time, etc.  Execution of the BHDetails ``main`` routine
+    the select dets parameters (i.e. mass, BH ID, mdot, rho, cs), along with some meta data
+    about the `run` number, and creation time, etc.  Execution of the details ``main`` routine
     checks to see if the npz files exist, and if they do not, they are created.
 
-  - There are also routines to obtain the details entries for a specific BH ID.  In particular,
-    the method `detailsForBH()` will return the details entry/entries for a target BH ID and
+  - There are also routines to obtain the dets entries for a specific BH ID.  In particular,
+    the method `detailsForBH()` will return the dets entry/entries for a target BH ID and
     run/snapshot.
 
   - Illustris Blackhole Details Files 'blackhole_details_<#>.txt'
@@ -69,18 +69,18 @@ from datetime import datetime
 import zcode.inout as zio
 
 from illpy_lib.constants import DTYPE, NUM_SNAPS
-from . import BHConstants
-from .BHConstants import DETAILS
+from . import constants
+from .constants import DETAILS
 
 
-VERSION = 0.23                                    # Version of BHDetails
+VERSION = 0.23                                    # Version of details
 
 _DEF_PRECISION = -8                               # Default precision
 
 
 def processDetails(run, loadsave=True, verbose=True):
 
-    if verbose: print(" - - BHDetails.processDetails()")
+    if verbose: print(" - - details.processDetails()")
 
     # Organize Details by Snapshot Time; create new, temporary ASCII Files
     organizeDetails(run, loadsave=loadsave, verbose=verbose)
@@ -93,9 +93,9 @@ def processDetails(run, loadsave=True, verbose=True):
 
 def organizeDetails(run, loadsave=True, verbose=True):
 
-    if verbose: print(" - - BHDetails.organizeDetails()")
+    if verbose: print(" - - details.organizeDetails()")
 
-    tempFiles = [BHConstants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
+    tempFiles = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
 
     # Check if all temp files already exist
     if loadsave:
@@ -110,13 +110,13 @@ def organizeDetails(run, loadsave=True, verbose=True):
         # Get Illustris BH Details Filenames
         if verbose:
             print(" - - - Finding Illustris BH Details files")
-        rawFiles = BHConstants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
+        rawFiles = constants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
         if len(rawFiles) < 1:
-            raise RuntimeError("Error no details files found!!")
+            raise RuntimeError("Error no dets files found!!")
 
         # Reorganize into temp files
         if verbose:
-            print(" - - - Reorganizing details into temporary files")
+            print(" - - - Reorganizing dets into temporary files")
         _reorganizeBHDetailsFiles(run, rawFiles, tempFiles, verbose=verbose)
 
     # Confirm all temp files exist
@@ -131,18 +131,18 @@ def organizeDetails(run, loadsave=True, verbose=True):
 
 
 def formatDetails(run, loadsave=True, verbose=True):
-    if verbose: print(" - - BHDetails.formatDetails()")
+    if verbose: print(" - - details.formatDetails()")
     # See if all npz files already exist
-    saveFilenames = [BHConstants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
+    saveFilenames = [constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
                      for snap in range(NUM_SNAPS)]
 
     # Check if all save files already exist, and correct versions
     if (loadsave):
         saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
         if (not saveExist):
-            print(("BHDetails.formatDetails() : Save files do not exist e.g. '{:s}'".format(
+            print(("details.formatDetails() : Save files do not exist e.g. '{:s}'".format(
                 saveFilenames[0])))
-            print("BHDetails.formatDetails() : converting raw Details files !!!")
+            print("details.formatDetails() : converting raw Details files !!!")
             loadsave = False
 
     # Re-convert files
@@ -163,7 +163,7 @@ def formatDetails(run, loadsave=True, verbose=True):
 
 def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
-    if verbose: print(" - - BHDetails._reorganizeBHDetailsFiles()")
+    if verbose: print(" - - details._reorganizeBHDetailsFiles()")
 
     # Load cosmology
     # from illpy_lib import illcosmo
@@ -172,7 +172,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
     cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
     snapScales = cosmo.scales()
 
-    # Open new ASCII, Temp details files
+    # Open new ASCII, Temp dets files
     #    Make sure path is okay
     zio.checkPath(tempFilenames[0])
     # Open each temp file
@@ -185,13 +185,13 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
     # Iterate over all Illustris Details Files
     # ----------------------------------------
     if verbose:
-        print(" - - - Sorting details into times of snapshots")
+        print(" - - - Sorting dets into times of snapshots")
         pbar = zio.getProgressBar(numRaw)
 
     for ii, rawName in enumerate(rawFilenames):
         detLines = []
         detScales = []
-        # Load all lines and entry scale-factors from raw details file
+        # Load all lines and entry scale-factors from raw dets file
         for dline in open(rawName):
             detLines.append(dline)
             # Extract scale-factor from line
@@ -210,7 +210,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
             prec = _getPrecision(detScales)
         # Set to a default value on error (not sure what's causing it)
         except ValueError as err:
-            print(("BHDetails._reorganizeBHDetailsFiles() : caught error '{:s}'".format(str(err))))
+            print(("details._reorganizeBHDetailsFiles() : caught error '{:s}'".format(str(err))))
             print(("\tii = {:d}; file = '{:s}'".format(ii, rawName)))
             print(("\tlen(detScales) = ",  len(detScales)))
             prec = _DEF_PRECISION
@@ -231,7 +231,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
     if verbose: pbar.finish()
 
-    # Close out details files
+    # Close out dets files
     fileSizes = 0.0
     if verbose:
         print(" - - - Closing files, checking sizes")
@@ -259,10 +259,10 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
 
 def _convertDetailsASCIItoNPZ(run, verbose=True):
-    """Convert all snapshot ASCII details files to dictionaries in NPZ files.
+    """Convert all snapshot ASCII dets files to dictionaries in NPZ files.
     """
     if verbose:
-        print(" - - BHDetails._convertDetailsASCIItoNPZ()")
+        print(" - - details._convertDetailsASCIItoNPZ()")
     filesSize = 0.0
     # sav = None
 
@@ -296,7 +296,7 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
     """Convert a single snapshot ASCII Details file to dictionary saved to NPZ file.
 
     Makes sure the ASCII file exists, if not, ASCII 'temp' files are reloaded
-    for all snapshots from the 'raw' details data from illustris.
+    for all snapshots from the 'raw' dets data from illustris.
 
     Arguments
     ---------
@@ -306,33 +306,33 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
 
     """
 
-    if verbose: print(" - - BHDetails._convertDetailsASCIItoNPZ_snapshot()")
+    if verbose: print(" - - details._convertDetailsASCIItoNPZ_snapshot()")
 
-    tmp = BHConstants.GET_DETAILS_TEMP_FILENAME(run, snap)
-    sav = BHConstants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
+    tmp = constants.GET_DETAILS_TEMP_FILENAME(run, snap)
+    sav = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
 
     # Make Sure Temporary Files exist, Otherwise re-create them
     if (not os.path.exists(tmp)):
-        print(("BHDetails._convertDetailsASCIItoNPZ_snapshot(): no temp file '{:s}' ".format(tmp)))
-        print("BHDetails._convertDetailsASCIItoNPZ_snapshot(): Reloading all temp files!!")
+        print(("details._convertDetailsASCIItoNPZ_snapshot(): no temp file '{:s}' ".format(tmp)))
+        print("details._convertDetailsASCIItoNPZ_snapshot(): Reloading all temp files!!")
         organizeDetails(run, loadsave=loadsave, verbose=verbose)
 
     # Try to load from existing save
     if (loadsave):
         if verbose: print((" - - - Loading from save '{:s}'".format(sav)))
         if (os.path.exists(sav)):
-            details = zio.npzToDict(sav)
+            dets = zio.npzToDict(sav)
         else:
             if verbose: print((" - - - '{:s}' does not exist!".format(sav)))
             loadsave = False
 
     # Load Details from ASCII, Convert to Dictionary and Save to NPZ
     if (not loadsave):
-        # Load details from ASCII File
+        # Load dets from ASCII File
         ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
 
-        # Store details in dictionary
-        details = {DETAILS.RUN: run,
+        # Store dets in dictionary
+        dets = {DETAILS.RUN: run,
                    DETAILS.SNAP: snap,
                    DETAILS.NUM: len(ids),
                    DETAILS.FILE: sav,
@@ -346,7 +346,7 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
                    DETAILS.CS: cs}
 
         # Save Dictionary
-        zio.dictToNPZ(details, sav, verbose=verbose)
+        zio.dictToNPZ(dets, sav, verbose=verbose)
 
     return sav
 
@@ -433,16 +433,16 @@ def loadBHDetails(run, snap, loadsave=True, verbose=True):
 
     Returns
     -------
-        dets    : <dict>, BHDetails dictionary object for target snapshot
+        dets    : <dict>, details dictionary object for target snapshot
 
     """
-    if verbose: print(" - - BHDetails.loadBHDetails()")
+    if verbose: print(" - - details.loadBHDetails()")
 
-    detsName = BHConstants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
+    detsName = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
 
     # Load Existing Save File
     if (loadsave):
-        if verbose: print((" - - - Loading details from '{:s}'".format(detsName)))
+        if verbose: print((" - - - Loading dets from '{:s}'".format(detsName)))
         if (os.path.exists(detsName)):
             dets = zio.npzToDict(detsName)
         else:
@@ -452,10 +452,10 @@ def loadBHDetails(run, snap, loadsave=True, verbose=True):
 
     # If file does not exist, or is wrong version, recreate it
     if (not loadsave):
-        if verbose: print(" - - - Re-converting details")
+        if verbose: print(" - - - Re-converting dets")
         # Convert ASCII to NPZ
         saveFile = _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=verbose)
-        # Load details from newly created save file
+        # Load dets from newly created save file
         dets = zio.npzToDict(saveFile)
 
     return dets

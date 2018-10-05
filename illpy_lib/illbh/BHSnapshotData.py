@@ -7,7 +7,7 @@ import data), Run with something like:
 Once the intermediate data files exist, they can be loaded via the python API as,
     >>> import illpy_lib.illbh.BHSnapshotData
     >>> bhData = illpy_lib.illbh.BHSnapshotData(1)      # Load for illustris-1
-    >>> from illpy_lib.illbh.BHConstants import BH_SNAP
+    >>> from illpy_lib.illbh.constants import BH_SNAP
     >>> print(bhData[BH_SNAP.]
 
 Functions
@@ -39,9 +39,9 @@ import argparse
 
 from illpy_lib.constants import (NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR,
                                  DTYPE, GET_BAD_SNAPS)
-from . import BHMergers
-from . import BHConstants
-from .BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
+from . import mergers
+from . import constants
+from .constants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
 import illpy_lib as ill
 import zcode.inout as zio
@@ -71,7 +71,7 @@ def main():
     if (rank == 0):
         NAME = sys.argv[0]
         print(("\n{:s}\n{:s}\n{:s}".format(NAME, '='*len(NAME), str(datetime.now()))))
-        zio.checkPath(BHConstants._LOG_DIR)
+        zio.checkPath(constants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
     comm.Barrier()
@@ -83,7 +83,7 @@ def main():
     verbose = args.verbose
 
     # Load logger
-    logger = BHConstants._loadLogger(__file__, verbose=verbose, run=run,
+    logger = constants._loadLogger(__file__, verbose=verbose, run=run,
                                      rank=rank, version=_VERSION)
 
     logger.info("run           = %d  " % (run))
@@ -130,7 +130,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
     If the data is recreated (using ``_mergeBHSnapshotFiles``), it will be saved to an npz file.
     The loaded parameters are stored to a dictionary with keys given by the parameters in
-    ``BHConstants.BH_SNAP``.
+    ``constants.BH_SNAP``.
 
     Arguments
     ---------
@@ -148,7 +148,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
     Returns
     -------
     data : dict,
-        Dictionary of BH Snapshot data.  Keys are given by the entries to ``BHConstants.BH_SNAP``.
+        Dictionary of BH Snapshot data.  Keys are given by the entries to ``constants.BH_SNAP``.
 
     """
 
@@ -206,9 +206,9 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
 
 def _runMaster(run, comm, logger):
-    """Distribute snapshots and associated mergers to individual slave tasks for loading.
+    """Distribute snapshots and associated mrgs to individual slave tasks for loading.
 
-    Loads ``BHMergers`` and distributes them, based on snapshot, to slave processes run by the
+    Loads ``mergers`` and distributes them, based on snapshot, to slave processes run by the
     ``_runSlave`` method.  A status file is created to track progress.  Once all snapshots are
     distributed, this method directs the termination of all of the slave processes.
 
@@ -237,12 +237,12 @@ def _runMaster(run, comm, logger):
 
     # Load BH Mergers
     logger.info("Loading BH Mergers")
-    mergers = BHMergers.loadFixedMergers(run, loadsave=True, verbose=False)
-    numMergers = mergers[MERGERS.NUM]
-    logger.debug("- Loaded %d mergers" % (numMergers))
+    mrgs = mergers.loadFixedMergers(run, loadsave=True, verbose=False)
+    numMergers = mrgs[MERGERS.NUM]
+    logger.debug("- Loaded %d mrgs" % (numMergers))
 
     # Init status file
-    statFileName = BHConstants._GET_STATUS_FILENAME(__file__, run=run, version=_VERSION)
+    statFileName = constants._GET_STATUS_FILENAME(__file__, run=run, version=_VERSION)
     statFile = open(statFileName, 'w')
     logger.debug("Opened status file '%s'" % (statFileName))
     statFile.write('%s\n' % (str(datetime.now())))
@@ -266,9 +266,9 @@ def _runMaster(run, comm, logger):
         logger.debug("- Snap %d, count %d, done %d" % (snapNum, count, countDone))
 
         # Get Mergers occuring just after Snapshot `snapNum`
-        mrgs = mergers[MERGERS.MAP_STOM][snapNum+1]
+        mrgs = mrgs[MERGERS.MAP_STOM][snapNum+1]
         nums = len(mrgs)
-        targetIDs = mergers[MERGERS.IDS][mrgs]
+        targetIDs = mrgs[MERGERS.IDS][mrgs]
         logger.debug("- %d Mergers from snapshot %d" % (nums, snapNum+1))
 
         # Look for available slave process
@@ -346,7 +346,7 @@ def _runMaster(run, comm, logger):
 
 
 def _runSlave(run, comm, logger, loadsave=True):
-    """Receive snapshots and associatd mergers from the master process.  Loads BH Snapshot data.
+    """Receive snapshots and associatd mrgs from the master process.  Loads BH Snapshot data.
 
     This method receives task parameters from the ``_runMaster`` process, and uses the
     ``_loadSingleSnapshotBHs`` method to load and save individual snapshot data.  Once this method
@@ -432,9 +432,9 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
     snapNum : int,
         Illustris snapshot number {1, 135}.
     numMergers : int,
-        Total number of mergers.
+        Total number of mrgs.
     idxs : (N,) array of int,
-        Merger indices for this snapshot with `N` mergers.
+        Merger indices for this snapshot with `N` mrgs.
     bhids : (N,2,) array of int,
         BH ID numbers, `IN` and `OUT` BH for each merger.
     logger : ``logging.Logger`` object,
@@ -490,7 +490,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         logger.warning("Skipping bad snapshot.")
         process_snapshot = False
 
-    # Make sure there are mergers in this snapshot
+    # Make sure there are mrgs in this snapshot
     if (len(idxs) <= 0 or len(bhids) <= 0):
         logger.warning("Skipping snap %d with no valid BHs" % (snapNum))
         process_snapshot = False
@@ -587,9 +587,9 @@ def _mergeBHSnapshotFiles(run, logger):
     # Load BH Mergers
     # ---------------
     logger.info("Loading BH Mergers")
-    mergers = BHMergers.loadFixedMergers(run, loadsave=True)
-    numMergers = mergers[MERGERS.NUM]
-    logger.debug("Loaded %d mergers" % (numMergers))
+    mrgs = mergers.loadFixedMergers(run, loadsave=True)
+    numMergers = mrgs[MERGERS.NUM]
+    logger.debug("Loaded %d mrgs" % (numMergers))
 
     # Initialize storage
     allData = _initStorage(numMergers)
@@ -601,10 +601,10 @@ def _mergeBHSnapshotFiles(run, logger):
     pbar = zio.getProgressBar(NUM_SNAPS-1)
     for snap in snapList:
 
-        # Get mergers for just after this snapshot (hence '+1')
-        mrgs = mergers[MERGERS.MAP_STOM][snap+1]
+        # Get mrgs for just after this snapshot (hence '+1')
+        mrgs = mrgs[MERGERS.MAP_STOM][snap+1]
         nums = len(mrgs)
-        targetIDs = mergers[MERGERS.IDS][mrgs]
+        targetIDs = mrgs[MERGERS.IDS][mrgs]
         logger.debug("- Snap %d, Count %d.  %d Mergers" % (snap, count, nums))
 
         # Load Snapshot Data

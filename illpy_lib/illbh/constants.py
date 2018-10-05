@@ -11,7 +11,7 @@ Classes
     BH_TYPE : enum-type class for tracking the two types {``IN``, ``OUT``} of Merger BHs.
               The ``OUT`` BH is the one which persists after the merger, while the ``IN`` BH
               effectively dissappears.
-    BH_TIME : enum-type class for the three stored, details times {``FIRST``, ``BEFORE``, ``AFTER``}.
+    BH_TIME : enum-type class for the three stored, dets times {``FIRST``, ``BEFORE``, ``AFTER``}.
     BH_TREE : enum-type class for BH merger tree dictionary keys.
     BH_SNAP : enum class for BHSnapshotData dictionary keys.
 
@@ -70,7 +70,7 @@ _ILLUSTRIS_DETAILS_DIRS = {
 
 # Post-Processing Parameters
 # ==========================
-_MAX_DETAILS_PER_SNAP           = 10   # Number of details entries to store per snapshot
+_MAX_DETAILS_PER_SNAP           = 10   # Number of dets entries to store per snapshot
 
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
@@ -148,7 +148,7 @@ NUM_BH_TYPES = 2
 class BH_TIME():
     BEFORE  = 0                                   # Before merger time (MUST = 0!)
     AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
-    FIRST   = 2                                   # First matching details entry (MUST = 2!)
+    FIRST   = 2                                   # First matching dets entry (MUST = 2!)
 
 
 NUM_BH_TIMES = 3

@@ -7,13 +7,13 @@ for easier access in all future calls.  Executing the `main()` routine will
 prepare the intermediate file, as will calls to the `loadMergers()` function -
 if the intermediate file hasn't already been loaded.
 
-The `mergers` are represented as a dictionary object with keys given by the
-variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mergers.
+The `mrgs` are represented as a dictionary object with keys given by the
+variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mrgs.
 
 Internal Parameters
 -------------------
-VERSION_MAP <flt> : version number for 'mapped' mergers, and associated save files
-VERSION_FIX <flt> : version number for 'fixed'  mergers, and associated save files
+VERSION_MAP <flt> : version number for 'mapped' mrgs, and associated save files
+VERSION_FIX <flt> : version number for 'fixed'  mrgs, and associated save files
 
 Functions
 ---------
@@ -24,8 +24,8 @@ loadRawMergers                : load all merger entries, sorted by scalefactor, 
 loadMappedMergers             : load dictionary of merger events with associated mappings to and
                                 from snapshots.
 loadFixedMergers              : load dictionary of merger events with mappings, which have been
-                                processed and filtered.  These mergers also have the 'out' mass
-                                entry corrected (based on inference from ``BHDetails`` entries).
+                                processed and filtered.  These mrgs also have the 'out' mass
+                                entry corrected (based on inference from ``details`` entries).
 
 
 _findBoundingBins
@@ -34,8 +34,8 @@ _findBoundingBins
 Mergers Dictionary
 ------------------
    { MERGERS_RUN       : <int>, illustris simulation number in {1, 3}
-     MERGERS_NUM       : <int>, total number of mergers `N`
-     MERGERS_FILE      : <str>, name of save file from which mergers were loaded/saved
+     MERGERS_NUM       : <int>, total number of mrgs `N`
+     MERGERS_FILE      : <str>, name of save file from which mrgs were loaded/saved
      MERGERS_CREATED   : <str>,
      MERGERS_VERSION   : <float>,
 
@@ -51,12 +51,12 @@ Mergers Dictionary
 Examples
 --------
 
->>> # Load mergers from Illustris-2
->>> mergers = BHMergers.loadMergers(run=2, verbose=True)
->>> # Print the number of mergers
->>> print mergers[BHMergers.MERGERS_NUM]
+>>> # Load mrgs from Illustris-2
+>>> mrgs = mergers.loadMergers(run=2, verbose=True)
+>>> # Print the number of mrgs
+>>> print mrgs[mergers.MERGERS_NUM]
 >>> # Print the first 10 merger times
->>> print mergers[BHMergers.MERGERS_TIMES][:10]
+>>> print mrgs[mergers.MERGERS_TIMES][:10]
 
 
 Raises
@@ -65,7 +65,7 @@ Raises
 
 Notes
 -----
- - 'Raw Mergers' : these are mergers directly from the illustris files with NO modifications or
+ - 'Raw Mergers' : these are mrgs directly from the illustris files with NO modifications or
                    filtering of any kind.
 
 
@@ -77,8 +77,8 @@ Notes
    `dict` of all results.  This merger dictionary is saved to a 'raw' savefile whose name is given
    by `savedMergers_rawFilename()`.
    The method `processMergers()` not only loads the merger objects, but also creates mappings of
-   mergers to the snapshots nearest where they occur (``mapM2S`) and visa-versa (``mapS2M``); as
-   well as mergers which take place exactly during a snapshot iteration (``ontop``).  These three
+   mrgs to the snapshots nearest where they occur (``mapM2S`) and visa-versa (``mapS2M``); as
+   well as mrgs which take place exactly during a snapshot iteration (``ontop``).  These three
    maps are included in the merger dictionary.
 
 """
@@ -88,9 +88,9 @@ import os
 from datetime import datetime
 import numpy as np
 
-# from illpy_lib.illbh import BHDetails
-# import illpy_lib.illbh.BHConstants
-from illpy_lib.illbh.BHConstants import (
+# from illpy_lib.illbh import details
+# import illpy_lib.illbh.constants
+from illpy_lib.illbh.constants import (
     MERGERS_PHYSICAL_KEYS, MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, NUM_BH_TYPES,
     GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
 )
@@ -110,7 +110,7 @@ VERSION_FIX = 0.31
 def processMergers(run, verbose=True):
 
     if verbose:
-        print(" - - BHMergers.processMergers()")
+        print(" - - mergers.processMergers()")
 
     # Load Mapped Mergers #
     # re-creates them if needed
@@ -126,10 +126,10 @@ def loadRawMergers(run, verbose=True, recombine=False):
     """
     Load raw merger events into dictionary.
 
-    Raw mergers are the data directly from illustris without modification.
+    Raw mrgs are the data directly from illustris without modification.
     """
 
-    if verbose: print(" - - BHMergers.loadRawMergers()")
+    if verbose: print(" - - mergers.loadRawMergers()")
 
     # Concatenate Raw Illustris Files into a Single Combined File #
 
@@ -169,7 +169,7 @@ def loadMappedMergers(run, verbose=True, loadsave=True):
     Load or create Mapped Mergers Dictionary as needed.
     """
 
-    if verbose: print(" - - BHMergers.loadMappedMergers()")
+    if verbose: print(" - - mergers.loadMappedMergers()")
 
     mappedFilename = GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
 
@@ -187,7 +187,7 @@ def loadMappedMergers(run, verbose=True, loadsave=True):
     # Recreate Mappings
     #  -----------------
     if (not loadsave):
-        if verbose: print(" - - - Recreating mapped mergers")
+        if verbose: print(" - - - Recreating mapped mrgs")
 
         # Load Raw Mergers
         scales, ids, masses, filename = loadRawMergers(run, verbose=verbose)
@@ -227,12 +227,12 @@ def loadFixedMergers(run, verbose=True, loadsave=True):
 
     Returns
     -------
-       mergersFixed <dict> : dictionary of 'fixed' mergers, most entries shaped [N, 2] for `N`
-                             mergers, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
+       mergersFixed <dict> : dictionary of 'fixed' mrgs, most entries shaped [N, 2] for `N`
+                             mrgs, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
 
     """
 
-    if verbose: print(" - - BHMergers.loadFixedMergers()")
+    if verbose: print(" - - mergers.loadFixedMergers()")
 
     fixedFilename = GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
 
@@ -258,18 +258,18 @@ def loadFixedMergers(run, verbose=True, loadsave=True):
     return mergersFixed
 
 
-def _fixMergers(run, mergers, verbose=True):
+def _fixMergers(run, mrgs, verbose=True):
     """
     Filter and 'fix' input merger catalog.
 
     This includes:
      - Remove duplicate entries (Note-1)
-     - Load 'fixed' out-BH masses from ``BHMatcher`` (which uses ``BHDetails`` entries)
+     - Load 'fixed' out-BH masses from ``BHMatcher`` (which uses ``details`` entries)
 
     Arguments
     ---------
        run     <int>  : illustris simulation number {1, 3}
-       mergers <dict> : input dictionary of unfiltered merger events
+       mrgs <dict> : input dictionary of unfiltered merger events
        verbose <bool> : optional, print verbose output
 
     Returns
@@ -286,10 +286,10 @@ def _fixMergers(run, mergers, verbose=True):
     """
     from illpy_lib.illbh import BHMatcher
 
-    if verbose: print(" - - BHMergers._fixMergers()")
+    if verbose: print(" - - mergers._fixMergers()")
 
     # Make copy to modify
-    fixedMergers = dict(mergers)
+    fixedMergers = dict(mrgs)
 
     # Remove Repeated Entries
     # =======================
@@ -343,7 +343,7 @@ def _fixMergers(run, mergers, verbose=True):
     fixedMergers[MERGERS.MAP_ONTOP] = ontop
 
     # Change number, creation date, and version
-    oldNum = len(mergers[MERGERS.SCALES])
+    oldNum = len(mrgs[MERGERS.SCALES])
     newNum = len(fixedMergers[MERGERS.SCALES])
     fixedMergers[MERGERS.NUM] = newNum
     fixedMergers[MERGERS.CREATED] = datetime.now().ctime()
@@ -356,7 +356,7 @@ def _fixMergers(run, mergers, verbose=True):
     if verbose: print(" - - - Loading reconstructed 'out' BH masses")
     masses = fixedMergers[MERGERS.MASSES]
     aveBef = np.average(masses[:, BH_TYPE.OUT])
-    massOut = BHMatcher.inferMergerOutMasses(run, mergers=fixedMergers, verbose=verbose)
+    massOut = BHMatcher.inferMergerOutMasses(run, mrgs=fixedMergers, verbose=verbose)
     masses[:, BH_TYPE.OUT] = massOut
     aveAft = np.average(masses[:, BH_TYPE.OUT])
     if verbose: print((" - - - - Ave mass:  {:.4e} ===> {:.4e}".format(aveBef, aveAft)))
@@ -368,7 +368,7 @@ def _importRawMergers(files, verbose=True):
     """
     Fill the given arrays with merger data from the given target files.
 
-    Arrays ``ids`` and ``masses`` are shaped [N, 2], for ``N`` total mergers.
+    Arrays ``ids`` and ``masses`` are shaped [N, 2], for ``N`` total mrgs.
     By convention the
         'in'  (accreted) BH is index ``BH_TYPE.IN`` (0?)
         'out' (accretor) BH is index ``BH_TYPE.OUT`` (1?)
@@ -378,7 +378,7 @@ def _importRawMergers(files, verbose=True):
 
     """
 
-    if verbose: print(" - - BHMergers._importRawMergers()")
+    if verbose: print(" - - mergers._importRawMergers()")
 
     # Make sure argument is a list
     # if (not aux.iterableNotString(files)): files = [files]
@@ -423,7 +423,7 @@ def _parseMergerLine(line):
     Get target quantities from each line of the merger files.
 
     See 'http://www.illustris-project.org/w/index.php/Blackhole_Files' for
-    details regarding the illustris BH file structure.
+    dets regarding the illustris BH file structure.
 
     The format of each line is:
         "PROC-NUM  TIME  ID1  MASS1  ID2  MASS2"
@@ -461,7 +461,7 @@ def _mapToSnapshots(scales, verbose=True):
     """
 
     if verbose:
-        print(" - - BHMergers._mapToSnapshots()")
+        print(" - - mergers._mapToSnapshots()")
 
     numMergers = len(scales)
 
@@ -472,7 +472,7 @@ def _mapToSnapshots(scales, verbose=True):
 
     # Map Mergers-2-Snapshots: snapshot before (or ontop) of each merger
     mapM2S = np.zeros(numMergers, dtype=DTYPE.INDEX)
-    # Map Snapshots-2-Mergers: list of mergers just-after (or ontop) of each snapshot
+    # Map Snapshots-2-Mergers: list of mrgs just-after (or ontop) of each snapshot
     mapS2M = [[] for ii in range(cosmo.num)]
     # Flags if merger happens exactly on a snapshot (init to False=0)
     ontop  = np.zeros(numMergers, dtype=bool)
@@ -507,16 +507,16 @@ def _mapToSnapshots(scales, verbose=True):
     if verbose:
         pbar.finish()
 
-    # Find the most mergers in a snapshot
+    # Find the most mrgs in a snapshot
     numPerSnap = np.array([len(s2m) for s2m in mapS2M])
     mostMergers = np.max(numPerSnap)
     mostIndex = np.where(mostMergers == numPerSnap)[0]
-    # Find the number of ontop mergers
+    # Find the number of ontop mrgs
     numOntop = np.count_nonzero(ontop)
     if verbose:
-        print((" - - - Snapshot {:d} with the most ({:d}) mergers".format(mostIndex, mostMergers)))
+        print((" - - - Snapshot {:d} with the most ({:d}) mrgs".format(mostIndex, mostMergers)))
     if verbose:
-        print((" - - - {:d} ({:.2f}) ontop mergers".format(numOntop, 1.0*numOntop/nums)))
+        print((" - - - {:d} ({:.2f}) ontop mrgs".format(numOntop, 1.0*numOntop/nums)))
 
     return mapM2S, mapS2M, ontop
 
@@ -571,7 +571,7 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
 
     # Print warning on error
     if (low is None) or (high is None):
-        print("BHMergers._findBoundingBins: target = {:e}, bins = {{:e}, {:e}}; low, high = {:s}, {:s} !".format(target, bins[0], bins[-1], str(low), str(high)))
+        print("mergers._findBoundingBins: target = {:e}, bins = {{:e}, {:e}}; low, high = {:s}, {:s} !".format(target, bins[0], bins[-1], str(low), str(high)))
         raise RuntimeError("Could not find bins!")
 
     return [low, high, dlo, dhi]

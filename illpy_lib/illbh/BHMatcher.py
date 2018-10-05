@@ -1,30 +1,30 @@
 """Routines to match BH Mergers with BH Details entries based on times and IDs.
 
-The matched details files should be precomputed by executing this file as a script,
+The matched dets files should be precomputed by executing this file as a script,
 for example:
 
     $ mpirun -n 64 python -m illpy_lib.illbh.BHMatcher
 
-This will create the 'merger-details' and 'remnant-details' files respectively, which can then be
+This will create the 'merger-dets' and 'remnant-dets' files respectively, which can then be
 loaded via the API functions `loadMergerDetails` and `loadRemnantDetails` respectively.
 
 
 Functions
 ---------
--   main                     - Check if details files exist, if not manage their creation.
--   loadMergerDetails        - Load a previously calculated merger-details file.
--   loadRemnantDetails       - Load a previously calculated remnant-details file.
+-   main                     - Check if dets files exist, if not manage their creation.
+-   loadMergerDetails        - Load a previously calculated merger-dets file.
+-   loadRemnantDetails       - Load a previously calculated remnant-dets file.
 
--   allDetailsForBHLineage   - Load all details entries for a given BH lineage (merger tree).
--   inferMergerOutMasses     - Infer 'out' BH masses at time of mergers based on available data.
+-   allDetailsForBHLineage   - Load all dets entries for a given BH lineage (merger tree).
+-   inferMergerOutMasses     - Infer 'out' BH masses at time of mrgs based on available data.
 
--   _matchMergerDetails      - Find details entries matching merger-BH ID numbers.
+-   _matchMergerDetails      - Find dets entries matching merger-BH ID numbers.
 -   _createRemnantDetails    -
 -   _cleanErrDetails         -
--   _matchRemnantDetails     - Combine merger-details entries to obtain an entire remnant's life.
+-   _matchRemnantDetails     - Combine merger-dets entries to obtain an entire remnant's life.
 -   _unmergedMasses          -
--   _detailsForMergers_snapshots - Find details entries for BH IDs in a particular snapshots.
--   _saveDetails             - Package details into dictionary and save to NPZ file.
+-   _detailsForMergers_snapshots - Find dets entries for BH IDs in a particular snapshots.
+-   _saveDetails             - Package dets into dictionary and save to NPZ file.
 -   _findNextMerger          - Find the next merger index in which a particular BH participates.
 -   _indBefAft               - Retrieve the index matching the minimum greater-than zero of input.
 
@@ -36,10 +36,10 @@ import logging
 import numpy as np
 from datetime import datetime
 
-from illpy_lib.illbh import BHConstants
+from illpy_lib.illbh import constants
 
 from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
-from illpy_lib.illbh.BHConstants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
+from illpy_lib.illbh.constants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
     _distributeSnapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
 from illpy_lib.constants import DTYPE, NUM_SNAPS
@@ -67,7 +67,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     comm.Barrier()
 
     # Initialize log
-    log = BHConstants._loadLogger(
+    log = constants._loadLogger(
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
     log.debug(header)
     if (rank == 0):
@@ -83,12 +83,12 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     create_mergerDets = False
     create_remnantDets = False
     if (rank == 0):
-        # Check merger details status
+        # Check merger dets status
         mergerDetFName = GET_MERGER_DETAILS_FILENAME(
             run, __version__, _MAX_DETAILS_PER_SNAP)
         log.info("Merger Details file: '%s'" % (mergerDetFName))
         if (not os.path.exists(mergerDetFName)):
-            log.warning(" - Merger details file does not exist.")
+            log.warning(" - Merger dets file does not exist.")
             create_mergerDets = True
         else:
             log.info("Merger Details file exists.")
@@ -96,7 +96,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
                 log.info(" - Recreating anyway.")
                 create_mergerDets = True
 
-        # Check remnants details status
+        # Check remnants dets status
         remnantDetFName = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
         log.info("Remnant Details file: '%s'" % (remnantDetFName))
 
@@ -124,7 +124,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
         end = datetime.now()
         log.debug(" - Done after %s" % (str(end - beg)))
 
-    # Extend merger-details to account for later mergers
+    # Extend merger-dets to account for later mrgs
     # --------------------------------------------------
     if create_remnantDets:
         comm.Barrier()
@@ -138,7 +138,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
 
 
 def loadMergerDetails(run, verbose=True, log=None):
-    """Load a previously calculated merger-details file.
+    """Load a previously calculated merger-dets file.
 
     Arguments
     ---------
@@ -154,11 +154,11 @@ def loadMergerDetails(run, verbose=True, log=None):
     Returns
     -------
     megerDets : dict
-        Dictionary of merger-details data.
+        Dictionary of merger-dets data.
 
     """
     if (log is None):
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadMergerDetails()")
@@ -177,7 +177,7 @@ def loadMergerDetails(run, verbose=True, log=None):
 
 
 def loadRemnantDetails(run, verbose=True, log=None):
-    """Load a previously calculated remnant-details file.
+    """Load a previously calculated remnant-dets file.
 
     Arguments
     ---------
@@ -193,11 +193,11 @@ def loadRemnantDetails(run, verbose=True, log=None):
     Returns
     -------
     remnantDets : dict
-        Dictionary of remnant-details data.
+        Dictionary of remnant-dets data.
 
     """
     if (log is None):
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadRemnantDetails()")
@@ -214,7 +214,7 @@ def loadRemnantDetails(run, verbose=True, log=None):
 
 
 def allDetailsForBHLineage(run, mrg, log, reload=False):
-    """Load all of the details entries for a given BH lineage (merger tree).
+    """Load all of the dets entries for a given BH lineage (merger tree).
 
     Arguments
     ---------
@@ -268,9 +268,9 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
 
-    # Get details entries for unique merger IDs in snapshot list
+    # Get dets entries for unique merger IDs in snapshot list
     # ----------------------------------------------------------
-    #    Use ``maxPerSnap = None`` to save ALL details entries
+    #    Use ``maxPerSnap = None`` to save ALL dets entries
     nums, scales, masses, mdots, dens, csnds, ids = \
         _detailsForMergers_snapshots(run, mySnaps, bhIDs, None, log)
 
@@ -315,13 +315,13 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
                     if tempIds[jj][ii][0] is not None:
                         foundBH[ii] = True
                         dd = tempIds[jj][ii][0]
-                        # Make sure all of the details IDs are consistent
+                        # Make sure all of the dets IDs are consistent
                         if np.any(tempIds[jj][ii] != dd):
                             errStr += "ii = {}, jj = {}, mm = {}; tempIds[0] = {}".format(
                                 ii, jj, mm, dd)
                             errStr += " tempIds = {}".format(str(tempIds[ii]))
 
-                        # Make sure details IDs match expected merger ID
+                        # Make sure dets IDs match expected merger ID
                         if dd != mm:
                             errStr += "\nii = {}, jj = {}, mm = {}; dd = {}".format(ii, jj, mm, dd)
 
@@ -420,15 +420,15 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     return
 
 
-def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
-    """Based on 'merger' and 'details' information, infer the 'out' BH masses at time of mergers.
+def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
+    """Based on 'merger' and 'dets' information, infer the 'out' BH masses at time of mrgs.
 
     The Illustris 'merger' files have the incorrect values output for the 'out' BH mass.  This
-    method uses the data included in 'details' entries (via ``BHDetails``), which were matched
-    to mergers here in ``BHMatcher``, to infer the approximate mass of the 'out' BH at the
+    method uses the data included in 'dets' entries (via ``details``), which were matched
+    to mrgs here in ``BHMatcher``, to infer the approximate mass of the 'out' BH at the
     time of merger.
 
-    The ``mergerDetails`` entries have the details for both 'in' and 'out' BHs both 'before' and
+    The ``mergerDetails`` entries have the dets for both 'in' and 'out' BHs both 'before' and
     'after' merger.  First the 'out' BH's entries just 'before' merger are used directly as the
     'inferred' mass.  In the few cases where these entries don't exist, the code falls back on
     calculating the difference between the total mass (given by the 'out' - 'after' entry) and the
@@ -441,7 +441,7 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
     Arguments
     ---------
        run     <int>  :
-       mergers <dict> :
+       mrgs <dict> :
        mdets   <dict> :
        verbose <str>  :
        debug   <str>  :
@@ -452,19 +452,19 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
 
     """
     if (log is None):
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, verbose=True, debug=False, run=run, tofile=False)
 
     log.debug("inferMergerOutMasses()")
 
     # Load Mergers
-    if (mergers is None):
-        from illpy_lib.illbh import BHMergers
-        mergers = BHMergers.loadFixedMergers(run, verbose=False)
-    m_scales = mergers[MERGERS.SCALES]
-    m_masses = mergers[MERGERS.MASSES]
-    numMergers = mergers[MERGERS.NUM]
-    del mergers
+    if (mrgs is None):
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.loadFixedMergers(run, verbose=False)
+    m_scales = mrgs[MERGERS.SCALES]
+    m_masses = mrgs[MERGERS.MASSES]
+    numMergers = mrgs[MERGERS.NUM]
+    del mrgs
 
     # Load Merger Details
     if (mdets is None):
@@ -473,13 +473,13 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
     d_scales = mdets[DETAILS.SCALES]
     del mdets
 
-    # Find details entries before and after merger
+    # Find dets entries before and after merger
     massBef = np.zeros_like(m_masses)
     massAft = np.zeros_like(m_masses)
     for ii, sc in enumerate(m_scales):
         for bh in [BH_TYPE.IN, BH_TYPE.OUT]:
             if (d_scales[ii].size == 0):
-                log.warning("Merger %s with zero details entries" % str(ii))
+                log.warning("Merger %s with zero dets entries" % str(ii))
             else:
                 # 'before' is ``sc > d_scales``
                 bef = _indBefAft(sc - d_scales[ii, bh])
@@ -525,7 +525,7 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
 
 
 def _matchMergerDetails(run, log):
-    """Find details entries matching merger-BH ID numbers.
+    """Find dets entries matching merger-BH ID numbers.
 
     Stores at most ``_MAX_DETAILS_PER_SNAP`` entries per snapshot for each BH.
     """
@@ -541,10 +541,10 @@ def _matchMergerDetails(run, log):
     if rank == 0:
         # Load Mergers
         log.debug("Loading Mergers")
-        from illpy_lib.illbh import BHMergers
-        mergers = BHMergers.loadFixedMergers(run)
-        numMergers = mergers[MERGERS.NUM]
-        mergerIDs = mergers[MERGERS.IDS]
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.loadFixedMergers(run)
+        numMergers = mrgs[MERGERS.NUM]
+        mergerIDs = mrgs[MERGERS.IDS]
 
         # Find unique BH IDs from set of merger BHs
         #    these are now 1D and sorted
@@ -563,7 +563,7 @@ def _matchMergerDetails(run, log):
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
 
-    # Get details entries for unique merger IDs in snapshot list
+    # Get dets entries for unique merger IDs in snapshot list
     # ----------------------------------------------------------
     nums, scales, masses, mdots, dens, csnds, ids = \
         _detailsForMergers_snapshots(run, mySnaps, bhIDsUnique, _MAX_DETAILS_PER_SNAP, log)
@@ -606,13 +606,13 @@ def _matchMergerDetails(run, log):
                     errStr = ""
                     if tempIds[jj][ii][0] is not None:
                         dd = tempIds[jj][ii][0]
-                        # Make sure all of the details IDs are consistent
+                        # Make sure all of the dets IDs are consistent
                         if np.any(tempIds[jj][ii] != dd):
                             errStr += "ii = {}, jj = {}, mm = {}; tempIds[0] = {}"
                             errStr = errStr.format(ii, jj, mm, dd)
                             errStr += " tempIds = {}".format(str(tempIds[ii]))
 
-                        # Make sure details IDs match expected merger ID
+                        # Make sure dets IDs match expected merger ID
                         if dd != mm:
                             errStr += "\nii = {}, jj = {}, mm = {}; dd = {}".format(ii, jj, mm, dd)
 
@@ -658,7 +658,7 @@ def _matchMergerDetails(run, log):
 
             log.debug("Total entries stored = %d" % (np.sum([np.sum(nn) for nn in nums])))
 
-    # Convert from uinique BH IDs back to full mergers list.  Sort results by time (scalefactor)
+    # Convert from uinique BH IDs back to full mrgs list.  Sort results by time (scalefactor)
     if rank == 0:
         log.debug(" - Reconstructing")
         beg = datetime.now()
@@ -739,7 +739,7 @@ def _matchMergerDetails(run, log):
     return data
 
 
-def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
+def _createRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
     """Create and Save Remnant Details Entries.
 
     Loads required data objects, calls `_matchRemnantDetails()`, corrects masses, and saves
@@ -749,7 +749,7 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     ---------
     run : int
     log : ``logging.Logger`` or `None`
-    mergers : dict or `None`
+    mrgs : dict or `None`
     mdets : dict of `None`
     tree : dict of `None`
 
@@ -760,7 +760,7 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     """
 
     if log is None:
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_createRemnantDetails()")
@@ -771,10 +771,10 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     if rank != 0:
         return
 
-    if mergers is None:
+    if mrgs is None:
         log.debug("Loading Mergers.")
-        from illpy_lib.illbh import BHMergers
-        mergers = BHMergers.loadFixedMergers(run)
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.loadFixedMergers(run)
     if mdets is None:
         log.debug("Loading Merger-Details.")
         mdets = loadMergerDetails(run, log=log)
@@ -785,9 +785,9 @@ def _createRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
 
     # Create 'remnant' profiles ('RemnantDetails') based on tree and MergerDetails
     ids, scales, masses, dens, mdots, csnds = \
-        _matchRemnantDetails(run, log=log, mergers=mergers, mdets=mdets, tree=tree)
+        _matchRemnantDetails(run, log=log, mrgs=mrgs, mdets=mdets, tree=tree)
 
-    mcorrected = _unmergedMasses(scales, masses, mergers, tree[BH_TREE.NEXT], log=log)
+    mcorrected = _unmergedMasses(scales, masses, mrgs, tree[BH_TREE.NEXT], log=log)
 
     savename = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
     rdets = _saveDetails(savename, run, ids, scales, masses, dens, mdots, csnds, log,
@@ -828,13 +828,13 @@ def _cleanErrDetails(ids, scales, masses, dens, mdots, csnds, log):
     return ids, scales, masses, dens, mdots, csnds
 
 
-def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
-    """Combine merger-details entries to obtain details for an entire merger-remnant's life.
+def _matchRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
+    """Combine merger-dets entries to obtain dets for an entire merger-remnant's life.
 
-    Each merger 'out'-BH is followed in subsequent mergers to combine the details entries forming
-    a continuous chain of details entries for the remnant's entire life after the initial merger.
+    Each merger 'out'-BH is followed in subsequent mrgs to combine the dets entries forming
+    a continuous chain of dets entries for the remnant's entire life after the initial merger.
 
-    Loads `BHMergers` and `MergerDetails` files and uses that data to construct remnant details.
+    Loads `mergers` and `MergerDetails` files and uses that data to construct remnant dets.
     Runs on a single core (processors with ``rank > 0`` simply return at start).
 
     Arguments
@@ -843,7 +843,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
         Illustris simulation run number {1,3}.
     log : ``logging.Logger``
         Logging object.
-    mergers : dict or `None`
+    mrgs : dict or `None`
         BH-Mergers dictionary.  Loaded from file if (`None`) not provided.
     mdets : dict or `None`
         `MergerDetails` data, loaded if not proveded.
@@ -857,21 +857,21 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
 
     """
     if log is None:
-        log = BHConstants._loadLogger(
+        log = constants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_matchRemnantDetails()")
 
     # Load Mergers
     log.debug("Loading Mergers")
-    if mergers is None:
-        from illpy_lib.illbh import BHMergers
-        mergers = BHMergers.loadFixedMergers(run)
-    m_scales = mergers[MERGERS.SCALES]
-    m_ids = mergers[MERGERS.IDS]
-    numMergers = np.int(mergers[MERGERS.NUM])     # Convert from ``np.array(int)``
+    if mrgs is None:
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.loadFixedMergers(run)
+    m_scales = mrgs[MERGERS.SCALES]
+    m_ids = mrgs[MERGERS.IDS]
+    numMergers = np.int(mrgs[MERGERS.NUM])     # Convert from ``np.array(int)``
 
-    # Load merger-details file
+    # Load merger-dets file
     if mdets is None:
         log.debug("Loading Merger-Details")
         mdets = loadMergerDetails(run, log=log)
@@ -905,12 +905,12 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
     mdots = numMergers*[None]
     csnds = numMergers*[None]
 
-    # Iterate over all mergers
+    # Iterate over all mrgs
     # ------------------------
     log.debug("Matching data to remnants")
     for ii in range(numMergers):
         # First Merger
-        #    Store details after merger time for 'out' BH
+        #    Store dets after merger time for 'out' BH
         inds = np.where(d_scales[ii, BH_TYPE.OUT] > m_scales[ii])[0]
         if inds.size > 0:
             # Make sure values are valid
@@ -934,7 +934,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
                 mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
 
         else:
-            log.warning("Merger %d without post-merger details entries!" % (ii))
+            log.warning("Merger %d without post-merger dets entries!" % (ii))
             ids[ii] = m_ids[ii, BH_TYPE.OUT]
             scales[ii] = []
             masses[ii] = []
@@ -945,7 +945,7 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             idnums[ii] = []
             mrgnums[ii] = []
 
-        # Subsequent mergers
+        # Subsequent mrgs
         #    Find the next merger that this 'out' BH participates in
         next = nextMerger[ii]
         checkID = m_ids[next, BH_TYPE.OUT]
@@ -1036,21 +1036,21 @@ def _matchRemnantDetails(run, log=None, mergers=None, mdets=None, tree=None):
             log.error(errStr)
             raise RuntimeError(errStr)
 
-    log.debug("Remnant details collected.")
+    log.debug("Remnant dets collected.")
     _logStats('Number of entries', nents, log)
 
     return idnums, scales, masses, dens, mdots, csnds
 
 
-def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
-    """Remove mass from mergers for the remnant in this BH lineage.
+def _unmergedMasses(allScales, allMasses, mrgs, nextMerger, log):
+    """Remove mass from mrgs for the remnant in this BH lineage.
 
     Arguments
     ---------
     mind : int
     scales : (M,) array of arrays of scalar
     masses : (M,) array of arrays of scalar
-    mergers : dict
+    mrgs : dict
     tree : dict
     log : ``logging.Logger`` object
 
@@ -1060,7 +1060,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
 
     """
     log.debug("_unmergedMasses()")
-    numMergers = mergers[MERGERS.NUM]
+    numMergers = mrgs[MERGERS.NUM]
     allUnmerged = []
     errMergs_mass = []     # Mergers which cause errors trying to subtract masses
     effMergs_mass = []     # Mergers which are effected by the above errors
@@ -1071,7 +1071,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
     numBon = 0
     for mind in range(numMergers):
         # Starting ID for this remnant
-        bhID = mergers[MERGERS.IDS][mind, BH_TYPE.OUT]
+        bhID = mrgs[MERGERS.IDS][mind, BH_TYPE.OUT]
         # scales and masses for this remnant
         scales = allScales[mind]
         masses = allMasses[mind]
@@ -1080,18 +1080,18 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
         log.debug(" - Merger %d (ID %d), Next = %d" % (mind, bhID, next))
         nmal = 0
         nbon = 0
-        # loop over all following mergers
+        # loop over all following mrgs
         while next >= 0:
             # Figure out which BH the remnant is; select the other-BH's mass to subtract
-            if bhID == mergers[MERGERS.IDS][next, BH_TYPE.IN]:
-                otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.OUT]
-            elif bhID == mergers[MERGERS.IDS][next, BH_TYPE.OUT]:
-                otherMass = mergers[MERGERS.MASSES][next, BH_TYPE.IN]
+            if bhID == mrgs[MERGERS.IDS][next, BH_TYPE.IN]:
+                otherMass = mrgs[MERGERS.MASSES][next, BH_TYPE.OUT]
+            elif bhID == mrgs[MERGERS.IDS][next, BH_TYPE.OUT]:
+                otherMass = mrgs[MERGERS.MASSES][next, BH_TYPE.IN]
             else:
                 errStr = "Initial Merger %d, out bh ID %d\n" % (mind, bhID)
                 errStr += "\tNext merger {}, IDs dont match: {}, {}".format(
-                    next, mergers[MERGERS.IDS][next, BH_TYPE.IN],
-                    mergers[MERGERS.IDS][next, BH_TYPE.OUT])
+                    next, mrgs[MERGERS.IDS][next, BH_TYPE.IN],
+                    mrgs[MERGERS.IDS][next, BH_TYPE.OUT])
                 log.error(errStr)
                 errMergs_id.append(mind)
                 effMergs_id.append(next)
@@ -1099,7 +1099,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
                 # raise RuntimeError(errStr)
 
             # Figure out which entries to subtract the mass from
-            mscale = mergers[MERGERS.SCALES][next]
+            mscale = mrgs[MERGERS.SCALES][next]
             # Find scales after the merger
             allInds = np.where(scales >= mscale)[0]
             if allInds.size == 0:
@@ -1142,7 +1142,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
                     nbon += 1
 
             # Update for next merger
-            bhID = mergers[MERGERS.IDS][next, BH_TYPE.OUT]
+            bhID = mrgs[MERGERS.IDS][next, BH_TYPE.OUT]
             next = nextMerger[next]
 
         allUnmerged.append(masses)
@@ -1155,7 +1155,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
     nerrs = len(errCorr)
     log.info(" - {}/{} = {:.4f} Remnants with correction errors".format(
         nerrs, numMergers, nerrs/numMergers))
-    log.info(" - {}/{} = {:.4f} Total Errors (over all mergers).".format(
+    log.info(" - {}/{} = {:.4f} Total Errors (over all mrgs).".format(
         numMal, numTot, numMal/numTot))
     # log.info(" - Errors on remnants: {}".format(str(corrErrs)))
     errMergs_id = np.array(list(set(errMergs_id)))
@@ -1164,10 +1164,10 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
     errMergs_mass = np.array(list(set(errMergs_mass)))
     effMergs_mass = np.array(list(set(effMergs_mass)))
     frac_mass = errMergs_mass.size/numMergers
-    logStr = " - ID Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mergers"
+    logStr = " - ID Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mrgs"
     logStr = logStr.format(effMergs_id.size, numMergers, frac_id, errMergs_id.size)
     log.info(logStr)
-    logStr = " - Mass Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mergers"
+    logStr = " - Mass Errors:\n - - {}/{} = {:.4f} Unique Mergers Effected, by {} unique mrgs"
     logStr = logStr.format(effMergs_mass.size, numMergers, frac_mass, errMergs_mass.size)
     log.info(logStr)
 
@@ -1175,7 +1175,7 @@ def _unmergedMasses(allScales, allMasses, mergers, nextMerger, log):
 
 
 def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
-    """Find details entries for BH IDs in a particular snapshots.
+    """Find dets entries for BH IDs in a particular snapshots.
 
     For each snapshot, store at most `_MAX_DETAILS_PER_SNAP` entries for each blackhole,
     interpolating values to an even spacing in scale-factor if more entries are found.  The first
@@ -1186,15 +1186,15 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
     run : int
         Illustris run number {1,3}.
     snapshots : int or array_like of int
-        Snapshots to search for details entries.
+        Snapshots to search for dets entries.
     bhIDsUnique : (N,) array of long
         Sequence of all unique, merger-BH ID numbers.
     maxPerSnap : int or `None`
-        The maximum number of details entries to store for each snapshot.  If more entries than
+        The maximum number of dets entries to store for each snapshot.  If more entries than
         this are found, the values are interpolated down to a linearly-even spacing of
-        scale-factors within the range of the matching details entries.
+        scale-factors within the range of the matching dets entries.
         The maximum number of entries stored is thus ``maxPerSnap*np.size(snapshots)``
-        for each BH.  When loading all merger/remnant details, this should be
+        for each BH.  When loading all merger/remnant dets, this should be
         `_MAX_DETAILS_PER_SNAP`.
     log : ``logging.Logger`` object
         Object for logging stream output.
@@ -1202,11 +1202,11 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
     Returns
     -------
     numStoredTotal : (N,) array of int
-        For each unique BH ID, the number of details entries stored.
+        For each unique BH ID, the number of dets entries stored.
     scales : (N,) array of arrays of float
         Scale-factor of each entry.
         Each of the `N` entries corresponds to a unique merger-BH.  In that entry is an array
-        including all of the matching details entries found for that BH.  The length of each of
+        including all of the matching dets entries found for that BH.  The length of each of
         these arrays can be (effectively) any value between zero and
         ``_MAX_DETAILS_PER_SNAP*np.size(snapshots)``.  This applies to all of the following
         returned values as-well.
@@ -1252,9 +1252,9 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
         numMatchesSnap = np.zeros(numUniqueBHs, dtype=int)    # Num matches in a given snapshot
         numStoredSnap = np.zeros(numUniqueBHs, dtype=int)     # Num entries stored in a snapshot
 
-        # Load `BHDetails`
-        from illpy_lib.illbh import BHDetails
-        dets = BHDetails.loadBHDetails(run, snap, verbose=False)
+        # Load `details`
+        from illpy_lib.illbh import details
+        dets = details.loadBHDetails(run, snap, verbose=False)
         numDets = dets[DETAILS.NUM]
         log.debug(" - %d Details" % (numDets))
         detIDs = dets[DETAILS.IDS]
@@ -1267,7 +1267,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
 
         detScales = dets[DETAILS.SCALES]
 
-        # Sort details entries by IDs then by scales (times)
+        # Sort dets entries by IDs then by scales (times)
         detSort = np.lexsort((detScales, detIDs))
         count = 0
         # Iterate over and search for each unique BH ID
@@ -1277,7 +1277,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
             while count < numDets and detIDs[detSort[count]] < bh:
                 count += 1
 
-            # Iterate over all matching BH IDs, storing those details' indices
+            # Iterate over all matching BH IDs, storing those dets' indices
             while count < numDets and detIDs[detSort[count]] == bh:
                 tempMatches.append(detSort[count])
                 count += 1
@@ -1369,7 +1369,7 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
 
 
 def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log, **kwargs):
-    """Package details into dictionary and save to NPZ file.
+    """Package dets into dictionary and save to NPZ file.
     """
     log.debug("_saveDetails()")
     data = {DETAILS.IDS: ids,
@@ -1417,7 +1417,7 @@ def _findNextMerger(myID, myScale, ids, scales):
     ids : (N,2) array of long
         ID number of all merger BHs
     scales : (N,) array of float
-        Scalefactors at which all of the mergers occur.
+        Scalefactors at which all of the mrgs occur.
 
     Returns
     -------
@@ -1488,11 +1488,11 @@ def _logStats(name, prop, log, lvl=logging.DEBUG):
 
 
 '''
-def _detailsForBHLineage(run, mrg, log, rdets=None, tree=None, mergers=None):
+def _detailsForBHLineage(run, mrg, log, rdets=None, tree=None, mrgs=None):
     log.debug("_detailsForBHLineage()")
     # Get all merger indices in this tree
     finMerger, bhIDs, mrgInds = illpy_lib.illbh.BHTree.allIDsForTree(
-        run, mrg, tree=tree, mergers=mergers)
+        run, mrg, tree=tree, mrgs=mrgs)
 '''
 
 
