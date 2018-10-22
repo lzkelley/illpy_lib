@@ -231,7 +231,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     rank = comm.rank
     size = comm.size
 
-    bhIDs = None
+    bh_ids = None
     fname = None
     log.debug(" - Rank %d/%d." % (rank, size))
     if rank == 0:
@@ -241,7 +241,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
         log.debug(" - Loaded %d unique ID numbers" % (len(unique[DETAILS.IDS])))
         # get the final merger number, the unique BH IDs, and the merger indices of this tree
         from illpy_lib.illbh import BHTree
-        finMerger, bhIDs, mrgInds = BHTree.allIDsForTree(run, mrg)
+        finMerger, bh_ids, mrgInds = BHTree.allIDsForTree(run, mrg)
         # Construct the appropriate file-name
         fname = GET_BLACKHOLE_TREE_DETAILS_FILENAME(run, finMerger, __version__)
         log.debug(" - Merger %d ==> Final merger %d, filename: '%s'" % (mrg, finMerger, fname))
@@ -253,11 +253,11 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
             elif not reload:
                 raise RuntimeError("WE SHOULD NOT GET HERE!")
 
-        bhIDs = np.array(bhIDs)
-        numBHs = bhIDs.size
+        bh_ids = np.array(bh_ids)
+        numBHs = bh_ids.size
         log.info(" - Merger {} has a tree with {} unique BHs".format(mrg, numBHs))
         if numBHs < 2:
-            errStr = "ERROR: only IDs found for merger {} are : {}".format(mrg, str(bhIDs))
+            errStr = "ERROR: only IDs found for merger {} are : {}".format(mrg, str(bh_ids))
             log.error(errStr)
             raise RuntimeError(errStr)
 
@@ -272,7 +272,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     # ----------------------------------------------------------
     #    Use ``maxPerSnap = None`` to save ALL dets entries
     nums, scales, masses, mdots, dens, csnds, ids = \
-        _detailsForMergers_snapshots(run, mySnaps, bhIDs, None, log)
+        _detailsForMergers_snapshots(run, mySnaps, bh_ids, None, log)
 
     # Collect results and organize
     # ----------------------------
@@ -309,7 +309,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
             ids = numBHs*[[None]]
 
             # Iterate over each black-hole and processor, collect results into single arrays
-            for ii, mm in enumerate(bhIDs):
+            for ii, mm in enumerate(bh_ids):
                 for jj in range(size):
                     errStr = ""
                     if tempIds[jj][ii][0] is not None:
@@ -415,7 +415,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
 
         # Save data
         data = _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log,
-                            target_ids=bhIDs, target_mergers=mrgInds, final_merger=finMerger)
+                            target_ids=bh_ids, target_mergers=mrgInds, final_merger=finMerger)
 
     return
 
@@ -1491,7 +1491,7 @@ def _logStats(name, prop, log, lvl=logging.DEBUG):
 def _detailsForBHLineage(run, mrg, log, rdets=None, tree=None, mrgs=None):
     log.debug("_detailsForBHLineage()")
     # Get all merger indices in this tree
-    finMerger, bhIDs, mrgInds = illpy_lib.illbh.BHTree.allIDsForTree(
+    finMerger, bh_ids, mrgInds = illpy_lib.illbh.BHTree.allIDsForTree(
         run, mrg, tree=tree, mrgs=mrgs)
 '''
 

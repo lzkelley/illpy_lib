@@ -176,7 +176,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
     if verbose: print(" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM]))
 
     if verbose: print(" - - - Loading BH Hosts Catalog")
-    bhHosts = particle_hosts.load_bh_hosts(run, loadsave=True, verbose=verbose, bar=True)
+    bh_hosts = particle_hosts.load_bh_hosts(run, loadsave=True, verbose=verbose, bar=True)
 
     # Snapshot for each merger
     merger_snaps = mergers[MERGERS.MAP_MTOS]
@@ -201,10 +201,10 @@ def get_merger_and_subhalo_indices(run, verbose=True):
         # Select BH-Hosts dict for this snapshot
         #    Individual snapshot dictionaries have string keys (i.e. '"054"' instead of '54')
         snap_out = OFFTAB.snapDictKey(snap)
-        bh_hosts_snap_out = bhHosts[snap_out]
+        bh_hosts_snap_out = bh_hosts[snap_out]
         #    For the 'in' BH, use the previous snapshot
         snap_in = OFFTAB.snapDictKey(snap-1)
-        bh_hosts_snap_in = bhHosts[snap_in]
+        bh_hosts_snap_in = bh_hosts[snap_in]
         #   Convert from array(dict) to just dict
         # bh_hosts_snap_out = bh_hosts_snap_out.item()
 
@@ -222,7 +222,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
         else:
             # Find the subhalo hosts for these merger BHs
             subh_ind_out[mergs] = particle_hosts.subhalosForBHIDs(
-                run, snap, ids_out, bhHosts=bh_hosts_snap_out, verbose=False)
+                run, snap, ids_out, bh_hosts=bh_hosts_snap_out, verbose=False)
 
         # In BH
         bad_flag_in = False
@@ -242,7 +242,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
         else:
             # Find the subhalo hosts for these merger BHs ('in' use previous snapshot)
             subh_ind_in[mergs] = particle_hosts.subhalosForBHIDs(
-                run, snap-1, ids_in, bhHosts=bh_hosts_snap_in, verbose=False)
+                run, snap-1, ids_in, bh_hosts=bh_hosts_snap_in, verbose=False)
 
     n_tot = len(subh_ind_out)
     n_good = np.count_nonzero(subh_ind_out >= 0)
