@@ -97,10 +97,12 @@ class OFFTAB():
     BH_SUBHALOS = 'bh_subhalos'
 
     @staticmethod
-    def snapDictKey(snap): return "%03d" % (snap)
+    def snapDictKey(snap):
+        return "%03d" % (snap)
 
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
+
 
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
     if (version is None): version = _VERSION
@@ -111,6 +113,7 @@ def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
 
 _BH_HOSTS_SNAP_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%03d_bh-hosts_v%.2f.npz"
 
+
 def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
     if (version is None): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
@@ -120,11 +123,13 @@ def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
 
 _BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_bh-hosts_v%.2f.npz"
 
+
 def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
     if (version is None): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
+
 
 '''
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
@@ -140,11 +145,11 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 
     Returns
     -------
-       offsetTable <dict> : particle offset table, see ``ParticleHosts`` docs for more info.
+       offsetTable <dict> : particle offset table, see ``particle_hosts`` docs for more info.
 
     """
 
-    if verbose: print(" - - ParticleHosts.loadOffsetTable()")
+    if verbose: print(" - - particle_hosts.loadOffsetTable()")
 
     saveFile = _GET_OFFSET_TABLE_FILENAME(run, snap)
 
@@ -230,8 +235,9 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
     bhHosts <dict> : table of hosts for all snapshots
 
     """
-    if verbose: print(" - - ParticleHosts.loadBHHosts()")
-    if (bar is None): bar = bool(verbose)
+    if verbose: print(" - - particle_hosts.loadBHHosts()")
+    if (bar is None):
+        bar = bool(verbose)
 
     # Load Existing Save
     #  ==================
@@ -307,10 +313,10 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
 
     Returns
     -------
-    offsetTable <dict> : particle offset table, see `ParticleHosts` docs for more info.
+    offsetTable <dict> : particle offset table, see `particle_hosts` docs for more info.
 
     """
-    if verbose: print(" - - ParticleHosts.loadBHHostsSnap()")
+    if verbose: print(" - - particle_hosts.loadBHHostsSnap()")
     if (bar is None): bar = bool(verbose)
 
     # Load Existing Save
@@ -377,8 +383,8 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             # On success, Find BH Subhalos
             else:
                 binInds = np.digitize(bhInds, offsets[:, PARTICLE.BH]).astype(DTYPE.INDEX)-1
-                if (any(binInds < 0)):
-                    raise RuntimeError("Some bhInds not matched!! '%s'" % (str(bads)))
+                if any(binInds < 0):
+                    raise RuntimeError("Some bhInds not matched!! '%s'" % (str(binInds)))
 
                 bhHalos = haloNums[binInds]
                 bhSubhs = subhNums[binInds]
@@ -424,7 +430,7 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     foundSubh <int>[N] : subhalo index numbers (`-1` for invalid)
 
     """
-    if verbose: print(" - - ParticleHosts.subhalosForBHIDs()")
+    if verbose: print(" - - particle_hosts.subhalosForBHIDs()")
 
     # Load (Sub)Halo Offset Table
     # ---------------------------
@@ -495,7 +501,7 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
     import illpy_lib as ill
 
-    if verbose: print(" - - ParticleHosts._constructOffsetTable()")
+    if verbose: print(" - - particle_hosts._constructOffsetTable()")
 
     if (bar is None): bar = bool(verbose)
 
@@ -505,14 +511,16 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
-    if verbose: print((" - - - Loading Catalogs from '{:s}'".format(illpath)))
+    if verbose:
+        print((" - - - Loading Catalogs from '{:s}'".format(illpath)))
     haloCat = ill.groupcat.loadHalos(illpath, snap, fields=None)
-    numHalos    = haloCat['count']
-    if verbose: print((" - - - - Halos    Loaded ({:7d})".format(numHalos)))
+    numHalos = haloCat['count']
+    if verbose:
+        print((" - - - - Halos    Loaded ({:7d})".format(numHalos)))
     subhCat = ill.groupcat.loadSubhalos(illpath, snap, fields=None)
     numSubhs = subhCat['count']
-    if verbose: print((" - - - - Subhalos Loaded ({:7d})".format(numSubhs)))
-
+    if verbose:
+        print((" - - - - Subhalos Loaded ({:7d})".format(numSubhs)))
 
     # Initialize Storage
     #  ------------------
@@ -521,8 +529,8 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
     # See object description; recall entries are [HALO, SUBHALO, PART0, ... PART5]
     #    (Sub)halo numbers are smaller, use signed-integers for `-1` to be no (Sub)halo
-    haloNum = np.zeros(tableSize,               dtype=DTYPE.INDEX)
-    subhNum = np.zeros(tableSize,               dtype=DTYPE.INDEX)
+    haloNum = np.zeros(tableSize, dtype=DTYPE.INDEX)
+    subhNum = np.zeros(tableSize, dtype=DTYPE.INDEX)
     # Offsets approach total number of particles, must be uint64
     offsets = np.zeros([tableSize, PARTICLE._NUM], dtype=DTYPE.ID)
 
@@ -602,14 +610,16 @@ def _constructBHIndexTable(run, snap, verbose=True):
 
     """
 
-    if verbose: print(" - - ParticleHosts._constructBHIndexTable()")
+    if verbose: print(" - - particle_hosts._constructBHIndexTable()")
 
     # Illustris Data Directory where catalogs are stored
     illpath = GET_ILLUSTRIS_OUTPUT_DIR(run)
 
+    import illpy
+
     # Load all BH ID numbers from snapshot (single ``fields`` parameters loads array, not dict)
     if verbose: print((" - - - Loading BHs from Snapshot {:d} in '{:s}'".format(snap, illpath)))
-    bhIDs = ill.snapshot.loadSubset(illpath, snap, PARTICLE.BH, fields=SNAPSHOT.IDS)
+    bhIDs = illpy.snapshot.loadSubset(illpath, snap, PARTICLE.BH, fields=SNAPSHOT.IDS)
     numBHs = len(bhIDs)
     if verbose: print((" - - - - BHs Loaded ({:7d})".format(numBHs)))
     # Create 'indices' of BHs
@@ -618,7 +628,7 @@ def _constructBHIndexTable(run, snap, verbose=True):
 
 
 def main():
-    titleStr = "illpy_lib.subhalos.ParticleHosts.main()"
+    titleStr = "illpy_lib.subhalos.particle_hosts.main()"
     print(("\n{:s}\n{:s}\n".format(titleStr, "="*len(titleStr))))
 
     import sys
@@ -631,7 +641,7 @@ def main():
 
     except:
         # Print Usage
-        print("usage:  ParticleHosts RUN SNAP_START SNAP_STOP SNAP_SKIP")
+        print("usage:  particle_hosts RUN SNAP_START SNAP_STOP SNAP_SKIP")
         print("arguments:")
         print("    RUN        <int> : illustris simulation number {1, 3}")
         print("    SNAP_START <int> : illustris snapshot   number {0, 135} to start on")
@@ -650,7 +660,7 @@ def main():
             sys.stdout.flush()
 
             beg = datetime.now()
-            table = loadBHHostsSnap(run, sn, convert=0.4, bar=False)
+            loadBHHostsSnap(run, sn, convert=0.4, bar=False)
             end = datetime.now()
 
             sys.stdout.write(' After %s\n' % (str(end-beg)))
@@ -658,4 +668,6 @@ def main():
 
     return
 
-if (__name__ == "__main__"): main()
+
+if __name__ == "__main__":
+    main()
