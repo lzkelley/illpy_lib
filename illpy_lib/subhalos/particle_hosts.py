@@ -12,8 +12,8 @@ Classes
 Functions
 ---------
     # loadOffsetTable            : load offset table for target run and snapshot
-    loadBHHostsSnap            : load (sub)halo host associations for blackholes in one snapshot
-    loadBHHosts                : load (sub)halo host associations for blackholes in all snapshots
+    load_bh_hosts_snap            : load (sub)halo host associations for blackholes in one snapshot
+    load_bh_hosts                : load (sub)halo host associations for blackholes in all snapshots
     main                       :
     subhalosForBHIDs           : find subhalos for given BH IDs
 
@@ -218,7 +218,7 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
 '''
 
 
-def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, convert=None):
+def load_bh_hosts(run, loadsave=True, version=None, verbose=True, bar=None, convert=None):
     """Merge individual snapshot's blackhole hosts files into a single file.
 
     Arguments
@@ -235,7 +235,7 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
     bhHosts <dict> : table of hosts for all snapshots
 
     """
-    if verbose: print(" - - particle_hosts.loadBHHosts()")
+    if verbose: print(" - - particle_hosts.load_bh_hosts()")
     if (bar is None):
         bar = bool(verbose)
 
@@ -284,7 +284,7 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
         # -----------------------
         for snap in range(NUM_SNAPS):
             # Load Snapshot BH-Hosts
-            hdict = loadBHHostsSnap(run, snap, loadsave=True, verbose=True, convert=convert)
+            hdict = load_bh_hosts_snap(run, snap, loadsave=True, verbose=True, convert=convert)
             # Extract and store target data
             snapStr = OFFTAB.snapDictKey(snap)
             bhHosts[snapStr] = {hkey: hdict[hkey] for hkey in hostKeys}
@@ -301,7 +301,7 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
     return bhHosts
 
 
-def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=None, convert=None):
+def load_bh_hosts_snap(run, snap, version=None, loadsave=True, verbose=True, bar=None, convert=None):
     """Load pre-existing, or manage the creation of the particle offset table.
 
     Arguments
@@ -316,7 +316,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
     offsetTable <dict> : particle offset table, see `particle_hosts` docs for more info.
 
     """
-    if verbose: print(" - - particle_hosts.loadBHHostsSnap()")
+    if verbose: print(" - - particle_hosts.load_bh_hosts_snap()")
     if (bar is None): bar = bool(verbose)
 
     # Load Existing Save
@@ -436,7 +436,7 @@ def subhalosForBHIDs(run, snap, bhIDs, bhHosts=None, verbose=True):
     # ---------------------------
     if (bhHosts is None):
         if verbose: print(" - - - Loading offset table")
-        bhHosts = loadBHHostsSnap(run, snap, loadsave=True, verbose=verbose)
+        bhHosts = load_bh_hosts_snap(run, snap, loadsave=True, verbose=verbose)
 
     outIDs  = bhHosts[OFFTAB.BH_IDS]
     outInds = bhHosts[OFFTAB.BH_INDICES]
@@ -660,7 +660,7 @@ def main():
             sys.stdout.flush()
 
             beg = datetime.now()
-            loadBHHostsSnap(run, sn, convert=0.4, bar=False)
+            load_bh_hosts_snap(run, sn, convert=0.4, bar=False)
             end = datetime.now()
 
             sys.stdout.write(' After %s\n' % (str(end-beg)))

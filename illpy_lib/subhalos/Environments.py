@@ -176,7 +176,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
     if verbose: print(" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM]))
 
     if verbose: print(" - - - Loading BH Hosts Catalog")
-    bhHosts = particle_hosts.loadBHHosts(run, loadsave=True, verbose=verbose, bar=True)
+    bhHosts = particle_hosts.load_bh_hosts(run, loadsave=True, verbose=verbose, bar=True)
 
     # Snapshot for each merger
     merger_snaps = mergers[MERGERS.MAP_MTOS]
