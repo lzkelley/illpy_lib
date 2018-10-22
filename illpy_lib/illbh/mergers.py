@@ -105,11 +105,11 @@ def process_mergers(run, verbose=True):
     if verbose:
         print(" - - mergers.process_mergers()")
 
-    # Load Mapped Mergers #
+    # Load Mapped Mergers
     # re-creates them if needed
     mergersMapped = load_mapped_mergers(run, verbose=verbose)
 
-    # Load Fixed Mergers #
+    # Load Fixed Mergers
     mergersFixed = load_fixed_mergers(run, verbose=verbose)
 
     return mergersMapped, mergersFixed
@@ -122,30 +122,30 @@ def load_raw_mergers(run, verbose=True, recombine=False):
     Raw mrgs are the data directly from illustris without modification.
     """
 
-    if verbose: print(" - - mergers.load_raw_mergers()")
+    if verbose:
+        print("mergers.load_raw_mergers()")
 
-    # Concatenate Raw Illustris Files into a Single Combined File #
-
-    combinedFilename = GET_MERGERS_RAW_COMBINED_FILENAME(run)
-    if (recombine or not os.path.exists(combinedFilename)):
+    # Concatenate Raw Illustris Files into a Single Combined File
+    fname_combined = GET_MERGERS_RAW_COMBINED_FILENAME(run)
+    if recombine or not os.path.exists(fname_combined):
         if verbose:
-            print((" - - Combining Illustris Merger files into '{:s}'".format(combinedFilename)))
-        mergerFilenames = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
+            print(" - Combining Illustris Merger files into '{:s}'".format(fname_combined))
+        fnames_mergers = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
         if verbose:
-            print((" - - - Found {:d} merger Files".format(len(mergerFilenames))))
-        zio.combine_files(mergerFilenames, combinedFilename, verbose=verbose)
+            print(" - Found {:d} merger Files".format(len(fnames_mergers)))
+        zio.combine_files(fnames_mergers, fname_combined, verbose=verbose)
 
     if verbose:
-        print((" - - - Merger file '{:s}'".format(combinedFilename)))
+        print(" - Merger file '{:s}'".format(fname_combined))
 
     # Load Raw Data from Merger Files #
     if verbose:
-        print(" - - - Importing Merger Data")
-    scales, ids, masses = _import_raw_mergers(combinedFilename, verbose=verbose)
+        print(" - Importing Merger Data")
+    scales, ids, masses = _import_raw_mergers(fname_combined, verbose=verbose)
 
     # Sort Data by Time #
     if verbose:
-        print(" - - - Sorting Data")
+        print(" - Sorting Data")
 
     # Find indices which sort by time
     inds = np.argsort(scales)
@@ -154,7 +154,7 @@ def load_raw_mergers(run, verbose=True, recombine=False):
     ids    = ids[inds]
     masses = masses[inds]
 
-    return scales, ids, masses, combinedFilename
+    return scales, ids, masses, fname_combined
 
 
 def load_mapped_mergers(run, verbose=True, loadsave=True):

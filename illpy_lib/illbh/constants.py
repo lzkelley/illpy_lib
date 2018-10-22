@@ -95,7 +95,7 @@ _BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz
 _LOG_DIR = "./logs/"
 
 
-class MERGERS():
+class MERGERS:
     # Meta Data
     RUN       = 'run'
     CREATED   = 'created'
@@ -117,7 +117,7 @@ class MERGERS():
 MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
 
 
-class DETAILS():
+class DETAILS:
     RUN     = 'run'
     CREATED = 'created'
     VERSION = 'version'
@@ -137,7 +137,7 @@ DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
                          DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 
-class BH_TYPE():
+class BH_TYPE:
     IN  = 0
     OUT = 1
 
@@ -145,7 +145,7 @@ class BH_TYPE():
 NUM_BH_TYPES = 2
 
 
-class BH_TIME():
+class BH_TIME:
     BEFORE  = 0                                   # Before merger time (MUST = 0!)
     AFTER   = 1                                   # After (or equal) merger time (MUST = 1!)
     FIRST   = 2                                   # First matching dets entry (MUST = 2!)
@@ -154,7 +154,7 @@ class BH_TIME():
 NUM_BH_TIMES = 3
 
 
-class BH_TREE():
+class BH_TREE:
     LAST         = 'last'
     NEXT         = 'next'
     LAST_TIME    = 'lastTime'
@@ -168,7 +168,7 @@ class BH_TREE():
     VERSION      = 'version'
 
 
-class BH_SNAP():
+class BH_SNAP:
     RUN     = 'run'
     SNAP    = 'snap'
     VERSION = 'version'
