@@ -458,7 +458,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         `+1` if a new file was created, otherwise `0`.
 
     """
-    import illustris_python as ill
+    import illpy as ill
 
     logger.warning("BHSnapshotData._loadSingleSnapshotBHs()")
 

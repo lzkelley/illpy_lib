@@ -72,8 +72,7 @@ import numpy as np
 import h5py
 import tqdm
 
-from .. Constants import DTYPE, NUM_SNAPS, PARTICLE, \
-    GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
+from .. constants import DTYPE, NUM_SNAPS, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
 from . Constants import SNAPSHOT
 
 import zcode.inout as zio
@@ -83,6 +82,7 @@ import zcode.inout as zio
 #    formerly: "/n/home00/lkelley/hernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_DIR = "/n/home00/lkelley/illustris/data/{}/output/postprocessing/"
 
+'''
 illustris_python_path = "/n/home00/lkelley/illustris/"
 if not os.path.exists(illustris_python_path):
     print("Path '{}' does not exist...".format(illustris_python_path))
@@ -94,6 +94,8 @@ if not os.path.exists(illustris_python_path):
 if illustris_python_path not in sys.path:
     sys.path.append(illustris_python_path)
 import illustris_python as ill
+'''
+import illpy as ill
 
 _VERSION = '1.0'
 
