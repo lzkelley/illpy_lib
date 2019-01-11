@@ -61,6 +61,7 @@ Notes
 
 """
 
+
 import os
 import warnings
 import numpy as np
@@ -71,7 +72,6 @@ import zcode.inout as zio
 from illpy_lib.constants import DTYPE, NUM_SNAPS
 from . import BHConstants
 from .BHConstants import DETAILS
-
 
 VERSION = 0.23                                    # Version of BHDetails
 

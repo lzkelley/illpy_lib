@@ -502,11 +502,11 @@ def inferMergerOutMasses(run, mergers=None, mdets=None, log=None):
     ntot = masses.size
 
     bads = np.where(np.isfinite(massBef) == False)[0]
-    print("Bads Before = ", bads)
-    print("\t", massBef[bads])
+    print(("Bads Before = ", bads))
+    print(("\t", massBef[bads]))
     bads = np.where(np.isfinite(massAft) == False)[0]
-    print("Bads After = ", bads)
-    print("\t", massAft[bads])
+    print(("Bads After = ", bads))
+    print(("\t", massAft[bads]))
 
     # Use 'before' masses
     inds = np.where(massBef > 0.0)
@@ -1318,9 +1318,9 @@ def _detailsForMergers_snapshots(run, snapshots, bhIDsUnique, maxPerSnap, log):
                     try:
                         scales[ii] = tempScales
                     except:
-                        print(np.shape(scales[ii]))
-                        print(scales[ii])
-                        print(np.shape(tempScales))
+                        print((np.shape(scales[ii])))
+                        print((scales[ii]))
+                        print((np.shape(tempScales)))
                         zio.mpiError(comm)
 
                     masses[ii] = tempMasses

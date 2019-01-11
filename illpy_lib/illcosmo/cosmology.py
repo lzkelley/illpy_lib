@@ -2,11 +2,10 @@
 
 """
 
-
 import os
 import numpy as np
 import scipy as sp
-from scipy import interpolate  # noqa
+import scipy.interpolate
 import astropy as ap
 import astropy.cosmology  # noqa
 
@@ -76,10 +75,10 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         self._grid_age = self.age(zgrid).cgs.value
         self._sort_age = np.argsort(self._grid_age)
         #    Comoving distances in centimeters
-        self._grid_comdist = self.comoving_distance(zgrid).cgs.value
+        # self._grid_comdist = self.comoving_distance(zgrid).cgs.value
         # self._sort_comdist = np.argsort(self._grid_comdist)
         #    Comoving volume of the universe
-        self._grid_comvol = self.comoving_volume(zgrid).cgs.value
+        # self._grid_comvol = self.comoving_volume(zgrid).cgs.value
         return
 
     def _init_interp_grid(self, z_pnts, num_pnts):
@@ -141,31 +140,33 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         """Convert from scale-factor to age of the universe [seconds].
         """
         zz = self._scale_to_z(sf)
-        if np.size(zz) == 1:
-            age = self.age(zz).cgs.value
-        else:
-            age = self._interp(zz, self._grid_z, self._grid_age, self._sort_z)
+        age = self.age(zz).cgs.value
+        # if np.size(zz) == 1:
+        #     age = self.age(zz).cgs.value
+        # else:
+        #     age = self._interp(zz, self._grid_z, self._grid_age, self._sort_z)
         return age
 
     def scale_to_comdist(self, sf):
         """Convert from scale-factor to comoving distance [cm].
         """
         zz = self._scale_to_z(sf)
-        if np.size(zz) == 1:
-            comdist = self.comoving_distance(zz).cgs.value
-        else:
-            comdist = self._interp(zz, self._grid_z, self._grid_comdist, self._sort_z)
+        comdist = self.comoving_distance(zz).cgs.value
+        # if np.size(zz) == 1:
+        #     comdist = self.comoving_distance(zz).cgs.value
+        # else:
+        #     comdist = self._interp(zz, self._grid_z, self._grid_comdist, self._sort_z)
         return comdist
 
-    def scale_to_comvol(self, sf):
-        """Convert from scale-factor to comoving volume [cm^3].
-        """
-        zz = self._scale_to_z(sf)
-        if np.size(zz) == 1:
-            comvol = self.comoving_volume(zz).cgs.value
-        else:
-            comvol = self._interp(zz, self._grid_z, self._grid_comvol, self._sort_z)
-        return comvol
+    # def scale_to_comvol(self, sf):
+    #     """Convert from scale-factor to comoving volume [cm^3].
+    #     """
+    #     zz = self._scale_to_z(sf)
+    #     if np.size(zz) == 1:
+    #         comvol = self.comoving_volume(zz).cgs.value
+    #     else:
+    #         comvol = self._interp(zz, self._grid_z, self._grid_comvol, self._sort_z)
+    #     return comvol
 
     def age_to_scale(self, age):
         """Convert from age of the universe [seconds] to scale-factor.
@@ -246,7 +247,6 @@ class Cosmology(object):
         self.__cosmo = np.load(fname)
         self.filename = fname
         self.num = len(self.__cosmo[self.__NUM])
-
         return
 
     def __getitem__(self, it):
@@ -400,12 +400,11 @@ class Cosmology(object):
         Returns
         -------
         """
-
         # Generalize argument to always be iterable
         if (not np.iterable(sf)):
             sf = np.array([sf])
 
-        # Get Cosmological Parameters #
+        # Get Cosmological Parameters
         nums = len(sf)
         comDist = np.zeros(nums, dtype=FLT_TYPE)
         redz    = np.zeros(nums, dtype=FLT_TYPE)
@@ -435,5 +434,4 @@ class Cosmology(object):
 
         # Convert strains to cosmological strains
         cosmoFactor = density*cosmoVolume
-
         return cosmoFactor

@@ -305,11 +305,11 @@ def _mergeUnique(snaps, old_ids, old_scales, new_data, log):
             n_old += 1
 
     if old_ids.dtype.type is not np.uint64:
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
+        print(("types = ", old_ids.dtype.type, new_ids.dtype.type))
         raise RuntimeError("old_ids at snap = %d is non-integral!" % (new_snap))
 
     if new_ids.dtype.type is not np.uint64:
-        print("types = ", old_ids.dtype.type, new_ids.dtype.type)
+        print(("types = ", old_ids.dtype.type, new_ids.dtype.type))
         raise RuntimeError("new_ids at snap = %d is non-integral!" % (new_snap))
 
     # Make sure things seem right
@@ -365,7 +365,7 @@ def _saveUnique(run, snap, fname, uids, uscales, log):
         DETAILS.IDS: uids.astype(DTYPE.ID),
         DETAILS.SCALES: uscales.astype(DTYPE.SCALAR),
         DETAILS.NUM: uids.size,
-        }
+    }
 
     for key, val in list(data.items()):
         data[key] = np.asarray(val)
@@ -415,7 +415,7 @@ def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
         header = "\n%s\n%s\n%s" % (__file__, '='*len(__file__), str(datetime.now()))
         log.debug(header)
     if not rank:
-        print("Log filename = ", log.filename)
+        print(("Log filename = ", log.filename))
 
     return log
 

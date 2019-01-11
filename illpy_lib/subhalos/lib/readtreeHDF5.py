@@ -48,7 +48,7 @@ class _Subset(object):
 
 class _AdjacentRows(object):
     """
-    Used by the TreeDB class. Consists of 
+    Used by the TreeDB class. Consists of
     a set of adjacent rows from the merger tree file.
     Since subhalo IDs are assigned in a depth-first fashion,
     a "chunk" of adjacent rows can represent, e.g., a main branch
@@ -75,7 +75,7 @@ class _AdjacentRows(object):
             self._fields = list(treefile.keys())
         else:
             self._fields = keysel
-        
+
         # Add them
         for field_name in self._fields:
             setattr(self, field_name, treefile[field_name][locs])
@@ -87,7 +87,7 @@ class TreeDB:
     """
     Python class to extract information from merger tree files
     in "database mode."
-    
+
     --------------- USAGE EXAMPLE: PRINT STELLAR MASS HISTORY ---------------
     import readtreeHDF5
     treedir = '/n/ghernquist/vrodrigu/MergerTrees/output/Subhalos/Illustris/L75n1820FP'
@@ -101,7 +101,7 @@ class TreeDB:
     def __init__(self, treedir, name='tree_extended', filenum=-1):
         """
         Create a TreeDB object.
-        
+
         Parameters
         ----------
         treedir : string
@@ -156,7 +156,7 @@ class TreeDB:
         For a subhalo specified by its snapshot number and Subfind ID,
         return the progenitors along its main branch, i.e. all subhalos
         with IDs between SubhaloID and MainLeafProgenitorID.
-        
+
         Parameters
         ----------
         snapnum : int
@@ -187,7 +187,7 @@ class TreeDB:
         return all the objects in the subtree which is rooted on the
         subhalo of interest, i.e. all subhalos with IDs between SubhaloID
         and LastProgenitorID. Note that this includes the given subhalo itself.
-        
+
         Parameters
         ----------
         snapnum : int
@@ -211,7 +211,7 @@ class TreeDB:
         row_start = rownum
         row_end = rownum + (last_progenitor_id - subhalo_id)
         subtree = _AdjacentRows(self._treefile, row_start, row_end, keysel=keysel)
-        
+
         return subtree
 
     def _get_subhalos_between_root_and_given(self, snapnum, subfind_id, keysel=None):
@@ -219,7 +219,7 @@ class TreeDB:
         Return all subhalos with IDs between RootDescendantID and
         SubhaloID (of the given subhalo), in a depth-first fashion.
         This function is used by "get_forward_branch."
-        
+
         Parameters
         ----------
         snapnum : int

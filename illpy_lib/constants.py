@@ -1,9 +1,5 @@
 """
 """
-
-
-"""Numerical constants pertaining to the Illustris Simulations and their data.
-"""
 import numpy as np
 
 HPAR = 0.704
@@ -62,10 +58,11 @@ class CONV_CGS_TO_SOL(object):
 class CONV_ILL_TO_SOL(object):
     """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
     """
-    MASS = CONV_ILL_TO_CGS.MASS * CONV_CGS_TO_SOL.MASS  # e10 Msol to [Msol]
-    MDOT = CONV_ILL_TO_CGS.MDOT * CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
-    DENS = CONV_ILL_TO_CGS.DENS * CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
-    DIST = CONV_ILL_TO_CGS.DIST * CONV_CGS_TO_SOL.DIST  # to comoving-pc
+    MASS = CONV_ILL_TO_CGS.MASS.value * CONV_CGS_TO_SOL.MASS.value  # e10 Msol to [Msol]
+    MDOT = CONV_ILL_TO_CGS.MDOT.value * CONV_CGS_TO_SOL.MDOT.value  # to [Msol/yr]
+    DENS = CONV_ILL_TO_CGS.DENS.value * CONV_CGS_TO_SOL.DENS.value  # to [Msol/pc^3]
+    DIST = CONV_ILL_TO_CGS.DIST.value * CONV_CGS_TO_SOL.DIST.value  # to comoving-pc
+
     VEL = 1.0
 
 

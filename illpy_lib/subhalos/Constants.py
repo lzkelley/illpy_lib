@@ -1,3 +1,6 @@
+"""
+"""
+import collections
 
 
 class SNAPSHOT():
@@ -15,7 +18,6 @@ class SNAPSHOT():
 
     SUBF_HSML            = "SubfindHsml"
     SUBF_VDISP           = "SubfindVelDisp"
-
 
     '''
     BH_MASS                  = "BH_Mass"
@@ -86,4 +88,4 @@ class SUBHALO():
     @staticmethod
     def PROPERTIES():
         return [getattr(SUBHALO, it) for it in vars(SUBHALO)
-                if not it.startswith('_') and not callable(getattr(SUBHALO, it))]
+                if not it.startswith('_') and not isinstance(getattr(SUBHALO, it), collections.Callable)]

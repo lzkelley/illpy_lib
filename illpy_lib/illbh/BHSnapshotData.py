@@ -27,6 +27,7 @@ Functions
 -   _GET_BH_SNAPSHOT_FILENAME
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import numpy as np
 from datetime import datetime
@@ -44,6 +45,7 @@ from . import BHConstants
 from .BHConstants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
 import illpy_lib as ill
+
 import zcode.inout as zio
 
 MPI_TAGS = zio.MPI_TAGS
@@ -456,6 +458,7 @@ def _loadSingleSnapshotBHs(run, snapNum, numMergers, idxs, bhids,
         `+1` if a new file was created, otherwise `0`.
 
     """
+    import illustris_python as ill
 
     logger.warning("BHSnapshotData._loadSingleSnapshotBHs()")
 

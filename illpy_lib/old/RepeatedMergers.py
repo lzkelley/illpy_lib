@@ -14,7 +14,6 @@ import numpy as np
 from datetime import datetime
 import os
 
-
 # import illpy_lib
 # from illpy_lib import AuxFuncs as aux
 # from illpy_lib.constants import *
@@ -50,12 +49,12 @@ MYR = (1.0e6)*YEAR
 
 def main(run=RUN, load=LOAD, verbose=VERBOSE):
 
-    # Initialize Log File #
+    # Initialize Log File
     print("\nRepeatedMergers.py\n")
 
     start_time  = datetime.now()
 
-    # Set basic Parameters #
+    # Set basic Parameters
     print(" - Loading Basics")
     start = datetime.now()
     base = Basics.Basics(run)
@@ -280,6 +279,7 @@ def analyzeRepeats(repeats, base, verbose=VERBOSE):
     inds = np.where(next >= 0)[0]
     numRepeats = len(inds)
     fracRepeats = 1.0*numRepeats/numMergers
+
     print((" - - - Number of repeated mergers = {:d}/{:d} = {:.4f}".format(numRepeats, numMergers, fracRepeats)))
     print((" - - - Average Number of Repeated mergers  past, future  =  {:.3f}, {:.3f}".format(avePast, aveFuture)))
 

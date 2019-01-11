@@ -1,4 +1,4 @@
-# Python HDF5 subfind reader 
+# Python HDF5 subfind reader
 # (requires util/hdf5lib.py)
 #
 # import readsubfHDF5
@@ -11,7 +11,7 @@
 import numpy as np
 import os
 import sys
-from . import hdf5lib 
+from . import hdf5lib
 
 #
 #SUBHALO DATABLOCKS#
@@ -81,13 +81,13 @@ grp_datablocks = {"GroupLen":["INT", 1],
                   "GroupGasMetalFractions":["FLOAT", 9],
                   "GroupStarMetalFractions":["FLOAT", 9],
                   "GroupBHMass":["FLOAT", 1],
-                  "GroupBHMdot":["FLOAT", 1], 
+                  "GroupBHMdot":["FLOAT", 1],
 		  "GroupFuzzOffsetType":["INT64", 6]}
 
 class subfind_catalog:
 	def __init__(self, basedir, snapnum, long_ids = False, double_output = False, grpcat = True, subcat = True, name = "fof_subhalo_tab", keysel = None):
 		self.filebase = basedir + "/groups_" + str(snapnum).zfill(3) + "/" + name + "_" + str(snapnum).zfill(3) + "."
- 
+
 		if long_ids: self.id_type = np.uint64
 		else: self.id_type = np.uint32
 		if double_output: self.double_type = np.float32
@@ -106,11 +106,11 @@ class subfind_catalog:
 				self.filebase = basedir + "/" + name + "_" + str(snapnum).zfill(3)
 				curfile = self.filebase + ".hdf5"
 			if (not os.path.exists(curfile)):
-				print(("file not found:",  curfile))
+				print(("file not found:", curfile))
 				sys.exit()
 
-			f=hdf5lib.OpenFile(curfile)     
-			ngroups = hdf5lib.GetAttr(f, "Header", "Ngroups_ThisFile") 
+			f=hdf5lib.OpenFile(curfile)
+			ngroups = hdf5lib.GetAttr(f, "Header", "Ngroups_ThisFile")
 			nsubs = hdf5lib.GetAttr(f, "Header", "Nsubgroups_ThisFile")
 			nfiles = hdf5lib.GetAttr(f, "Header", "NumFiles")
 			if filenum == 0:
@@ -137,7 +137,7 @@ class subfind_catalog:
 						for key in keysel:
 							if hdf5lib.Contains(f, "Group", key):
 								val = grp_datablocks[key]
-								type = val[0] 
+								type = val[0]
 								dim = val[1]
 								if (type=='FLOAT'):
 									vars(self)[key]=np.empty(self.ngroups, dtype=np.dtype((self.double_type, dim)))
@@ -149,7 +149,7 @@ class subfind_catalog:
 									vars(self)[key]=np.empty(self.ngroups, dtype=np.dtype((self.id_type, dim)))
 								vardict[key]=vars(self)[key]
 
-		
+
 				#SUBHALOS
 				if (subcat==True):
 					if (keysel == None):
@@ -208,10 +208,10 @@ class subfind_catalog:
 								else:
 									for d in range(0, dim):
 										vardict[key][skip_gr:skip_gr + ngroups, d]=a[:, d]
-							
+
 					skip_gr += ngroups
-			#SUBHALOS 
-			if (subcat==True): 
+			#SUBHALOS
+			if (subcat==True):
 				if nsubs > 0:
 					if (keysel == None):
 						for key, val in list(sub_datablocks.items()):
@@ -237,7 +237,7 @@ class subfind_catalog:
 									for d in range(0, dim):
 										vardict[key][skip_sub:skip_sub + nsubs, d]=a[:, d]
 
-					skip_sub += nsubs      
+					skip_sub += nsubs
 
 			f.close()
 

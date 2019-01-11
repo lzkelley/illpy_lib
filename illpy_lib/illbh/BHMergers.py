@@ -82,6 +82,7 @@ Notes
    maps are included in the merger dictionary.
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 # import sys
@@ -101,7 +102,6 @@ from illpy_lib.constants import DTYPE
 
 import zcode.inout as zio
 
-# VERSION = 0.21
 
 VERSION_MAP = 0.21
 VERSION_FIX = 0.31
@@ -248,6 +248,7 @@ def loadFixedMergers(run, verbose=True, loadsave=True):
     # Recreate Fixed Mergers
     if (not loadsave):
         if verbose: print(" - - - Creating Fixed Mergers")
+
         # Load Mapped Mergers
         mergersMapped = loadMappedMergers(run, verbose=verbose)
         # Fix Mergers
@@ -323,9 +324,6 @@ def _fixMergers(run, mergers, verbose=True):
                 break
 
             jj += 1
-
-        # } while
-    # ii
 
     if verbose:
         print((" - - - Total number of duplicates = {:d}".format(len(badInds))))
