@@ -221,7 +221,7 @@ def _load_bh_hosts_table(run, log=None, load_saved=True, version=None):
     log.debug("particle_hosts._load_bh_hosts_table()")
     beg_all = datetime.now()
 
-    fname_bh_hosts = _get_filename_bh_hosts_table(run, version=version)
+    fname_bh_hosts = _get_filename_bh_hosts_table(run)
     _path = zio.check_path(fname_bh_hosts)
     if not os.path.isdir(_path):
         log.raise_error("Error with path for '{}' (path: '{}')".format(fname_bh_hosts, _path))
@@ -520,7 +520,7 @@ def _get_path_processed(run):
     _PROCESSED_DIR = "/n/home00/lkelley/illustris/data/{}/output/postprocessing/"
 
     """
-    from .. Constants import _ILLUSTRIS_RUN_NAMES
+    from .. constants import _ILLUSTRIS_RUN_NAMES
     # Make sure path ends in '/'
     path = os.path.join(_PROCESSED_DIR.format(_ILLUSTRIS_RUN_NAMES[run]), '')
     if zio.check_path(path) is None:
@@ -541,13 +541,17 @@ def _get_filename_offset_table(run, snap, version=None):
     return fname
 
 
-def _get_filename_bh_hosts_snap_table(run, snap, version=None):
-    fname = _processed_filname(run, snap, version, _FILENAME_BH_HOSTS_SNAP_TABLE)
+def _get_filename_bh_hosts_snap_table(run, snap):
+    # fname = _processed_filname(run, snap, version, _FILENAME_BH_HOSTS_SNAP_TABLE)
+    fname = _FILENAME_BH_HOSTS_SNAP_TABLE.format(run=run, snap=snap)
+    fname = os.path.join(_get_path_processed(run), fname)
     return fname
 
 
-def _get_filename_bh_hosts_table(run, snap, version=None):
-    fname = _processed_filname(run, snap, version, _FILENAME_BH_HOSTS_TABLE)
+def _get_filename_bh_hosts_table(run):
+    # fname = _processed_filname(run, snap, version, _FILENAME_BH_HOSTS_TABLE)
+    fname = _FILENAME_BH_HOSTS_TABLE.format(run=run)
+    fname = os.path.join(_get_path_processed(run), fname)
     return fname
 
 
