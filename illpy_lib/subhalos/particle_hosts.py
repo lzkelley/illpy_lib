@@ -73,6 +73,7 @@ import h5py
 import tqdm
 
 from .. constants import DTYPE, NUM_SNAPS, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
+from ..illbh.constants import check_log
 from . Constants import SNAPSHOT
 
 import zcode.inout as zio
@@ -202,7 +203,7 @@ def bh_subhalos(run, snap, log, bh_ids, bh_hosts_snap=None):
     return match_subhs
 
 
-def _load_bh_hosts_table(run, log, load_saved=True, version=None):
+def _load_bh_hosts_table(run, log=None, load_saved=True, version=None):
     """Merge individual snapshot's blackhole hosts files into a single file.
 
     Arguments
@@ -216,6 +217,7 @@ def _load_bh_hosts_table(run, log, load_saved=True, version=None):
     bh_hosts <dict> : table of hosts for all snapshots
 
     """
+    log = check_log(log, run=run)
     log.debug("particle_hosts._load_bh_hosts_table()")
     beg_all = datetime.now()
 
