@@ -314,7 +314,7 @@ def _runMaster(run, comm):
         # Create output directory (subhalo doesn't matter since only creating dir)
         #    don't let slave processes create it - makes conflicts
         fname = _GET_MERGER_SUBHALO_FILENAME(run, snap, 0)
-        zio.checkPath(fname)
+        zio.check_path(fname)
 
         # Get most bound particles for each subhalo in this snapshot
         mostBound = Subhalo.importGroupCatalogData(run, snap, subhalos=subs,

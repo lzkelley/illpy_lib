@@ -175,7 +175,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
 
     # Open new ASCII, Temp dets files
     #    Make sure path is okay
-    zio.checkPath(tempFilenames[0])
+    zio.check_path(tempFilenames[0])
     # Open each temp file
     tempFiles = [open(tfil, 'w') for tfil in tempFilenames]
 

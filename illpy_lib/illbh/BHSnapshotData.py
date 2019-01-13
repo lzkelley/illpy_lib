@@ -73,7 +73,7 @@ def main():
     if (rank == 0):
         NAME = sys.argv[0]
         print(("\n{:s}\n{:s}\n{:s}".format(NAME, '='*len(NAME), str(datetime.now()))))
-        zio.checkPath(constants._LOG_DIR)
+        zio.check_path(constants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
     comm.Barrier()
@@ -235,7 +235,7 @@ def _runMaster(run, comm, logger):
 
     # Make sure output directory exists
     fname = _GET_BH_SINGLE_SNAPSHOT_FILENAME(run, 0)
-    zio.checkPath(fname)
+    zio.check_path(fname)
 
     # Load BH Mergers
     logger.info("Loading BH Mergers")

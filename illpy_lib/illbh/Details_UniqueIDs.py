@@ -406,7 +406,7 @@ def _checkLog(log, run=None, debug=Settings.debug, verbose=Settings.verbose):
     comm = MPI.COMM_WORLD
     rank = comm.rank
     if not rank:
-        zio.checkPath(_LOG_DIR)
+        zio.check_path(_LOG_DIR)
     comm.Barrier()
 
     if log is None:

@@ -63,7 +63,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     header = "\n%s\n%s\n%s" % (name, '='*len(name), str(datetime.now()))
 
     if (rank == 0):
-        zio.checkPath(_LOG_DIR)
+        zio.check_path(_LOG_DIR)
     comm.Barrier()
 
     # Initialize log

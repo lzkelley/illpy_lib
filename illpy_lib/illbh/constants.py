@@ -351,7 +351,7 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
     # Get logger and log-file names
     logName, logFilename = _GET_LOG_NAMES(name, run=run, rank=rank, version=version)
     # Make sure directory exists
-    zio.checkPath(logFilename)
+    zio.check_path(logFilename)
     # Determine verbosity level
     if debug:
         strLvl = logging.DEBUG
