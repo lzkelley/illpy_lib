@@ -366,9 +366,12 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
     fileLvl = logging.DEBUG
     # Create logger
     if rank == 0 or rank is None:
-        logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, strLevel=strLvl)
+        kw = dict(level_stream=strLvl)
     else:
-        logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, tostr=False)
+        kw = dict(tostr=False)
+
+    # logger = zio.getLogger(logName, tofile=logFilename, fileLevel=fileLvl, strLevel=strLvl, **kw)
+    logger = zio.get_logger(logName, tofile=logFilename, level_file=fileLvl, **kw)
 
     return logger
 
