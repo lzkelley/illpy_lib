@@ -62,12 +62,11 @@ Notes
     Finally, any Particle1's with index 988 or after belong to no subhalo, and no halo.
 
 """
-
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import numpy as np
 from datetime import datetime
-
 
 from illpy_lib.constants import (DTYPE, NUM_SNAPS, PARTICLE,
                                  GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR, GET_BAD_SNAPS)
@@ -97,10 +96,12 @@ class OFFTAB():
     BH_SUBHALOS = 'bh_subhalos'
 
     @staticmethod
-    def snapDictKey(snap): return "%03d" % (snap)
+    def snapDictKey(snap):
+        return "%03d" % (snap)
 
 
 _OFFSET_TABLE_FILENAME_BASE = "offsets/ill%d_snap%d_offset-table_v%.2f.npz"
+
 
 def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
     if (version is None): version = _VERSION
@@ -111,6 +112,7 @@ def _GET_OFFSET_TABLE_FILENAME(run, snap, version=None):
 
 _BH_HOSTS_SNAP_TABLE_FILENAME_BASE = "bh-hosts/ill%d_snap%03d_bh-hosts_v%.2f.npz"
 
+
 def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
     if (version is None): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
@@ -120,11 +122,13 @@ def _GET_BH_HOSTS_SNAP_TABLE_FILENAME(run, snap, version=None):
 
 _BH_HOSTS_TABLE_FILENAME_BASE = "bh-hosts/ill%d_bh-hosts_v%.2f.npz"
 
+
 def _GET_BH_HOSTS_TABLE_FILENAME(run, version=None):
     if (version is None): version = _VERSION
     fname  = GET_PROCESSED_DIR(run)
     fname += _BH_HOSTS_TABLE_FILENAME_BASE % (run, version)
     return fname
+
 
 '''
 def loadOffsetTable(run, snap, loadsave=True, verbose=True):
@@ -206,7 +210,6 @@ def loadOffsetTable(run, snap, loadsave=True, verbose=True):
         stop = datetime.now()
         if verbose: print(" - - - - Done after {:s}".format(str(stop-start)))
 
-
     return offsetTable
 
 # loadOffsetTable()
@@ -259,7 +262,7 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
 
         # Create progress-bar
         pbar = zio.getProgressBar(NUM_SNAPS)
-        if (bar): pbar.start()
+        if bar: pbar.start()
 
         # Select the dict-keys for snapshot hosts to transfer
         hostKeys = [OFFTAB.BH_IDS, OFFTAB.BH_INDICES, OFFTAB.BH_HALOS, OFFTAB.BH_SUBHALOS]
@@ -282,15 +285,15 @@ def loadBHHosts(run, loadsave=True, version=None, verbose=True, bar=None, conver
             # Extract and store target data
             snapStr = OFFTAB.snapDictKey(snap)
             bhHosts[snapStr] = {hkey: hdict[hkey] for hkey in hostKeys}
-            if (bar): pbar.update(snap)
+            if bar: pbar.update(snap)
 
-        if (bar): pbar.finish()
+        if bar: pbar.finish()
 
         # Save to file
         zio.dictToNPZ(bhHosts, saveFile, verbose=verbose)
 
         stop = datetime.now()
-        if verbose: print((" - - - - Done after {:s}".format(str(stop-start))))
+        if verbose: print(" - - - - Done after %s" % (str(stop-start)))
 
     return bhHosts
 
@@ -343,7 +346,7 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
 
         # Convert an Existing (Full) Offset Table into BH Hosts
         # -----------------------------------------------------
-        if (os.path.exists(offsetFile)):
+        if os.path.exists(offsetFile):
             offsetTable = zio.npzToDict(offsetFile)
 
             bhInds  = offsetTable[OFFTAB.BH_INDICES]
@@ -364,14 +367,16 @@ def loadBHHostsSnap(run, snap, version=None, loadsave=True, verbose=True, bar=No
             except:
                 # If this is a known bad snapshot, set values to None
                 if (snap in GET_BAD_SNAPS(run)):
-                    if verbose: print((" - - - BAD SNAPSHOT: RUN {:d}, Snap {:d}".format(run, snap)))
+                    if verbose:
+                        print((" - - - BAD SNAPSHOT: RUN {:d}, Snap {:d}".format(run, snap)))
                     bhInds  = None
                     bhIDs   = None
                     bhHalos = None
                     bhSubhs = None
                 # If this is not a known problem, still raise error
                 else:
-                    print(("this is not a known bad snapshot: run {:d}, snap {:d}".format(run, snap)))
+                    print(("this is not a known bad snapshot: run {:d}, snap {:d}".format(
+                        run, snap)))
                     raise
 
             # On success, Find BH Subhalos
@@ -532,10 +537,10 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
     cumSubhParts = np.zeros(PARTICLE._NUM, dtype=DTYPE.ID)
 
     pbar = zio.getProgressBar(tableSize)
-    if (bar): pbar.start()
+    if bar: pbar.start()
 
     # Iterate Over Each Halo
-    #  ----------------------
+    # ----------------------
     for ii in range(numHalos):
 
         # Add the number of particles in this halo
@@ -561,7 +566,7 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
             # Increment subhalo and entry number
             subh += 1
             offs += 1
-            if (bar): pbar.update(offs)
+            if bar: pbar.update(offs)
 
         # Add Entry for particles with NO subhalo
         haloNum[offs] = ii                        # Still part of halo ``ii``
@@ -573,14 +578,14 @@ def _constructOffsetTable(run, snap, verbose=True, bar=None):
 
         # Increment entry number
         offs += 1
-        if (bar): pbar.update(offs)
+        if bar: pbar.update(offs)
 
     # Add entry for particles with NO halo and NO subhalo
     haloNum[offs] = -1
     subhNum[offs] = -1
     offsets[offs, :] = cumSubhParts
 
-    if (bar): pbar.finish()
+    if bar: pbar.finish()
 
     return haloNum, subhNum, offsets
 
@@ -658,4 +663,6 @@ def main():
 
     return
 
-if (__name__ == "__main__"): main()
+
+if (__name__ == "__main__"):
+    main()

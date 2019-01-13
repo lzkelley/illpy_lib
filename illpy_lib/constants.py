@@ -1,9 +1,5 @@
 """
 """
-
-
-"""Numerical constants pertaining to the Illustris Simulations and their data.
-"""
 import numpy as np
 
 HPAR = 0.704
@@ -66,6 +62,7 @@ class CONV_ILL_TO_SOL(object):
     MDOT = CONV_ILL_TO_CGS.MDOT * CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
     DENS = CONV_ILL_TO_CGS.DENS * CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
     DIST = CONV_ILL_TO_CGS.DIST * CONV_CGS_TO_SOL.DIST  # to comoving-pc
+
     VEL = 1.0
 
 

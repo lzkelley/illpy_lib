@@ -1,7 +1,7 @@
 # ==================================================================================================
 # ParallelArray.py
 # ----------------
-# 
+#
 #
 #
 # ------------------
@@ -14,9 +14,9 @@ import numpy as np
 
 class ParallelArray(object):
     """
-    
+
     """
-    
+
     def __init__(self, length, names, types, keys=None, zero=True):
         self.num = len(names)                                                                       # Number of arrays
 
@@ -37,7 +37,7 @@ class ParallelArray(object):
         self.__keys = {}
         #self.__names = {}
 
-        # Initialize arrays #
+        # Initialize arrays
         for ii in range(self.num):
             # Add array as attribute
             setattr(self, names[ii], initFunc(length, dtype=types[ii]))
@@ -49,7 +49,7 @@ class ParallelArray(object):
 
     @classmethod
     def initFromArrays(cls, names, arrs):
-        
+
         # Get number of arrays
         if (len(arrs) != len(names)): raise RuntimeError("Names must match arrays in number!")
 
@@ -70,7 +70,7 @@ class ParallelArray(object):
         print(pararr.num)
         print(getattr(pararr, names[0]))
         print(pararr[names[0]])
-        
+
 
         # Set each array in object to given array
         for name, ar in zip(names, arrs):
@@ -80,7 +80,7 @@ class ParallelArray(object):
 
 
 
-    def keys(self): 
+    def keys(self):
         ''' List of array 'keys' (names) for each array, and their index for each row '''
         return sorted(list(self.__keys.items()), key=lambda x:x[1])
 
@@ -94,18 +94,18 @@ class ParallelArray(object):
         For a particular array, key is appropriate string argument.
             e.g. MERGER_TIME = 'time' for the time array
         """
-        
+
         if (type(key) == int): key = np.int(key)                                                   # Make sure ints are numpy ints
 
         # If int, return slice across all arrays
         if (np.issubdtype(type(key), int)):
             return [getattr(self, name)[key] for name, ind in list(self.keys())]
         # If str, try to return that attribute
-        elif (type(key) == str): 
+        elif (type(key) == str):
             if (hasattr(self, key)): return getattr(self, key)
             else: raise KeyError("Unrecognized key '%s' !" % (key))
         # Otherwise, error
-        else: 
+        else:
             raise KeyError("Key must be a string or integer, not a %s!" % (str(type(key))))
 
     '''
@@ -125,16 +125,16 @@ class ParallelArray(object):
 
         # If int, set same element of each array
         if (isInt(key)):
-            # name is the array name, ind is the corresponding index of 'vals' 
+            # name is the array name, ind is the corresponding index of 'vals'
             for (name, ind), aval in zip(list(self.keys()), vals):
                 getattr(self, name)[key] = aval                                                      # set element 'key' of array 'name' to aval (at ind)
 
         # If str, set full array
-        elif (type(key) == str): 
+        elif (type(key) == str):
             getattr(self, key)[:] = vals
 
         # Otherwise, error
-        else: 
+        else:
             raise KeyError("Key must be a string or integer, not a %s!" % (str(type(key))))
 
         return
@@ -155,7 +155,7 @@ class ParallelArray(object):
 
         return self.__len
 
-        
+
     def append(self, vals):
         """ Append the given merger information as a new last element """
 

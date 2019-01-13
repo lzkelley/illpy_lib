@@ -231,7 +231,6 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
             if (log): log.log("FAILED '%s'" % err.message, 3)
             load = False
 
-
     # Load Mergers from Illustris merger files
     if (not load or len(mergers) == 0):
         if (log):
@@ -242,7 +241,6 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
 
         if (log): log -= 1
 
-
     if (log):
         log.log("Loaded %d mergers." % (len(mergers)), 2)
         log += 1
@@ -252,7 +250,6 @@ def loadMergers(runNum, runsDir, loadFile=None, saveFile=None, log=None):
     if (log): log -= 2
 
     return mergers
-
 
 
 def parseIllustrisMergerLine(instr):
@@ -267,7 +264,6 @@ def parseIllustrisMergerLine(instr):
     '''
     args = instr.split()
     return DBL(args[1]), LONG(args[2]), DBL(args[3]), LONG(args[4]), DBL(args[5])
-
 
 
 def saveMergers(mergers, saveFilename, log=None):
@@ -291,7 +287,6 @@ def saveMergers(mergers, saveFilename, log=None):
     saveFile.close()
     if (log): log.log("Saved, size %s" % getFileSizeString(saveFilename), 2)
     return
-
 
 
 def loadMergersFromSave(loadFilename):

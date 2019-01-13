@@ -55,7 +55,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
                         	filename = base+"/snapdir_"+str(num).zfill(3)+"/"+snapbase+"_"+str(num).zfill(3)+"."+str(0)
 	                        multiple=True
         	        if (os.path.exists(filename+".hdf5")==False):
-                	        print(("READHALO: [error] file not found : ",  filename))
+                	        print(("READHALO: [error] file not found : ", filename))
                         	sys.exit()
 
 			FlagRead=True
@@ -73,7 +73,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 		       		        HaloOffset[k, parttype] =  HaloOffset[k-1, parttype] + cat.SubhaloLenType[k-1, parttype]
 					k+=1
 		if (k!=cat.nsubs):
-			print(("READHALO: problem with offset table",  k, cat.nsubs))
+			print(("READHALO: problem with offset table", k, cat.nsubs))
 			sys.exit()
 
 		#construct file tables
@@ -95,7 +95,7 @@ def readhalo(base, snapbase, num, block_name, parttype, fof_num, sub_num, long_i
 				filename = base+"/"+snapbase+"_"+str(num).zfill(3)
 
 			if verbose:
-				print(("READHALO: initial reading file :",  filename))
+				print(("READHALO: initial reading file :", filename))
 
 			head = snapHDF5.snapshot_header(filename)
 

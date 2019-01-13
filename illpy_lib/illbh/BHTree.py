@@ -13,6 +13,7 @@ Functions
 -   _getPastIDs               - Get all BH IDs in past-mrgs of this BHTree.
 
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import warnings
@@ -161,10 +162,12 @@ def analyzeTree(tree, verbose=True):
     numZeroInts = len(inds)
 
     if verbose:
-        print((" - - - Repeated mrgs = {:d}/{:d} = {:.4f}".format(numRepeats, numMergers, fracRepeats)))
+        print((" - - - Repeated mergers = {:d}/{:d} = {:.4f}".format(
+            numRepeats, numMergers, fracRepeats)))
         print((" - - - Average number past, future  =  {:.3f}, {:.3f}".format(avePast, aveFuture)))
         print((" - - - Number of merger intervals    = {:d}".format(numInts)))
-        print((" - - - - Time between = {:.4e} +- {:.4e} [Myr]".format(timeStats[0]/MYR, timeStats[1]/MYR)))
+        print((" - - - - Time between = {:.4e} +- {:.4e} [Myr]".format(
+            timeStats[0]/MYR, timeStats[1]/MYR)))
         print((" - - - Number of zero time intervals = {:d}".format(numZeroInts)))
 
     timeBetween = timeNext[indsInt]
@@ -236,6 +239,8 @@ def _constructBHTree(run, mrgs, verbose=True):
         tree : <dict>  container for tree data - see BHTree doc
 
     """
+    from . import BuildTree
+    import illpy.illcosmo
 
     if verbose: print(" - - BHTree.constructBHTree()")
 

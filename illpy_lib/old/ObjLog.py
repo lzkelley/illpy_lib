@@ -1,11 +1,15 @@
+"""
+"""
+
 import os
 import sys
 from datetime import datetime
 import numpy as np
 import traceback as tb
 
+
 class Log(object):
-    
+
     def __init__(self, filename='log.txt', verbose=True, num=0, clean=False, binary=False):
         self.filename = filename
         self.verbose = verbose
@@ -17,7 +21,7 @@ class Log(object):
         if (type(filename) == str):
             if (len(filename) > 0):
                 self.__initFile(filename, clean, binary)
-                
+
 
 
     def __initFile(self, fname, cln, bin):
@@ -45,7 +49,6 @@ class Log(object):
 
         return
 
-                
 
     def log(self, arg, add=0):
         """ Write a log entry to stdout, and to log file if it exists. """
@@ -60,9 +63,9 @@ class Log(object):
         if (usenum > 0): prep += " "
 
         if (self.verbose): print(prep + arg)
-            
+
         if (type(self.__log) == file):
-            if (not self.__log.closed): 
+            if (not self.__log.closed):
                 self.__log.write(prep + arg + "\n")
                 self.__log.flush()
 
