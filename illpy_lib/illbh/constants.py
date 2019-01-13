@@ -373,6 +373,14 @@ def _loadLogger(name, verbose=True, debug=False, run=None, rank=None, version=No
     return logger
 
 
+def check_log(log, name='log.log', **kwargs):
+    if log is not None:
+        return log
+
+    log = _loadLogger(name, **kwargs)
+    return log
+
+
 def _distributeSnapshots(comm):
     """Evenly distribute snapshot numbers across multiple processors.
     """
