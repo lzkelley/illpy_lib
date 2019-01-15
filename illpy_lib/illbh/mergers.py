@@ -88,7 +88,7 @@ import os
 from datetime import datetime
 import numpy as np
 
-from illpy_lib.illbh.constants import (
+from illpy_lib.illbh.bh_constants import (
     MERGERS_PHYSICAL_KEYS, MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, NUM_BH_TYPES,
     GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
 )

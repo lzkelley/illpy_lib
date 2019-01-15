@@ -36,10 +36,10 @@ import logging
 import numpy as np
 from datetime import datetime
 
-from illpy_lib.illbh import constants
+from illpy_lib.illbh import bh_constants
 
 from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
-from illpy_lib.illbh.constants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
+from illpy_lib.illbh.bh_constants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
     _distributeSnapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
 from illpy_lib.constants import DTYPE, NUM_SNAPS
@@ -67,7 +67,7 @@ def main(run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, red
     comm.Barrier()
 
     # Initialize log
-    log = constants._loadLogger(
+    log = bh_constants._loadLogger(
         __file__, debug=debug, verbose=verbose, run=run, rank=rank, version=__version__)
     log.debug(header)
     if (rank == 0):
@@ -158,7 +158,7 @@ def loadMergerDetails(run, verbose=True, log=None):
 
     """
     if (log is None):
-        log = constants._loadLogger(
+        log = bh_constants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadMergerDetails()")
@@ -197,7 +197,7 @@ def loadRemnantDetails(run, verbose=True, log=None):
 
     """
     if (log is None):
-        log = constants._loadLogger(
+        log = bh_constants._loadLogger(
             __file__, verbose=verbose, debug=False, run=run, tofile=False)
 
     log.debug("loadRemnantDetails()")
@@ -452,7 +452,7 @@ def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
 
     """
     if (log is None):
-        log = constants._loadLogger(
+        log = bh_constants._loadLogger(
             __file__, verbose=True, debug=False, run=run, tofile=False)
 
     log.debug("inferMergerOutMasses()")
@@ -760,7 +760,7 @@ def _createRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
     """
 
     if log is None:
-        log = constants._loadLogger(
+        log = bh_constants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_createRemnantDetails()")
@@ -857,7 +857,7 @@ def _matchRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
 
     """
     if log is None:
-        log = constants._loadLogger(
+        log = bh_constants._loadLogger(
             __file__, debug=True, verbose=True, run=run, version=__version__)
 
     log.debug("_matchRemnantDetails()")
