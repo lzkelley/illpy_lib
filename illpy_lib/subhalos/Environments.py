@@ -59,12 +59,10 @@ from illpy_lib.constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_IL
 
 from . import Subhalo
 from . import Profiler
-from . import ParticleHosts
-from . ParticleHosts import OFFTAB
+from . import particle_hosts
+from . particle_hosts import OFFTAB
 
-# import illpy_lib.illbh
-from illpy_lib.illbh import BHMergers
-from illpy_lib.illbh.BHConstants import MERGERS, BH_TYPE
+from illpy_lib.illbh.bh_constants import MERGERS, BH_TYPE
 
 # Hard Settings
 _VERSION      = 1.4
@@ -172,11 +170,13 @@ def get_merger_and_subhalo_indices(run, verbose=True):
     if verbose: print(" - - Environments.get_merger_and_subhalo_indices()")
 
     if verbose: print(" - - - Loading Mergers")
-    mergers = BHMergers.loadFixedMergers(run, verbose=verbose)
+    from illpy_lib import illbh
+    import illpy_lib.illbh.mergers
+    mergers = illbh.mergers.loadFixedMergers(run, verbose=verbose)
     if verbose: print((" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM])))
 
     if verbose: print(" - - - Loading BH Hosts Catalog")
-    bhHosts = ParticleHosts.loadBHHosts(run, loadsave=True, verbose=verbose, bar=True)
+    bhHosts = particle_hosts.loadBHHosts(run, loadsave=True, verbose=verbose, bar=True)
 
     # Snapshot for each merger
     merger_snaps = mergers[MERGERS.MAP_MTOS]
@@ -221,7 +221,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
                 raise RuntimeError("Run %d, Snap %d: Bad BH_IDS out" % (run, snap))
         else:
             # Find the subhalo hosts for these merger BHs
-            subh_ind_out[mergs] = ParticleHosts.subhalosForBHIDs(
+            subh_ind_out[mergs] = particle_hosts.subhalosForBHIDs(
                 run, snap, ids_out, bhHosts=bh_hosts_snap_out, verbose=False)
 
         # In BH
@@ -241,7 +241,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
 
         else:
             # Find the subhalo hosts for these merger BHs ('in' use previous snapshot)
-            subh_ind_in[mergs] = ParticleHosts.subhalosForBHIDs(
+            subh_ind_in[mergs] = particle_hosts.subhalosForBHIDs(
                 run, snap-1, ids_in, bhHosts=bh_hosts_snap_in, verbose=False)
 
     n_tot = len(subh_ind_out)
