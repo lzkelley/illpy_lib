@@ -1,5 +1,7 @@
 """This module handles the processing of Illustris BH files.
 """
+import os
+import glob
 
 import numpy as np
 
@@ -10,10 +12,10 @@ class Settings(pycore.Settings):
 
     # NAME = "fire-mergers"
     VERBOSITY = 30
-    LOG_FILENAME = "illpy-lib_bh.log"
+    LOG_FILENAME = "log_illpy-lib_bh.log"
 
-    INPUT = "/projects/b1026/anglesd/FIRE/h2_HR_sn1dy300ro100ss/"
-    OUTPUT = "/projects/p30669/h2_HR_sn1dy300ro100ss_bh/"
+    INPUT = "/n/ghernquist/Illustris/Runs/L75n1820FP/"
+    OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
 
     RECREATE = False
     BREAK_ON_FAIL = False
@@ -28,21 +30,71 @@ class Settings(pycore.Settings):
 
 
 class Paths(pycore.Paths):
-    FNAME_MERGERS = "blackhole_details/bhMRG.hdf5"
-    FNAME_DETAILS_REGEX = "blackhole_details/blackhole_details_*.txt"
+    _MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
+    _DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
     FNAME_DETAILS_CLEAN = "bh_details.hdf5"
     FNAME_MERGERS_CLEAN = "bh_mergers.hdf5"
 
+    # The substituted string should be either 'mergers' or 'details'
+    _ILL_1_TXT_DIRS = [
+        "txt-files-curie/blackhole_{}/",
+        "txt-files-supermuc/blackhole_{}/",
+        "txt-files-partial/Aug8/blackhole_{}/",
+        "txt-files-partial/Aug14/blackhole_{}/",
+        "txt-files-partial/Sep25/blackhole_{}/",
+        "txt-files-partial/Oct10/blackhole_{}/"
+    ]
+
     def __init__(self, core, **kwargs):
         super().__init__(core)
-        self.OUTPUT = core.sets.OUTPUT
-        self.INPUT = core.sets.INPUT
+        self.OUTPUT = os.path.realpath(core.sets.OUTPUT)
+        self.INPUT = os.path.realpath(core.sets.INPUT)
         return
 
     @property
-    def mergers(self):
-        return os.path.join(self.INPUT, self.FNAME_MERGERS)
+    def mergers_input(self):
+        return self._find_input_files('mergers', self._MERGERS_FILENAME_REGEX)
+
+    @property
+    def details_input(self):
+        return self._find_input_files('details', self._DETAILS_FILENAME_REGEX)
+
+    def _find_input_files(self, name, regex):
+        log = self._core.log
+
+        if ('illustris-1' in self.INPUT.lower()) or ('L75n1820FP' in self.INPUT):
+            log.debug("Input looks like `illustris-1` ('{}')".format(self.INPUT))
+            _path = os.path.join(self.INPUT, 'txt-files/txtfiles_new/')
+            paths = [os.path.join(_path, td.format(name), '') for td in self._ILL_1_TXT_DIRS]
+        elif ('illustris-2' in self.INPUT.lower()) or ('L75n910FP' in self.INTPUT):
+            log.debug("Input looks like `illustris-2` ('{}')".format(self.INPUT))
+            # subdir = "/combined_output/blackhole_mergers/"
+            subdir = "/combined_output/blackhole_{}/".format(name)            
+            paths = [os.path.join(self.INPUT, subdir)]
+        else:
+            log.debug("Input looks like `illustris-3` or default ('{}')".format(
+                self.INPUT))
+            # subdir = "/output/blackhole_mergers/"
+            subdir = "/output/blackhole_{}/".format(name)
+            paths = [os.path.join(self.INPUT, subdir)]
+        
+        files = []
+        log.debug("Checking {} directories for {} files".format(len(paths), name))
+        for pp in paths:
+            if not os.path.exists(pp):
+                raise RuntimeError("Expected path '{}' does not exist!".format(pp))
+            pattern = os.path.join(pp, regex)
+            log.debug("  Getting {} files from '{}'".format(name, pp))
+            _fils = sorted(glob.glob(pattern))
+            num_fils = len(_fils)
+            if num_fils == 0:
+                raise RuntimeError("No {} files found matching '{}'".format(name, pattern))
+            log.debug("    Found '{}' files, e.g. '{}'".format(num_fils, os.path.basename(_fils[0])))
+            files += _fils
+
+        log.debug("Found {} {} files".format(len(files), name))
+        return files        
 
     @property
     def details_clean(self):
