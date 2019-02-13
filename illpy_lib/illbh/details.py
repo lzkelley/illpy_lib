@@ -70,32 +70,35 @@ from datetime import datetime
 import zcode.inout as zio
 
 from illpy_lib.constants import DTYPE, NUM_SNAPS
-from . import constants
-from .constants import DETAILS
-
+# from . import constants
+from .bh_constants import DETAILS
+from . import Core
 
 VERSION = 0.23                                    # Version of details
 
 _DEF_PRECISION = -8                               # Default precision
 
 
-def processDetails(run, loadsave=True, verbose=True):
+def main(run, loadsave=True, verbose=True):
 
-    if verbose: print(" - - details.processDetails()")
+    if verbose: print(" - - details.main()")
 
     # Organize Details by Snapshot Time; create new, temporary ASCII Files
-    organizeDetails(run, loadsave=loadsave, verbose=verbose)
+    organize(run, loadsave=loadsave, verbose=verbose)
 
     # Create Dictionary Details Files
-    formatDetails(run, loadsave=loadsave, verbose=verbose)
+    reformat(run, loadsave=loadsave, verbose=verbose)
 
     return
 
 
-def organizeDetails(run, loadsave=True, verbose=True):
+def organize(sim_path=None, loadsave=True):
 
-    if verbose: print(" - - details.organizeDetails()")
+    core = Core()
+    log = core.log
 
+    log.debug("details.organize()")
+    
     tempFiles = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
 
     # Check if all temp files already exist
@@ -131,8 +134,8 @@ def organizeDetails(run, loadsave=True, verbose=True):
     return tempFiles
 
 
-def formatDetails(run, loadsave=True, verbose=True):
-    if verbose: print(" - - details.formatDetails()")
+def reformat(run, loadsave=True, verbose=True):
+    if verbose: print(" - - details.reformat()")
     # See if all npz files already exist
     saveFilenames = [constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
                      for snap in range(NUM_SNAPS)]
@@ -141,9 +144,9 @@ def formatDetails(run, loadsave=True, verbose=True):
     if (loadsave):
         saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
         if (not saveExist):
-            print(("details.formatDetails() : Save files do not exist e.g. '{:s}'".format(
+            print(("details.reformat() : Save files do not exist e.g. '{:s}'".format(
                 saveFilenames[0])))
-            print("details.formatDetails() : converting raw Details files !!!")
+            print("details.reformat() : converting raw Details files !!!")
             loadsave = False
 
     # Re-convert files
@@ -162,9 +165,9 @@ def formatDetails(run, loadsave=True, verbose=True):
     return saveFilenames
 
 
-def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
+def _reorganize_files(run, rawFilenames, tempFilenames, verbose=True):
 
-    if verbose: print(" - - details._reorganizeBHDetailsFiles()")
+    if verbose: print(" - - details._reorganize_files()")
 
     # Load cosmology
     # from illpy_lib import illcosmo
@@ -211,7 +214,7 @@ def _reorganizeBHDetailsFiles(run, rawFilenames, tempFilenames, verbose=True):
             prec = _getPrecision(detScales)
         # Set to a default value on error (not sure what's causing it)
         except ValueError as err:
-            print(("details._reorganizeBHDetailsFiles() : caught error '{:s}'".format(str(err))))
+            print(("details._reorganize_files() : caught error '{:s}'".format(str(err))))
             print(("\tii = {:d}; file = '{:s}'".format(ii, rawName)))
             print(("\tlen(detScales) = ",  len(detScales)))
             prec = _DEF_PRECISION
@@ -278,7 +281,7 @@ def _convertDetailsASCIItoNPZ(run, verbose=True):
 
     for ii, snap in enumerate(allSnaps):
         # Convert this particular snapshot
-        saveFilename = _convertDetailsASCIItoNPZ_snapshot(run, snap, verbose=False)
+        saveFilename = convert_ascii_to_npz_snapshot(run, snap, verbose=False)
         # Find and report progress
         if verbose:
             filesSize += os.path.getsize(saveFilename)
@@ -293,7 +296,7 @@ def _convertDetailsASCIItoNPZ(run, verbose=True):
     return
 
 
-def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
+def convert_ascii_to_npz_snapshot(run, snap, loadsave=True, verbose=True):
     """Convert a single snapshot ASCII Details file to dictionary saved to NPZ file.
 
     Makes sure the ASCII file exists, if not, ASCII 'temp' files are reloaded
@@ -307,16 +310,16 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
 
     """
 
-    if verbose: print(" - - details._convertDetailsASCIItoNPZ_snapshot()")
+    if verbose: print(" - - details.convert_ascii_to_npz_snapshot()")
 
     tmp = constants.GET_DETAILS_TEMP_FILENAME(run, snap)
     sav = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
 
     # Make Sure Temporary Files exist, Otherwise re-create them
     if (not os.path.exists(tmp)):
-        print(("details._convertDetailsASCIItoNPZ_snapshot(): no temp file '{:s}' ".format(tmp)))
-        print("details._convertDetailsASCIItoNPZ_snapshot(): Reloading all temp files!!")
-        organizeDetails(run, loadsave=loadsave, verbose=verbose)
+        print(("details.convert_ascii_to_npz_snapshot(): no temp file '{:s}' ".format(tmp)))
+        print("details.convert_ascii_to_npz_snapshot(): Reloading all temp files!!")
+        organize(run, loadsave=loadsave, verbose=verbose)
 
     # Try to load from existing save
     if (loadsave):
@@ -352,7 +355,7 @@ def _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=True):
     return sav
 
 
-def _loadBHDetails_ASCII(asciiFile, verbose=True):
+def _load_bhdetails_ascii(asciiFile, verbose=True):
     # Files have some blank lines in them... Clean
     lines  = open(asciiFile).readlines()
     nums   = len(lines)
@@ -370,7 +373,7 @@ def _loadBHDetails_ASCII(asciiFile, verbose=True):
     for lin in lines:
         lin = lin.strip()
         if (len(lin) > 0):
-            tid, tim, mas, dot, rho, tcs = _parseIllustrisBHDetailsLine(lin)
+            tid, tim, mas, dot, rho, tcs = _parse_bhdetails_line(lin)
             ids[count] = tid
             scales[count] = tim
             masses[count] = mas
@@ -392,7 +395,7 @@ def _loadBHDetails_ASCII(asciiFile, verbose=True):
     return ids, scales, masses, mdots, rhos, cs
 
 
-def _parseIllustrisBHDetailsLine(instr):
+def _parse_bhdetails_line(instr):
     """Parse a line from an Illustris blachole_details_#.txt file
 
     The line is formatted (in C) as:
@@ -419,7 +422,7 @@ def _parseIllustrisBHDetailsLine(instr):
     return idn, time, mass, mdot, rho, cs
 
 
-def loadBHDetails(run, snap, loadsave=True, verbose=True):
+def load_details(run, snap, loadsave=True, verbose=True):
     """Load Blackhole Details dictionary for the given snapshot.
 
     If the file does not already exist, it is recreated from the temporary ASCII files, or directly
@@ -437,7 +440,7 @@ def loadBHDetails(run, snap, loadsave=True, verbose=True):
         dets    : <dict>, details dictionary object for target snapshot
 
     """
-    if verbose: print(" - - details.loadBHDetails()")
+    if verbose: print(" - - details.load_details()")
 
     detsName = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
 
@@ -455,7 +458,7 @@ def loadBHDetails(run, snap, loadsave=True, verbose=True):
     if (not loadsave):
         if verbose: print(" - - - Re-converting dets")
         # Convert ASCII to NPZ
-        saveFile = _convertDetailsASCIItoNPZ_snapshot(run, snap, loadsave=True, verbose=verbose)
+        saveFile = convert_ascii_to_npz_snapshot(run, snap, loadsave=True, verbose=verbose)
         # Load dets from newly created save file
         dets = zio.npzToDict(saveFile)
 
