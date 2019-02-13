@@ -34,9 +34,9 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 from illpy_lib.constants import NUM_SNAPS, DTYPE
-from illpy_lib.illbh import constants
-from illpy_lib.illbh.constants import (DETAILS, _LOG_DIR, _distributeSnapshots,
-                                         GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave)
+from illpy_lib.illbh import bh_constants
+from illpy_lib.illbh.bh_constants import (DETAILS, _LOG_DIR, _distributeSnapshots,
+                                          GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave)
 
 __version__ = '0.4'
 
@@ -198,7 +198,7 @@ def loadAllUniqueIDs(run=Settings.run, loadsave=True, log=None, sets=None):
     comm = MPI.COMM_WORLD
     rank = comm.rank
 
-    fname = constants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
+    fname = bh_constants.GET_DETAILS_ALL_UNIQUE_IDS_FILENAME(run, __version__)
     log.debug(" - Filename '%s'" % (fname))
     if os.path.exists(fname):
         log.debug(" - - File Exists.")

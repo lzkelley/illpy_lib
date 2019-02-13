@@ -65,7 +65,7 @@ Notes
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import sys
+# import sys
 from datetime import datetime
 
 import numpy as np
@@ -73,7 +73,7 @@ import h5py
 import tqdm
 
 from .. constants import DTYPE, NUM_SNAPS, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
-from ..illbh.constants import check_log
+from ..illbh.bh_constants import check_log
 from . Constants import SNAPSHOT
 
 import zcode.inout as zio

@@ -7,7 +7,7 @@ import data), Run with something like:
 Once the intermediate data files exist, they can be loaded via the python API as,
     >>> import illpy_lib.illbh.BHSnapshotData
     >>> bhData = illpy_lib.illbh.BHSnapshotData(1)      # Load for illustris-1
-    >>> from illpy_lib.illbh.constants import BH_SNAP
+    >>> from illpy_lib.illbh.bh_constants import BH_SNAP
     >>> print(bhData[BH_SNAP.]
 
 Functions
@@ -41,10 +41,10 @@ import argparse
 from illpy_lib.constants import (NUM_SNAPS, GET_ILLUSTRIS_OUTPUT_DIR, GET_PROCESSED_DIR,
                                  DTYPE, GET_BAD_SNAPS)
 from . import mergers
-from . import constants
-from .constants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
+from . import bh_constants
+from .bh_constants import MERGERS, BH_TYPE, BH_SNAP, SNAPSHOT_FIELDS, SNAPSHOT_DTYPES
 
-import illpy_lib as ill
+# import illpy_lib as ill
 
 import zcode.inout as zio
 
@@ -73,7 +73,7 @@ def main():
     if (rank == 0):
         NAME = sys.argv[0]
         print(("\n{:s}\n{:s}\n{:s}".format(NAME, '='*len(NAME), str(datetime.now()))))
-        zio.check_path(constants._LOG_DIR)
+        zio.check_path(bh_constants._LOG_DIR)
 
     # Make sure log-path is setup before continuing
     comm.Barrier()
@@ -85,7 +85,7 @@ def main():
     verbose = args.verbose
 
     # Load logger
-    logger = constants._loadLogger(__file__, verbose=verbose, run=run,
+    logger = bh_constants._loadLogger(__file__, verbose=verbose, run=run,
                                      rank=rank, version=_VERSION)
 
     logger.info("run           = %d  " % (run))
@@ -132,7 +132,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
 
     If the data is recreated (using ``_mergeBHSnapshotFiles``), it will be saved to an npz file.
     The loaded parameters are stored to a dictionary with keys given by the parameters in
-    ``constants.BH_SNAP``.
+    ``bh_constants.BH_SNAP``.
 
     Arguments
     ---------
@@ -150,7 +150,7 @@ def loadBHSnapshotData(run, version=None, loadsave=True, verbose=False, logger=N
     Returns
     -------
     data : dict,
-        Dictionary of BH Snapshot data.  Keys are given by the entries to ``constants.BH_SNAP``.
+        Dictionary of BH Snapshot data.  Keys are given by the entries to ``bh_constants.BH_SNAP``.
 
     """
 
@@ -244,7 +244,7 @@ def _runMaster(run, comm, logger):
     logger.debug("- Loaded %d mrgs" % (numMergers))
 
     # Init status file
-    statFileName = constants._GET_STATUS_FILENAME(__file__, run=run, version=_VERSION)
+    statFileName = bh_constants._GET_STATUS_FILENAME(__file__, run=run, version=_VERSION)
     statFile = open(statFileName, 'w')
     logger.debug("Opened status file '%s'" % (statFileName))
     statFile.write('%s\n' % (str(datetime.now())))

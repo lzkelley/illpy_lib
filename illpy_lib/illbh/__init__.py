@@ -3,7 +3,9 @@
 import os
 import glob
 
-import numpy as np
+import os
+
+# import numpy as np
 
 import pycore
 
@@ -122,5 +124,4 @@ class Core(pycore.Core):
         return
 
 
-from . import constants  # noqa
-
+from . import bh_constants  # noqa
