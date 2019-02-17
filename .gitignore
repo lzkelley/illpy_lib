@@ -4,3 +4,6 @@ inspector_gadget/
 .*~
 *.egg-info
 illpy_lib/illbh/data
+*.log
+*_err.[0-9]*
+*_out.[0-9]*
