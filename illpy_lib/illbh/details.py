@@ -1,368 +1,308 @@
-"""Handle Illustris blackhole dets files.
-
-Details are accessed via 'intermediate' files which are reorganized versions of the 'raw' illustris
-files 'blackhole_details_<#>.txt'.  The `main()` function assures that dets entries are properly
-converted from raw to processed form, organized by time of entry instead of processor.  Those
-dets can then be accessed by snapshot and blackhole ID number.
-
-Functions
----------
-    processDetails
-    organizeDetails
-    formatDetails
-
-    _reorganizeBHDetailsFiles
-    _convertDetailsASCIItoNPZ
-    _convertDetailsASCIItoNPZ_snapshot
-    _loadBHDetails_ASCII
-    _parseIllustrisBHDetailsLine
-
-    loadBHDetails
-    _getPrecision
-
-Details Dictionary
-------------------
-   { DETAILS_RUN       : <int>, illustris simulation number in {1, 3}
-     DETAILS_NUM       : <int>, total number of mrgs `N`
-     DETAILS_FILE      : <str>, name of save file from which mrgs were loaded/saved
-     DETAILS_CREATED   : <str>, date and time this file was created
-     DETAILS_VERSION   : <flt>, version of details used to create file
-
-     DETAILS_IDS       : <uint64>[N], BH particle ID numbers for each entry
-     DETAILS_SCALES    : <flt64> [N], scale factor at which each entry was written
-     DETAILS_MASSES    : <flt64> [N], BH mass
-     DETAILS_MDOTS     : <flt64> [N], BH Mdot
-     DETAILS_RHOS      : <flt64> [N], ambient mass-density
-     DETAILS_CS        : <flt64> [N], ambient sound-speed
-   }
-
-
-Notes
------
-  - The BH Details files from illustris, 'blackhole_details_<#>.txt' are organized by the processor
-    on which each BH existed in the simulation.  The method `_reorganizeBHDetails()` sorts each
-    detail entry instead by the time (scalefactor) of the entry --- organizing them into files
-    grouped by which snapshot interval the detail entry corresponds to.  The reorganization is
-    first done into 'temporary' ASCII files before being converted into numpy `npz` files by the
-    method `_convertDetailsASCIItoNPZ()`.  The `npz` files are effectively dictionaries storing
-    the select dets parameters (i.e. mass, BH ID, mdot, rho, cs), along with some meta data
-    about the `run` number, and creation time, etc.  Execution of the details ``main`` routine
-    checks to see if the npz files exist, and if they do not, they are created.
-
-  - There are also routines to obtain the dets entries for a specific BH ID.  In particular,
-    the method `detailsForBH()` will return the dets entry/entries for a target BH ID and
-    run/snapshot.
-
-  - Illustris Blackhole Details Files 'blackhole_details_<#>.txt'
-    - Each entry is given as
-      0   1            2     3     4    5
-      ID  scalefactor  mass  mdot  rho  cs
-
-
+"""
 """
 
-
 import os
-import warnings
-import numpy as np
+import shutil
 from datetime import datetime
+
+import numpy as np
+import h5py
 
 import zcode.inout as zio
 
-from illpy_lib.constants import DTYPE, NUM_SNAPS
-# from . import constants
+# from illpy_lib.constants import DTYPE, NUM_SNAPS
+from ..constants import DTYPE, NUM_SNAPS
+
 from .bh_constants import DETAILS
 from . import Core
 
-VERSION = 0.23                                    # Version of details
+VERSION = 0.3                                    # Version of details
 
 _DEF_PRECISION = -8                               # Default precision
 
 
-def main(run, loadsave=True, verbose=True):
+def main():
 
-    if verbose: print(" - - details.main()")
+    core = Core()  # sets=dict(RECREATE=True))
+    log = core.log
+
+    log.info("details.main()")
+    print(log.filename)
+
+    beg = datetime.now()
 
     # Organize Details by Snapshot Time; create new, temporary ASCII Files
-    organize(run, loadsave=loadsave, verbose=verbose)
+    reorganize(core)  # run, loadsave=loadsave, verbose=verbose)
 
     # Create Dictionary Details Files
-    reformat(run, loadsave=loadsave, verbose=verbose)
+    reformat(core)  # run, loadsave=loadsave, verbose=verbose)
+
+    end = datetime.now()
+    log.info("Done after '{}'".format(end-beg))
 
     return
 
 
-def organize(sim_path=None, loadsave=True):
-
-    core = Core()
+def reorganize(core=None):
+    core = Core.load(core)
     log = core.log
 
-    log.debug("details.organize()")
-    
-    tempFiles = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
+    log.debug("details.reorganize()")
+
+    RUN = core.sets.RUN_NUM
+
+    # temp_fnames = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
+    temp_fnames = [core.paths.fname_details_temp_snap(snap, RUN) for snap in range(NUM_SNAPS)]
+
+    loadsave = (not core.sets.RECREATE)
+    print("core.sets.RECREATE = {}, loadsave = {}".format(core.sets.RECREATE, loadsave))
 
     # Check if all temp files already exist
     if loadsave:
-        tempExist = all([os.path.exists(tfil) for tfil in tempFiles])
-        if not tempExist:
-            if verbose:
-                print((" - - - Temp files do not exist '{:s}'".format(tempFiles[0])))
+        temps_exist = [os.path.exists(tfil) for tfil in temp_fnames]
+        if all(temps_exist):
+            log.info("All temp files exist.")
+        else:
+            bad = np.argmin(temps_exist)
+            bad = temp_fnames[bad]
+            log.warning("Temp files do not exist e.g. '{}'".format(bad))
             loadsave = False
 
     # If temp files dont exist, or we WANT to redo them, then create temp files
     if not loadsave:
+        log.debug("Finding Illustris BH Details files")
         # Get Illustris BH Details Filenames
-        if verbose:
-            print(" - - - Finding Illustris BH Details files")
-        rawFiles = constants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
-        if len(rawFiles) < 1:
-            raise RuntimeError("Error no dets files found!!")
+        # raw_fnames = constants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
+        raw_fnames = core.paths.fnames_details_input
+        if len(raw_fnames) < 1:
+            log.raise_error("Error no dets files found!!")
 
         # Reorganize into temp files
-        if verbose:
-            print(" - - - Reorganizing dets into temporary files")
-        _reorganizeBHDetailsFiles(run, rawFiles, tempFiles, verbose=verbose)
+        log.warning("Reorganizing details into temporary files")
+        _reorganize_files(core, raw_fnames, temp_fnames)
 
     # Confirm all temp files exist
-    tempExist = all([os.path.exists(tfil) for tfil in tempFiles])
+    temps_exist = all([os.path.exists(tfil) for tfil in temp_fnames])
 
     # If files are missing, raise error
-    if not tempExist:
-        print(("Temporary Files still missing!  '{:s}'".format(tempFiles[0])))
+    if not temps_exist:
+        print(("Temporary Files still missing!  '{:s}'".format(temp_fnames[0])))
         raise RuntimeError("Temporary Files missing!")
 
-    return tempFiles
+    return temp_fnames
 
 
-def reformat(run, loadsave=True, verbose=True):
-    if verbose: print(" - - details.reformat()")
-    # See if all npz files already exist
-    saveFilenames = [constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
-                     for snap in range(NUM_SNAPS)]
+def _reorganize_files(core, raw_fnames, temp_fnames):
+
+    log = core.log
+    log.debug("details._reorganize_files()")
+
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
+    snap_scales = cosmo.scales()
+
+    temps = [zio.modify_filename(tt, prepend='_') for tt in temp_fnames]
+
+    # Open new ASCII, Temp dets files
+    #    Make sure path is okay
+    zio.check_path(temps[0])
+    # Open each temp file
+    # temp_files = [open(tfil, 'w') for tfil in temp_fnames]
+    temp_files = [open(tfil, 'w') for tfil in temps]
+
+    num_temp = len(temp_files)
+    num_raw  = len(raw_fnames)
+    log.info("Organizing {:d} raw files into {:d} temp files".format(num_raw, num_temp))
+
+    prec = _DEF_PRECISION
+    all_num_lines_in = 0
+    all_num_lines_out = 0
+
+    # Iterate over all Illustris Details Files
+    # ----------------------------------------
+    for ii, raw in enumerate(core.tqdm(raw_fnames, desc='Raw files')):
+        log.debug("File {}: '{}'".format(ii, raw))
+        lines = []
+        scales = []
+        # Load all lines and entry scale-factors from raw dets file
+        for dline in open(raw):
+            lines.append(dline)
+            # Extract scale-factor from line
+            detScale = DTYPE.SCALAR(dline.split()[1])
+            scales.append(detScale)
+
+        # Convert to array
+        lines = np.array(lines)
+        scales = np.array(scales)
+        num_lines_in = scales.size
+
+        # If file is empty, continue
+        if num_lines_in == 0:
+            log.debug("\tFile empty")
+            continue
+
+        log.debug("\tLoaded {}".format(num_lines_in))
+
+        # Round snapshot scales to desired precision
+        scales_round = np.around(snap_scales, -prec)
+
+        # Find snapshots following each entry (right-edge) or equal (include right: 'right=True')
+        #    `-1` to put binaries into the snapshot UP-TO that scalefactor
+        snap_nums = np.digitize(scales, scales_round, right=True) - 1
+
+        # For each Snapshot, write appropriate lines
+        num_lines_out = 0
+        for snap in range(NUM_SNAPS):
+            inds = (snap_nums == snap)
+            num_lines_out_snap = np.count_nonzero(inds)
+            if num_lines_out_snap == 0:
+                continue
+
+            temp_files[snap].writelines(lines[inds])
+            log.debug("\t\tWrote {} lines to snap {}".format(num_lines_out_snap, snap))
+            num_lines_out += num_lines_out_snap
+
+        if num_lines_out != num_lines_in:
+            log.error("File {}, '{}'".format(ii, raw))
+            log.raise_error("Wrote {} lines, loaded {} lines!".format(num_lines_out, num_lines_in))
+
+        all_num_lines_in += num_lines_in
+        all_num_lines_out += num_lines_out
+
+    # Close out dets files
+    tot_size = 0.0
+    log.info("Closing files, checking sizes")
+
+    for ii, newdf in enumerate(temp_files):
+        newdf.close()
+        tot_size += os.path.getsize(newdf.name)
+
+    ave_size = tot_size/(1.0*len(temp_files))
+    size_str = zio.bytes_string(tot_size)
+    ave_size_str = zio.bytes_string(ave_size)
+    log.info("Total temp size = '{}', average = '{}'".format(size_str, ave_size_str))
+
+    log.info("Input lines = {:d}, Output lines = {:d}".format(all_num_lines_in, all_num_lines_out))
+    if (all_num_lines_in != all_num_lines_out):
+        log.raise_error("input lines {}, does not match output lines {}!".format(
+            all_num_lines_in, all_num_lines_out))
+
+    log.info("Renaming temporary files...")
+    for ii, (aa, bb) in enumerate(zip(temps, temp_fnames)):
+        if ii == 0:
+            log.debug("'{}' ==> '{}'".format(aa, bb))
+        shutil.move(aa, bb)
+
+    return
+
+
+def reformat(core=None):
+    core = Core.load(core)
+    log = core.log
+
+    log.debug("details.reformat()")
+
+    out_fnames = [core.paths.fname_details_snap(snap) for snap in range(NUM_SNAPS)]
+
+    loadsave = (not core.sets.RECREATE)
 
     # Check if all save files already exist, and correct versions
-    if (loadsave):
-        saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
-        if (not saveExist):
-            print(("details.reformat() : Save files do not exist e.g. '{:s}'".format(
-                saveFilenames[0])))
-            print("details.reformat() : converting raw Details files !!!")
+    if loadsave:
+        out_exist = [os.path.exists(sfil) for sfil in out_fnames]
+        if all(out_exist):
+            log.info("All output files exist")
+        else:
+            bad = np.argmin(out_exist)
+            bad = out_fnames[bad]
+            log.warning("Output files do not exist e.g. '{}'".format(bad))
             loadsave = False
 
     # Re-convert files
     if (not loadsave):
-        if verbose: print(" - - - Converting temporary files to NPZ")
-        _convertDetailsASCIItoNPZ(run, verbose=verbose)
+        log.warning("Processing temporary files")
+        temp_fnames = [core.paths.fname_details_temp_snap(snap) for snap in range(NUM_SNAPS)]
+        for snap in core.tqdm(range(NUM_SNAPS)):
+            temp = temp_fnames[snap]
+            out = out_fnames[snap]
+            _reformat_to_hdf5(core, snap, temp, out)
 
     # Confirm save files exist
-    saveExist = all([os.path.exists(sfil) for sfil in saveFilenames])
+    out_exist = [os.path.exists(sfil) for sfil in out_fnames]
 
     # If files are missing, raise error
-    if (not saveExist):
-        print(("Save Files missing!  e.g. '{:s}'".format(saveFilenames[0])))
-        raise RuntimeError("Save Files missing!")
+    if (not all(out_exist)):
+        log.raise_error("Output files missing!")
 
-    return saveFilenames
-
-
-def _reorganize_files(run, rawFilenames, tempFilenames, verbose=True):
-
-    if verbose: print(" - - details._reorganize_files()")
-
-    # Load cosmology
-    # from illpy_lib import illcosmo
-    # cosmo = illcosmo.Cosmology()
-    import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
-    snapScales = cosmo.scales()
-
-    # Open new ASCII, Temp dets files
-    #    Make sure path is okay
-    zio.check_path(tempFilenames[0])
-    # Open each temp file
-    tempFiles = [open(tfil, 'w') for tfil in tempFilenames]
-
-    numTemp = len(tempFiles)
-    numRaw  = len(rawFilenames)
-    if verbose: print((" - - - Organizing {:d} raw files into {:d} temp files".format(numRaw, numTemp)))
-
-    # Iterate over all Illustris Details Files
-    # ----------------------------------------
-    if verbose:
-        print(" - - - Sorting dets into times of snapshots")
-        pbar = zio.getProgressBar(numRaw)
-
-    for ii, rawName in enumerate(rawFilenames):
-        detLines = []
-        detScales = []
-        # Load all lines and entry scale-factors from raw dets file
-        for dline in open(rawName):
-            detLines.append(dline)
-            # Extract scale-factor from line
-            detScale = DTYPE.SCALAR(dline.split()[1])
-            detScales.append(detScale)
-
-        # Convert to array
-        detLines  = np.array(detLines)
-        detScales = np.array(detScales)
-
-        # If file is empty, continue
-        if (len(detLines) <= 0 or len(detScales) <= 0): continue
-
-        # Get required precision in matching entry times (scales)
-        try:
-            prec = _getPrecision(detScales)
-        # Set to a default value on error (not sure what's causing it)
-        except ValueError as err:
-            print(("details._reorganize_files() : caught error '{:s}'".format(str(err))))
-            print(("\tii = {:d}; file = '{:s}'".format(ii, rawName)))
-            print(("\tlen(detScales) = ",  len(detScales)))
-            prec = _DEF_PRECISION
-
-        # Round snapshot scales to desired precision
-        roundScales = np.around(snapScales, -prec)
-
-        # Find snapshots following each entry (right-edge) or equal (include right: 'right=True')
-        snapBins = np.digitize(detScales, roundScales, right=True)
-
-        # For each Snapshot, write appropriate lines
-        for jj in range(len(tempFiles)):
-            inds = np.where(snapBins == jj)[0]
-            if (len(inds) > 0): tempFiles[jj].writelines(detLines[inds])
-
-        # Print Progress
-        if verbose: pbar.update(ii)
-
-    if verbose: pbar.finish()
-
-    # Close out dets files
-    fileSizes = 0.0
-    if verbose:
-        print(" - - - Closing files, checking sizes")
-    for ii, newdf in enumerate(tempFiles):
-        newdf.close()
-        fileSizes += os.path.getsize(newdf.name)
-
-    if verbose:
-        aveSize = fileSizes/(1.0*len(tempFiles))
-        sizeStr = zio.bytesString(fileSizes)
-        aveSizeStr = zio.bytesString(aveSize)
-        print((" - - - - Total temp size = '{:s}', average = '{:s}'".format(sizeStr, aveSizeStr)))
-
-    if verbose:
-        print(" - - - Counting lines")
-    inLines = zio.countLines(rawFilenames, progress=True)
-    outLines = zio.countLines(tempFilenames, progress=True)
-    if verbose: print((" - - - - Input lines = {:d}, Output lines = {:d}".format(inLines, outLines)))
-    if (inLines != outLines):
-        print(("in  file: ",  rawFilenames[0]))
-        print(("out file: ",  tempFilenames[0]))
-        raise RuntimeError("WARNING: input lines = %d, output lines = %d!" % (inLines, outLines))
-
-    return
+    return out_fnames
 
 
-def _convertDetailsASCIItoNPZ(run, verbose=True):
-    """Convert all snapshot ASCII dets files to dictionaries in NPZ files.
+def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     """
-    if verbose:
-        print(" - - details._convertDetailsASCIItoNPZ()")
-    filesSize = 0.0
-    # sav = None
-
-    # Iterate over all Snapshots, convert from ASCII to NPZ
-    # ------------------------------------------------------
-    #     Go through snapshots in random order to make better estimate of duration.
-    allSnaps = np.arange(NUM_SNAPS)
-    np.random.shuffle(allSnaps)
-    if verbose:
-        pbar = zio.getProgressBar(NUM_SNAPS)
-        print(" - - - Converting files to NPZ")
-
-    for ii, snap in enumerate(allSnaps):
-        # Convert this particular snapshot
-        saveFilename = convert_ascii_to_npz_snapshot(run, snap, verbose=False)
-        # Find and report progress
-        if verbose:
-            filesSize += os.path.getsize(saveFilename)
-            pbar.update(ii)
-
-    if verbose:
-        pbar.finish()
-        totSize = zio.bytesString(filesSize)
-        aveSize = zio.bytesString(filesSize/NUM_SNAPS)
-        print((" - - - Total size = {:s}, Ave Size = {:s}".format(totSize, aveSize)))
-
-    return
-
-
-def convert_ascii_to_npz_snapshot(run, snap, loadsave=True, verbose=True):
-    """Convert a single snapshot ASCII Details file to dictionary saved to NPZ file.
-
-    Makes sure the ASCII file exists, if not, ASCII 'temp' files are reloaded
-    for all snapshots from the 'raw' dets data from illustris.
-
-    Arguments
-    ---------
-
-    Returns
-    -------
-
     """
 
-    if verbose: print(" - - details.convert_ascii_to_npz_snapshot()")
+    log = core.log
+    log.debug("details._reformat_to_hdf5()")
+    log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
 
-    tmp = constants.GET_DETAILS_TEMP_FILENAME(run, snap)
-    sav = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
+    loadsave = (not core.sets.RECREATE)
 
     # Make Sure Temporary Files exist, Otherwise re-create them
-    if (not os.path.exists(tmp)):
-        print(("details.convert_ascii_to_npz_snapshot(): no temp file '{:s}' ".format(tmp)))
-        print("details.convert_ascii_to_npz_snapshot(): Reloading all temp files!!")
-        organize(run, loadsave=loadsave, verbose=verbose)
+    if (not os.path.exists(temp_fname)):
+        log.raise_error("Temp file '{}' does not exist!".format(temp_fname))
 
     # Try to load from existing save
-    if (loadsave):
-        if verbose: print((" - - - Loading from save '{:s}'".format(sav)))
-        if (os.path.exists(sav)):
-            dets = zio.npzToDict(sav)
-        else:
-            if verbose: print((" - - - '{:s}' does not exist!".format(sav)))
-            loadsave = False
+    if loadsave:
+        if os.path.exists(out_fname):
+            log.info("\tOutput file '{}' already exists.".format(out_fname))
+            return
 
-    # Load Details from ASCII, Convert to Dictionary and Save to NPZ
-    if (not loadsave):
-        # Load dets from ASCII File
-        ids, scales, masses, mdots, rhos, cs = _loadBHDetails_ASCII(tmp)
+    # Load dets from ASCII File
+    vals = _load_bhdetails_ascii(temp_fname)
+    ids, scales, masses, mdots, rhos, cs = vals
+    # Sort by ID number, then by scale-factor
+    sort = np.lexsort((scales, ids))
+    vals = [vv[sort] for vv in vals]
+    ids, scales, masses, mdots, rhos, cs = vals
 
-        # Store dets in dictionary
-        dets = {DETAILS.RUN: run,
-                   DETAILS.SNAP: snap,
-                   DETAILS.NUM: len(ids),
-                   DETAILS.FILE: sav,
-                   DETAILS.CREATED: datetime.now().ctime(),
-                   DETAILS.VERSION: VERSION,
-                   DETAILS.IDS: ids,
-                   DETAILS.SCALES: scales,
-                   DETAILS.MASSES: masses,
-                   DETAILS.MDOTS: mdots,
-                   DETAILS.RHOS: rhos,
-                   DETAILS.CS: cs}
+    # Find unique ID numbers, their first occurence indices, and the number of occurences
+    u_ids, u_inds, u_counts = np.unique(ids, return_index=True, return_counts=True)
+    num_unique = u_ids.size
+    log.info("\tunique IDs: {}".format(zio.frac_str(num_unique, ids.size)))
 
-        # Save Dictionary
-        zio.dictToNPZ(dets, sav, verbose=verbose)
+    with h5py.File(out_fname, 'w') as out:
+        out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
+        out.attrs[DETAILS.SNAP] = snap
+        out.attrs[DETAILS.NUM] = len(ids)
+        out.attrs[DETAILS.CREATED] = str(datetime.now().ctime())
+        out.attrs[DETAILS.VERSION] = VERSION
 
-    return sav
+        out.create_dataset(DETAILS.IDS, data=ids)
+        out.create_dataset(DETAILS.SCALES, data=scales)
+        out.create_dataset(DETAILS.MASSES, data=masses)
+        out.create_dataset(DETAILS.MDOTS, data=mdots)
+        out.create_dataset(DETAILS.RHOS, data=rhos)
+        out.create_dataset(DETAILS.CS, data=cs)
+
+        out.create_dataset('unique_ids', data=u_ids)
+        out.create_dataset('unique_indices', data=u_inds)
+        out.create_dataset('unique_counts', data=u_counts)
+
+    size_str = zio.get_file_size(out_fname)
+    log.info("\tSaved snap {} to '{}', size {}".format(snap, out_fname, size_str))
+
+    return
 
 
-def _load_bhdetails_ascii(asciiFile, verbose=True):
+def _load_bhdetails_ascii(temp_fname):
     # Files have some blank lines in them... Clean
-    lines  = open(asciiFile).readlines()
-    nums   = len(lines)
+    with open(temp_fname, 'r') as temp:
+        lines = temp.readlines()
+
+    nums = len(lines)
 
     # Allocate storage
     ids    = np.zeros(nums, dtype=DTYPE.ID)
-    scales  = np.zeros(nums, dtype=DTYPE.SCALAR)
+    scales = np.zeros(nums, dtype=DTYPE.SCALAR)
     masses = np.zeros(nums, dtype=DTYPE.SCALAR)
     mdots  = np.zeros(nums, dtype=DTYPE.SCALAR)
     rhos   = np.zeros(nums, dtype=DTYPE.SCALAR)
@@ -380,11 +320,13 @@ def _load_bhdetails_ascii(asciiFile, verbose=True):
             mdots[count] = dot
             rhos[count] = rho
             cs[count] = tcs
+
             count += 1
 
     # Trim excess (shouldn't be needed)
     if (count != nums):
         trim = np.s_[count:]
+
         ids    = np.delete(ids, trim)
         scales = np.delete(scales, trim)
         masses = np.delete(masses, trim)
@@ -422,56 +364,39 @@ def _parse_bhdetails_line(instr):
     return idn, time, mass, mdot, rho, cs
 
 
-def load_details(run, snap, loadsave=True, verbose=True):
-    """Load Blackhole Details dictionary for the given snapshot.
-
-    If the file does not already exist, it is recreated from the temporary ASCII files, or directly
-    from the raw illustris ASCII files as needed.
-
-    Arguments
-    ---------
-        run     : <int>, illustris simulation number {1, 3}
-        snap    : <int>, illustris snapshot number {0, 135}
-        loadsave <bool> :
-        verbose  <bool> : print verbose output
-
-    Returns
-    -------
-        dets    : <dict>, details dictionary object for target snapshot
-
+def load_details(snap, core=None):
     """
-    if verbose: print(" - - details.load_details()")
-
-    detsName = constants.GET_DETAILS_SAVE_FILENAME(run, snap, VERSION)
-
-    # Load Existing Save File
-    if (loadsave):
-        if verbose: print((" - - - Loading dets from '{:s}'".format(detsName)))
-        if (os.path.exists(detsName)):
-            dets = zio.npzToDict(detsName)
-        else:
-            loadsave = False
-            warnStr = "%s does not exist!" % (detsName)
-            warnings.warn(warnStr, RuntimeWarning)
-
-    # If file does not exist, or is wrong version, recreate it
-    if (not loadsave):
-        if verbose: print(" - - - Re-converting dets")
-        # Convert ASCII to NPZ
-        saveFile = convert_ascii_to_npz_snapshot(run, snap, loadsave=True, verbose=verbose)
-        # Load dets from newly created save file
-        dets = zio.npzToDict(saveFile)
-
-    return dets
-
-
-def _getPrecision(args):
     """
-    Estimate the precision needed to differenciate between elements of an array
-    """
-    diffs = np.fabs(np.diff(sorted(args)))
-    inds  = np.nonzero(diffs)
-    if (len(inds) > 0): minDiff = np.min(diffs[inds])
-    else:                minDiff = np.power(10.0, _DEF_PRECISION)
-    order = int(np.log10(0.49*minDiff))
-    return order
+    core = Core.load(core)
+    log = core.log
+
+    log.debug("details.load_details()")
+
+    fname = core.paths.fname_details_snap(snap)
+    log.debug("Filename for snap {}: '{}'".format(snap, fname))
+
+    err = []
+    with h5py.File(fname, 'r') as data:
+        if data.attrs[DETAILS.RUN] != core.sets.RUN_NUM:
+            err.append("Run numbers do not match!")
+
+        if data.attrs[DETAILS.SNAP] != snap:
+            err.append("Snap numbers do not match!")
+
+        if data.attrs[DETAILS.VERSION] != VERSION:
+            err.append("Unexpected version number!")
+
+        if len(err) > 0:
+            err = ",  ".join(err)
+            log.raise_error(err)
+
+        log.debug("File saved at '{}'".format(data.attrs[DETAILS.CREATED]))
+
+        ids = data[DETAILS.IDS][:]
+        scales = data[DETAILS.SCALES][:]
+        masses = data[DETAILS.MASSES][:]
+        mdots = data[DETAILS.MDOTS][:]
+        rhos = data[DETAILS.RHOS][:]
+        cs = data[DETAILS.CS][:]
+
+    return ids, scales, masses, mdots, rhos, cs

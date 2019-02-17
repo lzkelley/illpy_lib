@@ -202,7 +202,8 @@ def GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run):
 def GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run):
     filesDir = _ILLUSTRIS_DETAILS_DIRS[run]
     files = []
-    if (type(filesDir) != list): filesDir = [filesDir]
+    if (type(filesDir) != list):
+        filesDir = [filesDir]
 
     for fdir in filesDir:
         filesNames = fdir + _ILLUSTRIS_DETAILS_FILENAME_REGEX
