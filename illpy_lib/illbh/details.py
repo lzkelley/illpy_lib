@@ -34,7 +34,7 @@ _DEF_PRECISION = -8                               # Default precision
 
 def main(reorganize_flag=True, reformat_flag=True):
 
-    core = Core(sets=dict(LOG_FILENAME='log_illbh-details.log')
+    core = Core(sets=dict(LOG_FILENAME='log_illbh-details.log'))
     log = core.log
 
     log.info("details.main()")
@@ -61,7 +61,6 @@ def main(reorganize_flag=True, reformat_flag=True):
 def reorganize(core=None):
     core = Core.load(core)
     log = core.log
-
     log.debug("details.reorganize()")
 
     RUN = core.sets.RUN_NUM
@@ -70,7 +69,6 @@ def reorganize(core=None):
     temp_fnames = [core.paths.fname_details_temp_snap(snap, RUN) for snap in range(NUM_SNAPS)]
 
     loadsave = (not core.sets.RECREATE)
-    print("core.sets.RECREATE = {}, loadsave = {}".format(core.sets.RECREATE, loadsave))
 
     # Check if all temp files already exist
     if loadsave:

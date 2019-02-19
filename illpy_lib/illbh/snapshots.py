@@ -34,10 +34,6 @@ except ImportError:
     import illpy_lib  # noqa
 
 
-# from ..constants import NUM_SNAPS, PARTICLE
-#
-# from . import Core
-
 from illpy_lib.constants import NUM_SNAPS, PARTICLE
 
 from illpy_lib.illbh import Core
