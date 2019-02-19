@@ -10,7 +10,6 @@ import h5py
 
 import zcode.inout as zio
 
-# from illpy_lib.constants import DTYPE, NUM_SNAPS
 from ..constants import DTYPE, NUM_SNAPS
 
 from .bh_constants import DETAILS
@@ -148,7 +147,8 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
 
         # Find snapshots following each entry (right-edge) or equal (include right: 'right=True')
         #    `-1` to put binaries into the snapshot UP-TO that scalefactor
-        snap_nums = np.digitize(scales, scales_round, right=True) - 1
+        # snap_nums = np.digitize(scales, scales_round, right=True) - 1
+        snap_nums = np.digitize(scales, scales_round, right=True)
 
         # For each Snapshot, write appropriate lines
         num_lines_out = 0
@@ -159,7 +159,7 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
                 continue
 
             temp_files[snap].writelines(lines[inds])
-            log.debug("\t\tWrote {} lines to snap {}".format(num_lines_out_snap, snap))
+            # log.debug("\t\tWrote {} lines to snap {}".format(num_lines_out_snap, snap))
             num_lines_out += num_lines_out_snap
 
         if num_lines_out != num_lines_in:
