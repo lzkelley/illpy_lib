@@ -47,6 +47,13 @@ class Paths(pycore.Paths):
     # "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
     FNAME_DETAILS_SNAP = "ill-{run_num:d}_blackhole_details_snap-{snap_num:03d}.hdf5"
 
+    # _MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
+    # _MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
+    FNAME_MERGERS_TEMP = "ill-{run_num:d}_blackhole_mergers_temp.txt"
+
+    # _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
+    FNAME_MERGERS_FIXED = "ill-{run_num:d}_blackhole_mergers_fixed.hdf5"
+
     # The substituted string should be either 'mergers' or 'details'
     _ILL_1_TXT_DIRS = [
         "txt-files-curie/blackhole_{}/",
@@ -139,6 +146,22 @@ class Paths(pycore.Paths):
             run_num = self._core.sets.RUN_NUM
 
         fname = self.FNAME_DETAILS_SNAP.format(snap_num=snap, run_num=run_num)
+        fname = os.path.join(self.output_details, fname)
+        return fname
+
+    def fname_mergers_temp(self, run_num=None):
+        if run_num is None:
+            run_num = self._core.sets.RUN_NUM
+
+        fname = self.FNAME_MERGERS_TEMP.format(run_num=run_num)
+        fname = os.path.join(self.output_details, fname)
+        return fname
+
+    def fname_mergers_fixed(self, run_num=None):
+        if run_num is None:
+            run_num = self._core.sets.RUN_NUM
+
+        fname = self.FNAME_MERGERS_FIXED.format(run_num=run_num)
         fname = os.path.join(self.output_details, fname)
         return fname
 
