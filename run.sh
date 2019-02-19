@@ -6,8 +6,9 @@
 #SBATCH -p hernquist,itc_cluster
 #SBATCH --mem-per-cpu=40000
 #SBATCH --time=20:00:00
-#SBATCH -o dets_out.%j
-#SBATCH -e dets_err.%j
-#SBATCH -J dets
+#SBATCH -o snaps_out.%j
+#SBATCH -e snaps_err.%j
+#SBATCH -J snaps
 
-python -m illpy_lib --RECREATE=True
+python illpy_lib/illbh/details.py --RECREATE=True
+# python illpy_lib/illbh/snapshots.py
