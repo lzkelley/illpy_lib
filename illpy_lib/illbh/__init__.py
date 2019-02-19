@@ -17,6 +17,7 @@ class Settings(pycore.Settings):
     RUN_NUM = 1
 
     INPUT = "/n/ghernquist/Illustris/Runs/L75n1820FP/"
+    # OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
     OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
 
     RECREATE = False
@@ -37,6 +38,8 @@ class Paths(pycore.Paths):
 
     FNAME_DETAILS_CLEAN = "bh_details.hdf5"
     FNAME_MERGERS_CLEAN = "bh_mergers.hdf5"
+
+    FNAME_BH_PARTICLES = "bh_particles.hdf5"
 
     # "ill-%d_blackhole_details_temp_snap-%d.txt"
     FNAME_DETAILS_TEMP_SNAP = "ill-{run_num:d}_blackhole_details_temp_snap-{snap_num:03d}.txt"
@@ -138,6 +141,10 @@ class Paths(pycore.Paths):
         fname = self.FNAME_DETAILS_SNAP.format(snap_num=snap, run_num=run_num)
         fname = os.path.join(self.output_details, fname)
         return fname
+
+    @property
+    def fname_bh_particles(self):
+        return os.path.join(self.OUTPUT, self.FNAME_BH_PARTICLES)
 
 
 class Core(pycore.Core):
