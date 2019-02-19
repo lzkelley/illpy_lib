@@ -2,6 +2,7 @@
 """
 
 import os
+import sys
 import shutil
 from datetime import datetime
 
@@ -10,19 +11,30 @@ import h5py
 
 import zcode.inout as zio
 
-from ..constants import DTYPE, NUM_SNAPS
 
-from .bh_constants import DETAILS
-from . import Core
+try:
+    import illpy_lib
+except ImportError:
+    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
+    if PATH_ILLPY_LIB not in sys.path:
+        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
+        sys.path.append(PATH_ILLPY_LIB)
+
+    import illpy_lib  # noqa
+
+
+from illpy_lib.constants import DTYPE, NUM_SNAPS
+from illpy_lib.illbh import Core
+from illpy_lib.illbh.bh_constants import DETAILS
 
 VERSION = 0.3                                    # Version of details
 
 _DEF_PRECISION = -8                               # Default precision
 
 
-def main():
+def main(reorganize_flag=True, reformat_flag=True):
 
-    core = Core()  # sets=dict(RECREATE=True))
+    core = Core(sets=dict(LOG_FILENAME='log_illbh-details.log')
     log = core.log
 
     log.info("details.main()")
@@ -31,10 +43,14 @@ def main():
     beg = datetime.now()
 
     # Organize Details by Snapshot Time; create new, temporary ASCII Files
-    reorganize(core)  # run, loadsave=loadsave, verbose=verbose)
+    log.debug("`reorganize_flag` = {}".format(reorganize_flag))
+    if reorganize_flag:
+        reorganize(core)
 
     # Create Dictionary Details Files
-    reformat(core)  # run, loadsave=loadsave, verbose=verbose)
+    log.debug("`reformat_flag` = {}".format(reformat_flag))
+    if reformat_flag:
+        reformat(core)
 
     end = datetime.now()
     log.info("Done after '{}'".format(end-beg))
@@ -400,3 +416,7 @@ def load_details(snap, core=None):
         cs = data[DETAILS.CS][:]
 
     return ids, scales, masses, mdots, rhos, cs
+
+
+if __name__ == "__main__":
+    main(reorganize_flag=False, reformat_flag=True)
