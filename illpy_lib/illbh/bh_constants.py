@@ -35,6 +35,7 @@ from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, 
 # Illustris Parameters
 # ====================
 
+'''
 _ILLUSTRIS_MERGERS_FILENAME_REGEX = "blackhole_mergers_*.txt"
 _ILLUSTRIS_DETAILS_FILENAME_REGEX = "blackhole_details_*.txt"
 
@@ -66,7 +67,7 @@ _ILLUSTRIS_DETAILS_DIRS = {
         _RUNS_1_DIR_TEXT + "txt-files-partial/Sep25/blackhole_details/"
     ]
 }
-
+'''
 
 # Post-Processing Parameters
 # ==========================
@@ -75,12 +76,12 @@ _MAX_DETAILS_PER_SNAP           = 10   # Number of dets entries to store per sna
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 
-_MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
-_MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
-_MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
+# _MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
+# _MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
+# _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
 
-_DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
-_DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
+# _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
+# _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
 _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
 _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
@@ -92,7 +93,7 @@ _BLACKHOLE_TREE_FILENAME         = "ill-%d_bh-tree_v%.2f.npz"
 _BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz"
 
 
-_LOG_DIR = "./logs/"
+# _LOG_DIR = "./logs/"
 
 
 class MERGERS:
@@ -109,9 +110,12 @@ class MERGERS:
     MASSES    = 'masses'
 
     # Maps
-    MAP_STOM  = 's2m'
-    MAP_MTOS  = 'm2s'
-    MAP_ONTOP = 'ontop'
+    # MAP_STOM  = 's2m'
+    # MAP_MTOS  = 'm2s'
+    # MAP_ONTOP = 'ontop'
+    SNAP_NUMS = "snap_nums"
+    ONTOP_NEXT = "ontop_next"
+    ONTOP_PREV = "ontop_prev"
 
 
 MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
