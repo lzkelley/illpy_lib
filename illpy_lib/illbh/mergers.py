@@ -1,352 +1,276 @@
-"""Module to handle Illustris BH Merger Files.
-
-This module is an interface to the 'blackhole_mergers_<#>.txt' files produced
-by Illustris.  Raw Illustris files are only used to initially load data, then
-an intermediate numpy npz-file is produced to store a dictionary of merger data
-for easier access in all future calls.  Executing the `main()` routine will
-prepare the intermediate file, as will calls to the `loadMergers()` function -
-if the intermediate file hasn't already been loaded.
-
-The `mrgs` are represented as a dictionary object with keys given by the
-variables `MERGERS_*`, e.g. `MERGERS_NUM` is the key for the number of mrgs.
-
-Internal Parameters
--------------------
-VERSION_MAP <flt> : version number for 'mapped' mrgs, and associated save files
-VERSION_FIX <flt> : version number for 'fixed'  mrgs, and associated save files
-
-Functions
----------
-process_mergers                : perform all processing methods, assures that save files are all
-                                constructed.
-load_raw_mergers                : load all merger entries, sorted by scalefactor, directly from
-                                illustris merger files - without any processing/filtering.
-load_mapped_mergers             : load dictionary of merger events with associated mappings to and
-                                from snapshots.
-load_fixed_mergers              : load dictionary of merger events with mappings, which have been
-                                processed and filtered.  These mrgs also have the 'out' mass
-                                entry corrected (based on inference from ``details`` entries).
-
-
-_findBoundingBins
-
-
-Mergers Dictionary
-------------------
-   { MERGERS_RUN       : <int>, illustris simulation number in {1, 3}
-     MERGERS_NUM       : <int>, total number of mrgs `N`
-     MERGERS_FILE      : <str>, name of save file from which mrgs were loaded/saved
-     MERGERS_CREATED   : <str>,
-     MERGERS_VERSION   : <float>,
-
-     MERGERS_SCALES    : <double>[N], the time of each merger [scale-factor]
-     MERGERS_IDS       : <ulong>[N, 2],
-     MERGERS_MASSES    : <double>[N, 2],
-
-     MERGERS_MAP_MTOS  : <int>[N],
-     MERGERS_MAP_STOM  : <int>[136, list],
-     MERGERS_MAP_ONTOP : <int>[136, list],
-   }
-
-Examples
---------
-
->>> # Load mrgs from Illustris-2
->>> mrgs = mergers.loadMergers(run=2, verbose=True)
->>> # Print the number of mrgs
->>> print mrgs[mergers.MERGERS_NUM]
->>> # Print the first 10 merger times
->>> print mrgs[mergers.MERGERS_TIMES][:10]
-
-
-Raises
-------
-
-
-Notes
------
- - 'Raw Mergers' : these are mrgs directly from the illustris files with NO modifications or
-                   filtering of any kind.
-
-
-
-   The underlying data is in the illustris bh merger files, 'blackhole_mergers_<#>.txt', which are
-   processed by `_loadMergersFromIllustris()`.  Each line of the input files is processed by
-   `_parse_merger_line()` which returns the redshift ('time') of the merger, and the IDs and masses
-   of each BH.  Each `merger` is sorted by time (redshift) in `_importMergers()` and placed in a
-   `dict` of all results.  This merger dictionary is saved to a 'raw' savefile whose name is given
-   by `savedMergers_rawFilename()`.
-   The method `process_mergers()` not only loads the merger objects, but also creates mappings of
-   mrgs to the snapshots nearest where they occur (``mapM2S`) and visa-versa (``mapS2M``); as
-   well as mrgs which take place exactly during a snapshot iteration (``ontop``).  These three
-   maps are included in the merger dictionary.
-
+"""
 """
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
+import sys
+import shutil
 from datetime import datetime
+
 import numpy as np
-
-from illpy_lib.illbh.bh_constants import (
-    MERGERS_PHYSICAL_KEYS, MERGERS, BH_TYPE, GET_MERGERS_RAW_COMBINED_FILENAME, NUM_BH_TYPES,
-    GET_ILLUSTRIS_BH_MERGERS_FILENAMES, GET_MERGERS_RAW_MAPPED_FILENAME, GET_MERGERS_FIXED_FILENAME
-)
-
-from illpy_lib.constants import DTYPE
+import h5py
 
 import zcode.inout as zio
 
 
-VERSION_MAP = 0.21
-VERSION_FIX = 0.31
+try:
+    import illpy_lib
+except ImportError:
+    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
+    if PATH_ILLPY_LIB not in sys.path:
+        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
+        sys.path.append(PATH_ILLPY_LIB)
+
+    import illpy_lib  # noqa
 
 
-def process_mergers(run, verbose=True):
-
-    if verbose:
-        print(" - - mergers.process_mergers()")
-
-    # Load Mapped Mergers
-    # re-creates them if needed
-    mergersMapped = load_mapped_mergers(run, verbose=verbose)
-
-    # Load Fixed Mergers
-    mergersFixed = load_fixed_mergers(run, verbose=verbose)
-
-    return mergersMapped, mergersFixed
+from illpy_lib.illbh.bh_constants import (
+    MERGERS_PHYSICAL_KEYS, MERGERS, BH_TYPE, NUM_BH_TYPES, GET_MERGERS_FIXED_FILENAME
+)
+from illpy_lib.illbh import Core
+from illpy_lib.constants import DTYPE
 
 
-def load_raw_mergers(run, verbose=True, recombine=False):
+# VERSION_MAP = 0.21
+# VERSION_FIX = 0.31
+VERSION = 0.4
+
+
+def main(reorganize_flag=True, crosscheck_flag=True):
+
+    core = Core(sets=dict(LOG_FILENAME='log_illbh-mergers.log'))
+    log = core.log
+    log.info("mergers.main()")
+    print(log.filename)
+
+    log.debug("`reorganize_flag` = {}".format(reorganize_flag))
+    if reorganize_flag:
+        reorganize(core=core)
+
+    log.debug("`crosscheck_flag` = {}".format(crosscheck_flag))
+    if crosscheck_flag:
+        crosscheck(core=core)
+
+    return
+
+
+def reorganize(core=None, recreate=None):
+
+    core = Core()
+    log = core.log
+    log.info("mergers.reorganize()")
+
+    if recreate is None:
+        recreate = core.sets.RECREATE
+
+    loadsave = (not recreate)
+    fname_temp = core.paths.fname_mergers_temp()
+    exists = os.path.exists(fname_temp)
+    log.debug("Temporary merger file '{}' exists: {}".format(fname_temp, exists))
+
+    if loadsave and exists:
+        log.info("Temporary merger file exists.")
+        return fname_temp
+
+    log.warning("Reoganizing merger files to temporary file '{}'".format(fname_temp))
+    _reorganize_files(core, fname_temp)
+
+    return fname_temp
+
+
+def _reorganize_files(core, fname_out):
     """
-    Load raw merger events into dictionary.
-
-    Raw mrgs are the data directly from illustris without modification.
     """
 
-    if verbose:
-        print("mergers.load_raw_mergers()")
+    core = Core.load(core)
+    log = core.log
+    log.debug("mergers._reorganize_files()")
 
-    # Concatenate Raw Illustris Files into a Single Combined File
-    fname_combined = GET_MERGERS_RAW_COMBINED_FILENAME(run)
-    if recombine or not os.path.exists(fname_combined):
-        if verbose:
-            print(" - Combining Illustris Merger files into '{:s}'".format(fname_combined))
-        fnames_mergers = GET_ILLUSTRIS_BH_MERGERS_FILENAMES(run)
-        if verbose:
-            print(" - Found {:d} merger Files".format(len(fnames_mergers)))
-        zio.combine_files(fnames_mergers, fname_combined, verbose=verbose)
+    # Use a size guaranteed to be larger than needed (need ~ 3e4)
+    BUFFER_SIZE = int(1e5)
+    scales = np.zeros(BUFFER_SIZE, dtype=DTYPE.SCALAR)
+    masses = np.zeros((BUFFER_SIZE, 2), dtype=DTYPE.SCALAR)
+    mids = np.zeros((BUFFER_SIZE, 2), dtype=DTYPE.ID)
 
-    if verbose:
-        print(" - Merger file '{:s}'".format(fname_combined))
+    raw_fnames = core.paths.mergers_input
+    cnt = 0
+    for ii, raw in enumerate(core.tqdm(raw_fnames, desc='Raw files')):
+        log.debug("File {}: '{}'".format(ii, raw))
 
-    # Load Raw Data from Merger Files #
-    if verbose:
-        print(" - Importing Merger Data")
-    scales, ids, masses = _import_raw_mergers(fname_combined, verbose=verbose)
+        file_cnt = cnt
+        with open(raw, 'r') as data:
+            for line in data.readlines():
+                time, out_id, out_mass, in_id, in_mass = _parse_merger_line(line)
 
-    # Sort Data by Time #
-    if verbose:
-        print(" - Sorting Data")
+                scales[cnt] = time
+                # mids[cnt, :] = [out_id, in_id]
+                # masses[cnt, :] = [out_mass, in_mass]
+                mids[cnt, BH_TYPE.OUT] = out_id
+                mids[cnt, BH_TYPE.IN] = in_id
+                masses[cnt, BH_TYPE.OUT] = out_mass
+                masses[cnt, BH_TYPE.IN] = in_mass
+                cnt += 1
 
-    # Find indices which sort by time
+            file_cnt = cnt - file_cnt
+            log.debug("\tRead {} lines".format(file_cnt))
+
+    num_mergers = cnt
+    log.info("Read {} mergers".format(num_mergers))
+
+    # Cutoff unused section of arrays
+    scales = scales[:cnt]
+    mids = mids[:cnt]
+    masses = masses[:cnt]
+
+    # Sort by scale-factors
     inds = np.argsort(scales)
-    # Use indices to reorder arrays
     scales = scales[inds]
-    ids    = ids[inds]
-    masses = masses[inds]
+    mids = mids[inds, :]
+    masses = masses[inds, :]
 
-    return scales, ids, masses, fname_combined
+    # Create Mapping Between Mergers and Snapshots
+    # mapM2S, mapS2M, ontop = _map_to_snapshots(scales)
+
+    # Find the snapshot that each merger directly precedes
+    log.debug("Calculating merger snapshots")
+    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(scales)
+
+    fname_temp = zio.modify_filename(fname_out, prepend='_')
+    log.info("Writing to file '{}'".format(fname_temp))
+    with h5py.File(fname_temp, 'w') as out:
+
+        out.attrs[MERGERS.RUN] = core.sets.RUN_NUM
+        out.attrs[MERGERS.NUM] = len(scales)
+        out.attrs[MERGERS.CREATED] = str(datetime.now().ctime())
+        out.attrs[MERGERS.VERSION] = VERSION
+        out.attrs[MERGERS.FILE] = fname_out
+
+        out.create_dataset(MERGERS.SCALES, data=scales)
+        out.create_dataset(MERGERS.IDS, data=mids)
+        out.create_dataset(MERGERS.MASSES, data=masses)
+
+        out.create_dataset(MERGERS.SNAP_NUMS, data=snap_nums)
+        out.create_dataset(MERGERS.ONTOP_NEXT, data=ontop_next)
+        out.create_dataset(MERGERS.ONTOP_PREV, data=ontop_prev)
+
+    log.info("Renaming temporary file")
+    log.debug("\t'{}' ==> '{}'".format(fname_temp, fname_out))
+    shutil.move(fname_temp, fname_out)
+
+    size_str = zio.get_file_size(fname_out)
+    log.info("Saved {} mergers to '{}', size {}".format(num_mergers, fname_out, size_str))
+
+    return fname_out
 
 
-def load_mapped_mergers(run, verbose=True, loadsave=True):
+def _map_to_snapshots(scales):
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
+    snap_scales = cosmo.scales()
+
+    snap_nums = np.searchsorted(snap_scales, scales, side='left')
+    # Find mergers which are at almost exactly the same time as their subsequent snapshot
+    ontop_next = np.isclose(scales, snap_scales[snap_nums], rtol=1e-4, atol=1e-6)
+    # Find mergers which are at almost exactly the same time as their previous snapshot
+    ontop_prev = np.isclose(scales, snap_scales[snap_nums-1], rtol=1e-4, atol=1e-6)
+
+    return snap_nums, ontop_next, ontop_prev
+
+
+def crosscheck(core=None, recreate=None):   # run, mrgs, verbose=True):
     """
-    Load or create Mapped Mergers Dictionary as needed.
     """
+    core = Core.load(core)
+    log = core.log
+    log.info("mergers.crosscheck()")
 
-    if verbose: print(" - - mergers.load_mapped_mergers()")
+    if recreate is None:
+        recreate = core.sets.RECREATE
 
-    mappedFilename = GET_MERGERS_RAW_MAPPED_FILENAME(run, VERSION_MAP)
+    loadsave = (not recreate)
+    fname_out = core.paths.fname_mergers_fixed()
+    exists = os.path.exists(fname_out)
 
-    # Load Existing Mapped Mergers
-    #  ----------------------------
-    if (loadsave):
-        if verbose: print((" - - - Loading saved data from '{:s}'".format(mappedFilename)))
-        # If file exists, load data
-        if (os.path.exists(mappedFilename)):
-            mergersMapped = zio.npzToDict(mappedFilename)
-        else:
-            print((" - - - - '{:s}' does not exist.  Recreating".format(mappedFilename)))
-            loadsave = False
+    log.debug("Fixed merger file '{}' exists: {}".format(fname_out, exists))
 
-    # Recreate Mappings
-    #  -----------------
-    if (not loadsave):
-        if verbose: print(" - - - Recreating mapped mrgs")
+    if loadsave and exists:
+        log.info("Fixed merger file exists.")
+        return fname_out
 
-        # Load Raw Mergers
-        scales, ids, masses, filename = load_raw_mergers(run, verbose=verbose)
+    log.warning("Crosschecking mergers")
+    _crosscheck_mergers(core, fname_out)
 
-        # Create Mapping Between Mergers and Snapshots #
-        mapM2S, mapS2M, ontop = _map_to_snapshots(scales)
-
-        # Store in dictionary
-        mergersMapped = {
-            MERGERS.FILE: mappedFilename,
-            MERGERS.RUN: run,
-            MERGERS.NUM: len(scales),
-            MERGERS.CREATED: datetime.now().ctime(),
-            MERGERS.VERSION: VERSION_MAP,
-            MERGERS.SCALES: scales,
-            MERGERS.IDS: ids,
-            MERGERS.MASSES: masses,
-            MERGERS.MAP_MTOS: mapM2S,
-            MERGERS.MAP_STOM: mapS2M,
-            MERGERS.MAP_ONTOP: ontop,
-        }
-
-        zio.dictToNPZ(mergersMapped, mappedFilename, verbose=verbose)
-
-    return mergersMapped
+    return fname_out
 
 
-def load_fixed_mergers(run, verbose=True, loadsave=True):
-    """
-    Load BH Merger data with duplicats removes, and masses corrected.
+def _crosscheck_mergers(core, fname_out):
+    log = core.log
+    log.info("mergers._crosscheck_mergers()")
 
-    Arguments
-    ---------
-       run      <int>  : illustris simulation run number {1, 3}
-       verbose  <bool> : optional, print verbose output
-       loadsave <bool> : optional, load existing save file (recreate if `False`)
-
-    Returns
-    -------
-       mergersFixed <dict> : dictionary of 'fixed' mrgs, most entries shaped [N, 2] for `N`
-                             mrgs, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
-
-    """
-
-    if verbose: print(" - - mergers.load_fixed_mergers()")
-
-    fixedFilename = GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
-
-    # Try to Load Existing Mapped Mergers
-    if loadsave:
-        if verbose: print((" - - - Loading from save '{:s}'".format(fixedFilename)))
-        if os.path.exists(fixedFilename):
-            mergersFixed = zio.npzToDict(fixedFilename)
-        else:
-            print((" - - - - '{:s}' does not exist.  Recreating.".format(fixedFilename)))
-            loadsave = False
-
-    # Recreate Fixed Mergers
-    if (not loadsave):
-        if verbose: print(" - - - Creating Fixed Mergers")
-
-        # Load Mapped Mergers
-        mergersMapped = load_mapped_mergers(run, verbose=verbose)
-        # Fix Mergers
-        mergersFixed = _fix_mergers(run, mergersMapped, verbose=verbose)
-        # Save
-        zio.dictToNPZ(mergersFixed, fixedFilename, verbose=verbose)
-
-    return mergersFixed
-
-
-def _fix_mergers(run, mrgs, verbose=True):
-    """
-    Filter and 'fix' input merger catalog.
-
-    This includes:
-     - Remove duplicate entries (Note-1)
-     - Load 'fixed' out-BH masses from ``BHMatcher`` (which uses ``details`` entries)
-
-    Arguments
-    ---------
-       run     <int>  : illustris simulation number {1, 3}
-       mrgs <dict> : input dictionary of unfiltered merger events
-       verbose <bool> : optional, print verbose output
-
-    Returns
-    -------
-       mrgs_fixed <dict> : filtered merger dictionary
-
-    Notes
-    -----
-       1 : There are 'duplicate' entries which have different occurence times (scale-factors)
-           suggesting that there is a problem with the actual merger, not just the logging.
-           This is not confirmed.  Currently, whether the times match or not, the *later*
-           merger entry is the only one that is preserved in ``mrgs_fixed``
-
-    """
     from illpy_lib.illbh import BHMatcher
 
-    if verbose: print(" - - mergers._fix_mergers()")
-
     # Make copy to modify
-    mrgs_fixed = dict(mrgs)
+    # mrgs_fixed = dict(mrgs)
+    fname_temp = core.paths.fname_mergers_temp()
+    with h5py.File(fname_temp, 'r') as data:
+        scales = data[MERGERS.SCALES][:]
+        mids = data[MERGERS.IDS][:]
+        masses = data[MERGERS.MASSES][:]
 
-    # Remove Repeated Entries
-    # =======================
+    num_mergers_temp = scales.size
+    log.info("Loaded {} raw mergers".format(num_mergers_temp))
+
     # Remove entries where IDs match a second time (IS THIS ENOUGH?!)
 
-    ids    = mrgs_fixed[MERGERS.IDS]
-    scales = mrgs_fixed[MERGERS.SCALES]
-
     # First sort by ``BH_TYPE.IN`` then ``BH_TYPE.OUT`` (reverse of given order)
-    sort = np.lexsort((ids[:, BH_TYPE.OUT], ids[:, BH_TYPE.IN]))
+    sort = np.lexsort((mids[:, BH_TYPE.OUT], mids[:, BH_TYPE.IN]))
 
-    badInds = []
-    numMismatch = 0
-
-    if verbose: print((" - - - Examining {:d} merger entries".format(len(sort))))
+    # bad_inds = []
+    bads = np.zeros_like(scales, dtype=bool)
+    mismatch = np.zeros_like(bads)
 
     # Iterate over all entries
-    for ii in range(len(sort)-1):
+    for ii in range(num_mergers_temp - 1):
+        this_ind = sort[ii]
 
-        this = ids[sort[ii]]
+        this = mids[this_ind]
         jj = ii+1
+        next_ind = sort[jj]
 
         # Look through all examples of same BH_TYPE.IN
-        while(ids[sort[jj], BH_TYPE.IN] == this[BH_TYPE.IN]):
-            # If BH_TYPE.OUT also matches, this is a duplicate -- store first entry as bad |NOTE-1|
-            if (ids[sort[jj], BH_TYPE.OUT] == this[BH_TYPE.OUT]):
+        while (mids[next_ind, BH_TYPE.IN] == this[BH_TYPE.IN]):
+            # If BH_TYPE.OUT also matches, this is a duplicate -- store first entry as bad
+            if (mids[next_ind, BH_TYPE.OUT] == this[BH_TYPE.OUT]):
 
                 # Double check that time also matches
-                if (scales[sort[ii]] != scales[sort[jj]]): numMismatch += 1
-                badInds.append(sort[ii])
+                if (not np.isclose(scales[this_ind], scales[next_ind])):
+                    # num_mismatch += 1
+                    mismatch[ii] = True
+
+                # bad_inds.append(this_ind)
+                bads[ii] = True
                 break
 
             jj += 1
+            next_ind = sort[jj]
 
-    if verbose:
-        print((" - - - Total number of duplicates = {:d}".format(len(badInds))))
-    if verbose:
-        print((" - - - Number with mismatched times = {:d}".format(numMismatch)))
+    log.info("Num duplicates       = {}".format(zio.frac_str(bads)))
+    log.info("Num mismatched times = {}".format(zio.frac_str(mismatch)))
 
     # Remove Duplicate Entries
-    for key in MERGERS_PHYSICAL_KEYS:
-        mrgs_fixed[key] = np.delete(mrgs_fixed[key], badInds, axis=0)
+    goods = ~bads
+    scales = scales[goods]
+    mids = mids[goods]
+    masses = masses[goods]
 
     # Recalculate maps
-    mapM2S, mapS2M, ontop = _map_to_snapshots(mrgs_fixed[MERGERS.SCALES])
-    mrgs_fixed[MERGERS.MAP_MTOS] = mapM2S
-    mrgs_fixed[MERGERS.MAP_STOM] = mapS2M
-    mrgs_fixed[MERGERS.MAP_ONTOP] = ontop
+    mapM2S, mapS2M, ontop = _map_to_snapshots(scales)
+    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(scales)
 
     # Change number, creation date, and version
-    oldNum = len(mrgs[MERGERS.SCALES])
-    newNum = len(mrgs_fixed[MERGERS.SCALES])
-    mrgs_fixed[MERGERS.NUM] = newNum
-    mrgs_fixed[MERGERS.CREATED] = datetime.now().ctime()
-    mrgs_fixed[MERGERS.VERSION] = VERSION_FIX
-
-    if verbose: print((" - - - Number of Mergers {:d} ==> {:d}".format(oldNum, newNum)))
 
     # Fix Merger 'Out' Masses
     #  =======================
-    if verbose: print(" - - - Loading reconstructed 'out' BH masses")
     masses = mrgs_fixed[MERGERS.MASSES]
     aveBef = np.average(masses[:, BH_TYPE.OUT])
     massOut = BHMatcher.inferMergerOutMasses(run, mrgs=mrgs_fixed, verbose=verbose)
@@ -357,6 +281,43 @@ def _fix_mergers(run, mrgs, verbose=True):
     return mrgs_fixed
 
 
+def _parse_merger_line(line):
+    """
+    Get target quantities from each line of the merger files.
+
+    See 'http://www.illustris-project.org/w/index.php/Blackhole_Files' for
+    dets regarding the illustris BH file structure.
+
+    The format of each line is:
+        "PROC-NUM  TIME  ID1  MASS1  ID2  MASS2"
+        see: http://www.illustris-project.org/w/index.php/Blackhole_Files
+        where
+            '1' corresponds to the 'out'/'accretor'/surviving BH
+            '2' corresponds to the 'in' /'accreted'/eliminated BH
+        NOTE: that MASS1 is INCORRECT (dynamical mass, instead of BH)
+
+    Returns
+    -------
+    time     : scalar, redshift of merger
+    out_id   : long, id number of `out` BH
+    out_mass : scalar, mass of `out` BH in simulation units (INCORRECT VALUE)
+    in_id    : long, id number of `in` BH
+    in_mass  : scalar, mass of `in` BH in simulation units
+
+    """
+
+    strs     = line.split()
+    # Convert to proper types
+    time     = DTYPE.SCALAR(strs[1])
+    out_id   = DTYPE.ID(strs[2])
+    out_mass = DTYPE.SCALAR(strs[3])
+    in_id    = DTYPE.ID(strs[4])
+    in_mass  = DTYPE.SCALAR(strs[5])
+
+    return time, out_id, out_mass, in_id, in_mass
+
+
+'''
 def _import_raw_mergers(files, verbose=True):
     """
     Fill the given arrays with merger data from the given target files.
@@ -411,46 +372,53 @@ def _import_raw_mergers(files, verbose=True):
     return scales, ids, masses
 
 
-def _parse_merger_line(line):
+def load_fixed_mergers(run, verbose=True, loadsave=True):
     """
-    Get target quantities from each line of the merger files.
+    Load BH Merger data with duplicats removes, and masses corrected.
 
-    See 'http://www.illustris-project.org/w/index.php/Blackhole_Files' for
-    dets regarding the illustris BH file structure.
-
-    The format of each line is:
-        "PROC-NUM  TIME  ID1  MASS1  ID2  MASS2"
-        see: http://www.illustris-project.org/w/index.php/Blackhole_Files
-        where
-            '1' corresponds to the 'out'/'accretor'/surviving BH
-            '2' corresponds to the 'in' /'accreted'/eliminated BH
-        NOTE: that MASS1 is INCORRECT (dynamical mass, instead of BH)
+    Arguments
+    ---------
+       run      <int>  : illustris simulation run number {1, 3}
+       verbose  <bool> : optional, print verbose output
+       loadsave <bool> : optional, load existing save file (recreate if `False`)
 
     Returns
     -------
-    time     : scalar, redshift of merger
-    out_id   : long, id number of `out` BH
-    out_mass : scalar, mass of `out` BH in simulation units (INCORRECT VALUE)
-    in_id    : long, id number of `in` BH
-    in_mass  : scalar, mass of `in` BH in simulation units
+       mergersFixed <dict> : dictionary of 'fixed' mrgs, most entries shaped [N, 2] for `N`
+                             mrgs, and an entry for each {``BH_TYPE.IN``, ``BH_TYPE.OUT``}
 
     """
 
-    strs     = line.split()
-    # Convert to proper types
-    time     = DTYPE.SCALAR(strs[1])
-    out_id   = DTYPE.ID(strs[2])
-    out_mass = DTYPE.SCALAR(strs[3])
-    in_id    = DTYPE.ID(strs[4])
-    in_mass  = DTYPE.SCALAR(strs[5])
+    if verbose: print(" - - mergers.load_fixed_mergers()")
 
-    return time, out_id, out_mass, in_id, in_mass
+    fixedFilename = GET_MERGERS_FIXED_FILENAME(run, VERSION_FIX)
+
+    # Try to Load Existing Mapped Mergers
+    if loadsave:
+        if verbose: print((" - - - Loading from save '{:s}'".format(fixedFilename)))
+        if os.path.exists(fixedFilename):
+            mergersFixed = zio.npzToDict(fixedFilename)
+        else:
+            print((" - - - - '{:s}' does not exist.  Recreating.".format(fixedFilename)))
+            loadsave = False
+
+    # Recreate Fixed Mergers
+    if (not loadsave):
+        if verbose: print(" - - - Creating Fixed Mergers")
+
+        # Load Mapped Mergers
+        mergersMapped = load_mapped_mergers(run, verbose=verbose)
+        # Fix Mergers
+        mergersFixed = _fix_mergers(run, mergersMapped, verbose=verbose)
+        # Save
+        zio.dictToNPZ(mergersFixed, fixedFilename, verbose=verbose)
+
+    return mergersFixed
 
 
 def _map_to_snapshots(scales, verbose=True):
     """
     Find the snapshot during which, or following each merger
-
     """
 
     if verbose:
@@ -568,3 +536,8 @@ def _findBoundingBins(target, bins, thresh=1.0e-5):
         raise RuntimeError("Could not find bins!")
 
     return [low, high, dlo, dhi]
+'''
+
+
+if __name__ == "__main__":
+    main(reorganize_flag=True, crosscheck_flag=False)
