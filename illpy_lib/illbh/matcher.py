@@ -3,10 +3,12 @@
 
 import os
 import sys
-import logging
+import shutil
+# import logging
 from datetime import datetime
 
 import numpy as np
+import h5py
 
 import zcode.inout as zio
 import zcode.math as zmath
@@ -38,6 +40,8 @@ from illpy_lib.illbh.bh_constants import (
 # __version__ = '0.25'
 # _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
+VERSION = 1.0
+
 
 def main():
     # run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, redo_remnants=True):
@@ -51,7 +55,7 @@ def main():
 
     #     MPI Parameters
     comm = MPI.COMM_WORLD
-    # rank = comm.rank
+    rank = comm.rank
     name = __file__
     header = "\n%s\n%s\n%s" % (name, '='*len(name), str(datetime.now()))
 
@@ -59,24 +63,19 @@ def main():
     log.debug(header)
 
     # Check status of files, determine what operations to perform
-    mrg_det_flag = True
+    mrg_det_flag = False
     rem_det_flag = False
-    '''
+
     if (rank == 0):
-        # Check merger dets status
-        mergerDetFName = GET_MERGER_DETAILS_FILENAME(
-            run, __version__, _MAX_DETAILS_PER_SNAP)
-        log.info("Merger Details file: '%s'" % (mergerDetFName))
-        if (not os.path.exists(mergerDetFName)):
-            log.warning(" - Merger dets file does not exist.")
-            mrg_det_flag = True
-        else:
-            log.info("Merger Details file exists.")
-            if (not loadsave or redo_mergers):
-                log.info(" - Recreating anyway.")
-                mrg_det_flag = True
+        fname_mdets = core.paths.fname_merger_details()
+        exists_mdets = os.path.exists(fname_mdets)
+        recreate = core.sets.RECREATE
+
+        log.info("Merger Details file: '{}', exists: {}".format(fname_mdets, exists_mdets))
+        mrg_det_flag = (recreate or not exists_mdets)
 
         # Check remnants dets status
+        '''
         remnantDetFName = GET_REMNANT_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
         log.info("Remnant Details file: '%s'" % (remnantDetFName))
 
@@ -88,19 +87,18 @@ def main():
             if (not loadsave or redo_remnants):
                 log.info(" - Recreating anyway.")
                 rem_det_flag = True
-    '''
+        '''
 
     # Synchronize control-flow flags
     mrg_det_flag = comm.bcast(mrg_det_flag, root=0)
     rem_det_flag = comm.bcast(rem_det_flag, root=0)
     comm.Barrier()
-    mdets = None
 
     # Match Merger BHs to Details entries
     # -----------------------------------
     if mrg_det_flag:
         log.info("Creating Merger Details")
-        mdets = _merger_details(core)
+        _merger_details(core)
 
     '''
     # Extend merger-dets to account for later mrgs
@@ -127,7 +125,6 @@ def _merger_details(core):
     comm = MPI.COMM_WORLD
     rank = comm.rank
     size = comm.size
-    data = None
 
     # Load Unique ID numbers to distribute to all tasks
     merger_bh_ids = None
@@ -175,8 +172,6 @@ def _merger_details(core):
 
         # Organize results appropriately
         if rank == 0:
-            beg = datetime.now()
-
             nums = np.zeros(num_unique, dtype=int)
             mdets = {kk: num_unique * [[None]] for kk in DETAILS_PHYSICAL_KEYS}
 
@@ -205,7 +200,7 @@ def _merger_details(core):
 
                     # If no entries have been stored yet, replace with first entries
                     for kk in DETAILS_PHYSICAL_KEYS:
-                        if mdets[kk][ii] is None:
+                        if mdets[kk][ii][0] is None:
                             mdets[kk][ii] = temp_mdets[kk][jj][ii]
                         else:
                             mdets[kk][ii] = np.append(mdets[kk][ii], temp_mdets[kk][jj][ii])
@@ -283,18 +278,19 @@ def _merger_details(core):
                     for kk in DETAILS_PHYSICAL_KEYS:
                         mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], bads)
 
-                nums[ii, jj] = scales[ii, jj].size
+                nums[ii, jj] = scales.size
 
         # Log basic statistics
         log.info("Number of     entries: " + zmath.stats_str(nums))
         log.info("Duplicate     entries: " + zmath.stats_str(num_dups))
         log.info("Non-monotonic entries: " + zmath.stats_str(num_bads))
 
-        # Save data
-        # filename = GET_MERGER_DETAILS_FILENAME(run, __version__, _MAX_DETAILS_PER_SNAP)
-        # data = _saveDetails(filename, run, ids, scales, masses, dens, mdots, csnds, log)
+        fname_out = core.paths.fname_merger_details()
+        # _save_merger_details_hdf5(core, fname_out, mdets)
+        log.warning("WARNING: saving to `npz` not `hdf5`!")
+        _save_merger_details_npz(core, fname_out, mdets)
 
-    return data
+    return
 
 
 def _merger_details_snap(core, snapshots, merger_bh_ids):
@@ -422,6 +418,66 @@ def _merger_details_snap(core, snapshots, merger_bh_ids):
             np.mean(num_stored), np.sum(num_stored)))
 
     return num_stored, data
+
+
+def _save_merger_details_hdf5(core, fname, mdets):
+    """Package dets into dictionary and save to NPZ file.
+    """
+    log = core.log
+    log.debug("_save_merger_details_hdf5()")
+
+    temp_fname = zio.modify_filename(fname, prepend="_")
+
+    log.debug("Writing to '{}'".format(temp_fname))
+    with h5py.File(temp_fname, 'w') as out:
+
+        out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
+        out.attrs[DETAILS.CREATED] = str(datetime.now().ctime())
+        out.attrs[DETAILS.VERSION] = VERSION
+        out.attrs["MAX_DETAILS_PER_SNAP"] = core.sets.MAX_DETAILS_PER_SNAP
+
+        for kk, vv in mdets.items():
+            try:
+                out.create_dataset(kk, data=vv)
+            except:
+                log.error(str(kk))
+                log.error(str(type(vv)))
+                log.error(str(vv))
+                raise
+
+    log.debug("Moving from '{}' ==> '{}'".format(temp_fname, fname))
+    shutil.move(temp_fname, fname)
+
+    size_str = zio.get_file_size(fname)
+    log.warning("Saved merger details {} to '{}', size {}".format(fname, size_str))
+
+    return
+
+
+def _save_merger_details_npz(core, fname, mdets):
+    """Package dets into dictionary and save to NPZ file.
+    """
+    log = core.log
+    log.debug("_save_merger_details_npz()")
+
+    fname = fname.replace('hdf5', 'npz')
+    temp_fname = zio.modify_filename(fname, prepend="_")
+
+    data = {kk: vv for kk, vv in mdets.items()}
+    data[DETAILS.RUN] = core.sets.RUN_NUM
+    data[DETAILS.CREATED] = str(datetime.now().ctime())
+    data[DETAILS.VERSION] = VERSION
+    data["MAX_DETAILS_PER_SNAP"] = core.sets.MAX_DETAILS_PER_SNAP
+
+    zio.dictToNPZ(data, temp_fname)
+
+    log.debug("Moving from '{}' ==> '{}'".format(temp_fname, fname))
+    shutil.move(temp_fname, fname)
+
+    size_str = zio.get_file_size(fname)
+    log.warning("Saved merger details {} to '{}', size {}".format(fname, size_str))
+
+    return data
 
 
 '''
@@ -1171,39 +1227,6 @@ def _unmergedMasses(allScales, allMasses, mrgs, nextMerger, log):
     return allUnmerged
 
 
-def _saveDetails(fname, run, ids, scales, masses, dens, mdots, csnds, log, **kwargs):
-    """Package dets into dictionary and save to NPZ file.
-    """
-    log.debug("_saveDetails()")
-    data = {DETAILS.IDS: ids,
-            DETAILS.SCALES: scales,
-            DETAILS.MASSES: masses,
-            DETAILS.RHOS: dens,
-            DETAILS.MDOTS: mdots,
-            DETAILS.CS: csnds,
-            DETAILS.RUN: np.array(run),
-            DETAILS.CREATED: np.array(datetime.now().ctime()),
-            DETAILS.VERSION: np.array(__version__),
-            DETAILS.FILE: np.array(fname),
-            'detailsPerSnapshot': np.array(_MAX_DETAILS_PER_SNAP),
-            'detailsKeys': _GET_KEYS,
-            }
-
-    # Add any additional parameters
-    #    Make sure all values are arrays
-    for key, val in list(kwargs.items()):
-        kwargs[key] = np.asarray(val)
-    data.update(kwargs)
-
-    log.info(" - Saving data to '%s'" % (fname))
-    beg = datetime.now()
-    zio.dictToNPZ(data, fname, verbose=True)
-    end = datetime.now()
-    log.info(" - - Saved to '%s' after %s" % (fname, str(end-beg)))
-
-    return data
-
-
 def _findNextMerger(myID, myScale, ids, scales):
     """Find the next merger index in which a particular BH participates.
 
@@ -1298,5 +1321,5 @@ def _detailsForBHLineage(run, mrg, log, rdets=None, tree=None, mrgs=None):
 '''
 
 
-if (__name__ == "__main__"):
+if __name__ == "__main__":
     main()
