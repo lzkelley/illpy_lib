@@ -3,7 +3,8 @@
 import os
 import glob
 
-# import numpy as np
+import numpy as np
+np.seterr(divide='ignore', invalid='ignore')
 
 import pycore
 
