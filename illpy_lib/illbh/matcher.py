@@ -147,11 +147,9 @@ def _merger_details(core):
     merger_bh_ids = comm.bcast(merger_bh_ids, root=0)
 
     # Distribute snapshots to each processor
-    # WARNING
-    log.error("WARNING: TESTING!")
-    # my_snaps = _distribute_snapshots(comm)
-    my_snaps = [100, 101] if rank == 0 else [102, 103]
-    my_snaps = np.array(my_snaps)
+    my_snaps = _distribute_snapshots(comm)
+    # my_snaps = [100, 101] if rank == 0 else [102, 103]
+    # my_snaps = np.array(my_snaps)
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, np.size(my_snaps), np.min(my_snaps), np.max(my_snaps)))
@@ -177,9 +175,9 @@ def _merger_details(core):
 
             # Iterate over each black-hole and processor, collect results into single arrays
             for ii, mm in enumerate(merger_bh_ids):
-                if ii > 40:
-                    log.error("WARNING: TEST BREAK")
-                    break
+                # if ii > 40:
+                #     log.error("WARNING: TEST BREAK")
+                #     break
 
                 for jj in range(size):
                     temp_ids = temp_mdets[DETAILS.IDS][jj][ii]
@@ -263,20 +261,27 @@ def _merger_details(core):
                 nd = np.count_nonzero(dups)
                 if nd > 0:
                     num_dups[ii, jj] = nd
-                    scales = np.delete(scales, dups)
-                    masses = np.delete(masses, dups)
+                    # scales = np.delete(scales, dups)
+                    # masses = np.delete(masses, dups)
+                    scales = scales[~dups]
+                    masses = masses[~dups]
                     for kk in DETAILS_PHYSICAL_KEYS:
-                        mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], dups)
+                        # mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], dups)
+                        mdets[kk][ii, jj] = mdets[kk][ii, jj][~dups]
 
                 # Find and remove non-monotonic entries
                 bads = (np.diff(masses) < 0.0)
                 nb = np.count_nonzero(bads)
                 if nb > 0:
                     num_bads[ii, jj] = nb
-                    scales = np.delete(scales, bads)
-                    masses = np.delete(masses, bads)
+                    # scales = np.delete(scales, bads)
+                    # masses = np.delete(masses, bads)
+                    bads = np.append(bads, False)
+                    scales = scales[~bads]
+                    masses = masses[~bads]
                     for kk in DETAILS_PHYSICAL_KEYS:
-                        mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], bads)
+                        # mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], bads)
+                        mdets[kk][ii, jj] = mdets[kk][ii, jj][~bads]
 
                 nums[ii, jj] = scales.size
 
@@ -299,17 +304,11 @@ def _merger_details_snap(core, snapshots, merger_bh_ids):
     log = core.log
     log.debug("_merger_details_snap()")
 
-    # from mpi4py import MPI
-    # comm = MPI.COMM_WORLD
     MAX_PER_SNAP = core.sets.MAX_DETAILS_PER_SNAP
 
     INTERP_KEYS = [xx for xx in DETAILS_PHYSICAL_KEYS]
     INTERP_KEYS.pop(INTERP_KEYS.index(DETAILS.SCALES))
     INTERP_KEYS.pop(INTERP_KEYS.index(DETAILS.IDS))
-
-    # # WARNING
-    # log.error("WARNING: REMOVING 'DMDTS' for TESTING!")
-    # INTERP_KEYS.pop(INTERP_KEYS.index(DETAILS.DMDTS))
 
     log.debug("All    keys: {}".format(DETAILS_PHYSICAL_KEYS))
     log.debug("Interp keys: {}".format(INTERP_KEYS))
@@ -341,7 +340,6 @@ def _merger_details_snap(core, snapshots, merger_bh_ids):
 
         dets = details.load_details(snap, core=core)
         det_scales = dets[DETAILS.SCALES]
-        # num_dets = dets[DETAILS.NUM]
         num_dets = det_scales.size
         log.debug("Details for snap {}: {}".format(snap, num_dets))
         if num_dets == 0:
@@ -357,25 +355,17 @@ def _merger_details_snap(core, snapshots, merger_bh_ids):
         # Iterate over and search for each merger BH ID
         for ii, bh in enumerate(merger_bh_ids):
             # Find the index in the details-unique-ids that matches this merger-BH
-            # log.debug("{:6d} {} {}".format(ii, bh, any(bh == u_ids)))
             uu = np.argmax(bh == u_ids)
-            if ii > 40:
-                log.error("WARNING: TEST BREAK")
-                break
 
             # If no matches, continue
             if u_ids[uu] != bh:
-                # log.debug("NO MATCHES")
                 continue
 
             # Get the starting and ending incides of the matching BH
             aa = u_inds[uu]
             bb = aa + u_nums[uu]
             if bb - aa == 0:
-                # log.debug("NO LENGTH TO MATCHES")
                 continue
-
-            # log.debug("Match between {}, {} - {}".format(aa, bb, (bb-aa)))
 
             # Store values at matching indices
             num_matches_snap[ii] = bb - aa
@@ -392,7 +382,6 @@ def _merger_details_snap(core, snapshots, merger_bh_ids):
                 data_snap[DETAILS.IDS] = np.random.choice(
                     dets[DETAILS.IDS][cut], size=MAX_PER_SNAP, replace=False)
                 data_snap[DETAILS.SCALES] = interp_scales
-                # data_snap[DETAILS.DMDTS] = np.zeros_like(data_snap[DETAILS.SCALES])
                 num_stored_snap[ii] += MAX_PER_SNAP
             else:
                 data_snap = {kk: np.array(dets[kk][cut]) for kk in DETAILS_PHYSICAL_KEYS}
@@ -449,7 +438,7 @@ def _save_merger_details_hdf5(core, fname, mdets):
     shutil.move(temp_fname, fname)
 
     size_str = zio.get_file_size(fname)
-    log.warning("Saved merger details {} to '{}', size {}".format(fname, size_str))
+    log.warning("Saved merger details to '{}', size {}".format(fname, size_str))
 
     return
 
@@ -475,7 +464,7 @@ def _save_merger_details_npz(core, fname, mdets):
     shutil.move(temp_fname, fname)
 
     size_str = zio.get_file_size(fname)
-    log.warning("Saved merger details {} to '{}', size {}".format(fname, size_str))
+    log.warning("Saved merger details to '{}', size {}".format(fname, size_str))
 
     return data
 
