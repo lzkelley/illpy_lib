@@ -25,7 +25,7 @@ except ImportError:
 
 from illpy_lib.constants import DTYPE, NUM_SNAPS
 from illpy_lib.illbh import Core
-from illpy_lib.illbh.bh_constants import DETAILS
+from illpy_lib.illbh.bh_constants import DETAILS, load_hdf5_to_mem
 
 VERSION = 0.3                                    # Version of details
 
@@ -255,6 +255,7 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     """
 
     log = core.log
+    cosmo = core.cosmo
     log.debug("details._reformat_to_hdf5()")
     log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
 
@@ -283,6 +284,18 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     num_unique = u_ids.size
     log.info("\tunique IDs: {}".format(zio.frac_str(num_unique, ids.size)))
 
+    # Calculate mass-differences
+    dmdts = np.zeros_like(mdots)
+    for ii, nn in zip(u_inds, u_counts):
+        j0 = slice(ii, ii+nn-1)
+        j1 = slice(ii+1, ii+nn)
+        t0 = cosmo.scale_to_age(scales[j0])
+        t1 = cosmo.scale_to_age(scales[j1])
+        m0 = masses[j0]
+        m1 = masses[j1]
+        dt = t1 - t0
+        dmdts[j1] = (m1 - m0) / dt
+
     with h5py.File(out_fname, 'w') as out:
         out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
         out.attrs[DETAILS.SNAP] = snap
@@ -294,12 +307,13 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
         out.create_dataset(DETAILS.SCALES, data=scales)
         out.create_dataset(DETAILS.MASSES, data=masses)
         out.create_dataset(DETAILS.MDOTS, data=mdots)
+        out.create_dataset(DETAILS.DMDTS, data=dmdts)
         out.create_dataset(DETAILS.RHOS, data=rhos)
         out.create_dataset(DETAILS.CS, data=cs)
 
-        out.create_dataset('unique_ids', data=u_ids)
-        out.create_dataset('unique_indices', data=u_inds)
-        out.create_dataset('unique_counts', data=u_counts)
+        out.create_dataset(DETAILS.UNIQUE_IDS, data=u_ids)
+        out.create_dataset(DETAILS.UNIQUE_INDICES, data=u_inds)
+        out.create_dataset(DETAILS.UNIQUE_COUNTS, data=u_counts)
 
     size_str = zio.get_file_size(out_fname)
     log.info("\tSaved snap {} to '{}', size {}".format(snap, out_fname, size_str))
@@ -389,32 +403,58 @@ def load_details(snap, core=None):
     fname = core.paths.fname_details_snap(snap)
     log.debug("Filename for snap {}: '{}'".format(snap, fname))
 
-    err = []
-    with h5py.File(fname, 'r') as data:
-        if data.attrs[DETAILS.RUN] != core.sets.RUN_NUM:
-            err.append("Run numbers do not match!")
+    dets = load_hdf5_to_mem(fname)
+    return dets
 
-        if data.attrs[DETAILS.SNAP] != snap:
-            err.append("Snap numbers do not match!")
 
-        if data.attrs[DETAILS.VERSION] != VERSION:
-            err.append("Unexpected version number!")
+def calc_dmdt_for_details(core=None):
+    """Calculate mass-differences as estimate for accretion rates, add/overwrite in HDF5 files.
+    """
+    core = Core.load(core)
+    cosmo = core.cosmo
 
-        if len(err) > 0:
-            err = ",  ".join(err)
-            log.raise_error(err)
+    for snap in core.tqdm(range(NUM_SNAPS)):
+        fname = core.paths.fname_details_snap(snap)
+        with h5py.File(fname, 'a') as data:
+            scales = data[DETAILS.SCALES]
+            if scales.size == 0:
+                continue
 
-        log.debug("File saved at '{}'".format(data.attrs[DETAILS.CREATED]))
+            # These are already sorted by ID and scale-factor, so contiguous and chronological
+            # for each BH
+            masses = data[DETAILS.MASSES]
+            mdots = data[DETAILS.MDOTS]
 
-        ids = data[DETAILS.IDS][:]
-        scales = data[DETAILS.SCALES][:]
-        masses = data[DETAILS.MASSES][:]
-        mdots = data[DETAILS.MDOTS][:]
-        rhos = data[DETAILS.RHOS][:]
-        cs = data[DETAILS.CS][:]
+            # u_ids = data[DETAILS.UNIQUE_IDS]
+            u_inds = data[DETAILS.UNIQUE_INDICES]
+            u_counts = data[DETAILS.UNIQUE_COUNTS]
 
-    return ids, scales, masses, mdots, rhos, cs
+            # Calculate mass-differences
+            dmdts = np.zeros_like(mdots)
+            for ii, nn in zip(u_inds, u_counts):
+                j0 = slice(ii, ii+nn-1)
+                j1 = slice(ii+1, ii+nn)
+                t0 = cosmo.scale_to_age(scales[j0])
+                t1 = cosmo.scale_to_age(scales[j1])
+                m0 = masses[j0]
+                m1 = masses[j1]
+                dm = m1 - m0
+                dt = t1 - t0
+
+                ss = np.ones_like(dm)
+                neg = (dm < 0.0) | (dt < 0.0)
+                ss[neg] *= -1
+
+                inds = (dt != 0.0)
+                dmdts[j1][inds] = ss[inds] * np.fabs(dm[inds] / dt[inds])
+
+            del data[DETAILS.DMDTS]
+            data.create_dataset(DETAILS.DMDTS, data=dmdts)
+
+    return
 
 
 if __name__ == "__main__":
     main(reorganize_flag=False, reformat_flag=True)
+
+    # calc_dmdt_for_details(core=None)
