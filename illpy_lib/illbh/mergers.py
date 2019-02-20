@@ -24,9 +24,7 @@ except ImportError:
     import illpy_lib  # noqa
 
 
-from illpy_lib.illbh.bh_constants import (
-    MERGERS_PHYSICAL_KEYS, MERGERS, BH_TYPE, NUM_BH_TYPES, GET_MERGERS_FIXED_FILENAME
-)
+from illpy_lib.illbh.bh_constants import MERGERS, BH_TYPE, load_hdf5_to_mem
 from illpy_lib.illbh import Core
 from illpy_lib.constants import DTYPE
 
@@ -201,6 +199,38 @@ def crosscheck(core=None, recreate=None):   # run, mrgs, verbose=True):
     _crosscheck_mergers(core, fname_out)
 
     return fname_out
+
+
+def load_temp_mergers(core=None):
+    core = Core.load(core)
+    log = core.log
+    log.debug("mergers.load_temp_mergers()")
+
+    fname_temp = core.paths.fname_mergers_temp()
+    if not os.path.exists(fname_temp):
+        log.error("ERROR: File '{}' does not exist!".format(fname_temp))
+        return None
+
+    data = load_hdf5_to_mem(fname_temp)
+    log.info("Loaded {} temporary mergers, keys: {}".format(
+        data[MERGERS.SCALES].size, list(data.keys())))
+    return data
+
+
+def load_fixed_mergers(core=None):
+    core = Core.load(core)
+    log = core.log
+    log.debug("mergers.load_fixed_mergers()")
+
+    fname_fixed = core.paths.fname_mergers_fixed()
+    if not os.path.exists(fname_fixed):
+        log.error("File '{}' does not exist!".format(fname_fixed))
+        return None
+
+    data = load_hdf5_to_mem(fname_fixed)
+    log.info("Loaded {} fixed mergers, keys: {}".format(
+        data[MERGERS.SCALES].size, list(data.keys())))
+    return data
 
 
 def _crosscheck_mergers(core, fname_out):
