@@ -35,7 +35,7 @@ import zcode.math as zmath
 
 from illpy_lib.constants import NUM_SNAPS, DTYPE
 from illpy_lib.illbh import bh_constants
-from illpy_lib.illbh.bh_constants import (DETAILS, _LOG_DIR, _distributeSnapshots,
+from illpy_lib.illbh.bh_constants import (DETAILS, _LOG_DIR, _distribute_snapshots,
                                           GET_DETAILS_UNIQUE_IDS_FILENAME, _checkLoadSave)
 
 __version__ = '0.4'
@@ -246,7 +246,7 @@ def _calculateAllUniqueIDs(run=1, loadsave=True, log=None):
     # Initialize log
     log = _checkLog(log, run=run)
     # Distribute snapshot numbers to different processors
-    mySnaps = _distributeSnapshots(comm)
+    mySnaps = _distribute_snapshots(comm)
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))

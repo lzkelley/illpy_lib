@@ -25,7 +25,9 @@ Functions
 import os
 import logging
 from glob import glob
+
 import numpy as np
+import h5py
 
 import zcode.inout as zio
 
@@ -71,7 +73,7 @@ _ILLUSTRIS_DETAILS_DIRS = {
 
 # Post-Processing Parameters
 # ==========================
-_MAX_DETAILS_PER_SNAP           = 10   # Number of dets entries to store per snapshot
+# _MAX_DETAILS_PER_SNAP           = 10   # Number of dets entries to store per snapshot
 
 _PROCESSED_MERGERS_DIR          = _PROCESSED_DIR + "blackhole_mergers/"
 _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
@@ -118,7 +120,7 @@ class MERGERS:
     ONTOP_PREV = "ontop_prev"
 
 
-MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
+# MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
 
 
 class DETAILS:
@@ -133,12 +135,17 @@ class DETAILS:
     SCALES  = 'scales'
     MASSES  = 'masses'
     MDOTS   = 'mdots'
+    DMDTS   = 'dmdts'     # differences in masses
     RHOS    = 'rhos'
     CS      = 'cs'
 
+    UNIQUE_IDS = 'unique_ids'
+    UNIQUE_INDICES = 'unique_indices'
+    UNIQUE_COUNTS = 'unique_counts'
+
 
 DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
-                         DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
+                         DETAILS.MDOTS, DETAILS.DMDTS, DETAILS.RHOS, DETAILS.CS]
 
 
 class BH_TYPE:
@@ -389,7 +396,7 @@ def check_log(log, name='log.log', **kwargs):
     return log
 
 
-def _distributeSnapshots(comm):
+def _distribute_snapshots(comm):
     """Evenly distribute snapshot numbers across multiple processors.
     """
     size = comm.size
@@ -430,6 +437,12 @@ def _checkLoadSave(fname, loadsave, log):
         log.debug(" - File does not exist.")
 
     return data
+
+
+def load_hdf5_to_mem(fname):
+    with h5py.File(fname, 'r') as data:
+        out = {kk: data[kk][:] for kk in data.keys()}
+    return out
 
 
 assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \

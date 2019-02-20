@@ -1,35 +1,5 @@
-"""Routines to match BH Mergers with BH Details entries based on times and IDs.
-
-The matched dets files should be precomputed by executing this file as a script,
-for example:
-
-    $ mpirun -n 64 python -m illpy_lib.illbh.BHMatcher
-
-This will create the 'merger-dets' and 'remnant-dets' files respectively, which can then be
-loaded via the API functions `loadMergerDetails` and `loadRemnantDetails` respectively.
-
-
-Functions
----------
--   main                     - Check if dets files exist, if not manage their creation.
--   loadMergerDetails        - Load a previously calculated merger-dets file.
--   loadRemnantDetails       - Load a previously calculated remnant-dets file.
-
--   allDetailsForBHLineage   - Load all dets entries for a given BH lineage (merger tree).
--   inferMergerOutMasses     - Infer 'out' BH masses at time of mrgs based on available data.
-
--   _matchMergerDetails      - Find dets entries matching merger-BH ID numbers.
--   _createRemnantDetails    -
--   _cleanErrDetails         -
--   _matchRemnantDetails     - Combine merger-dets entries to obtain an entire remnant's life.
--   _unmergedMasses          -
--   _detailsForMergers_snapshots - Find dets entries for BH IDs in a particular snapshots.
--   _saveDetails             - Package dets into dictionary and save to NPZ file.
--   _findNextMerger          - Find the next merger index in which a particular BH participates.
--   _indBefAft               - Retrieve the index matching the minimum greater-than zero of input.
-
 """
-
+"""
 
 import os
 import logging
@@ -41,7 +11,7 @@ from illpy_lib.illbh import bh_constants
 from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
 from illpy_lib.illbh.bh_constants import MERGERS, DETAILS, BH_TREE, _LOG_DIR, BH_TYPE, \
     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
-    _distributeSnapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
+    _distribute_snapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
 from illpy_lib.constants import DTYPE, NUM_SNAPS
 
 import zcode.inout as zio
@@ -264,7 +234,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     # Distribute snapshots to each processor
     log.debug(" - Barrier.")
     comm.Barrier()
-    mySnaps = _distributeSnapshots(comm)
+    mySnaps = _distribute_snapshots(comm)
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))
 
@@ -558,7 +528,7 @@ def _matchMergerDetails(run, log):
     bhIDsUnique = comm.bcast(bhIDsUnique, root=0)
 
     # Distribute snapshots to each processor
-    mySnaps = _distributeSnapshots(comm)
+    mySnaps = _distribute_snapshots(comm)
 
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, mySnaps.size, mySnaps.min(), mySnaps.max()))

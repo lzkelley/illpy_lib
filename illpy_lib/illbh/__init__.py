@@ -18,10 +18,12 @@ class Settings(pycore.Settings):
 
     INPUT = "/n/ghernquist/Illustris/Runs/L75n1820FP/"
     # OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
-    OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
+    OUTPUT = "/n/scratchlfs/hernquist_lab/lzkelley/illustris-processed/"
 
     RECREATE = False
     BREAK_ON_FAIL = False
+
+    MAX_DETAILS_PER_SNAP = 10
 
     def add_arguments(argself, parser):
         '''
@@ -49,7 +51,7 @@ class Paths(pycore.Paths):
 
     # _MERGERS_RAW_COMBINED_FILENAME  = "ill-%d_blackhole_mergers_combined.txt"
     # _MERGERS_RAW_MAPPED_FILENAME    = "ill-%d_blackhole_mergers_mapped_v%.2f.npz"
-    FNAME_MERGERS_TEMP = "ill-{run_num:d}_blackhole_mergers_temp.txt"
+    FNAME_MERGERS_TEMP = "ill-{run_num:d}_blackhole_mergers_temp.hdf5"
 
     # _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
     FNAME_MERGERS_FIXED = "ill-{run_num:d}_blackhole_mergers_fixed.hdf5"
@@ -179,5 +181,9 @@ class Core(pycore.Core):
         mpl.use('Agg')
         return
 
+    def _load_cosmology(self):
+        import illpy_lib.illcosmo
+        cosmo = illpy_lib.illcosmo.cosmology.Illustris_Cosmology()
+        return cosmo
 
 from . import bh_constants  # noqa
