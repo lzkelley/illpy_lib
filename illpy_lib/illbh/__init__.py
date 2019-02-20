@@ -56,6 +56,9 @@ class Paths(pycore.Paths):
     # _MERGERS_FIXED_FILENAME         = "ill-%d_blackhole_mergers_fixed_v%.2f.npz"
     FNAME_MERGERS_FIXED = "ill-{run_num:d}_blackhole_mergers_fixed.hdf5"
 
+    # _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
+    FNAME_MERGER_DETAILS = "ill-{run_num:d}_blackhole_merger-details_per-snap-{per_snap:03d}.hdf5"
+
     # The substituted string should be either 'mergers' or 'details'
     _ILL_1_TXT_DIRS = [
         "txt-files-curie/blackhole_{}/",
@@ -121,6 +124,10 @@ class Paths(pycore.Paths):
         return os.path.join(self.OUTPUT, self.FNAME_DETAILS_CLEAN)
 
     @property
+    def output(self):
+        return self.OUTPUT
+
+    @property
     def output_details(self):
         return os.path.join(self.OUTPUT, "details", "")
 
@@ -156,7 +163,7 @@ class Paths(pycore.Paths):
             run_num = self._core.sets.RUN_NUM
 
         fname = self.FNAME_MERGERS_TEMP.format(run_num=run_num)
-        fname = os.path.join(self.output_details, fname)
+        fname = os.path.join(self.output, fname)
         return fname
 
     def fname_mergers_fixed(self, run_num=None):
@@ -164,7 +171,18 @@ class Paths(pycore.Paths):
             run_num = self._core.sets.RUN_NUM
 
         fname = self.FNAME_MERGERS_FIXED.format(run_num=run_num)
-        fname = os.path.join(self.output_details, fname)
+        fname = os.path.join(self.output, fname)
+        return fname
+
+    def fname_merger_details(self, run_num=None, max_per_snap=None):
+        if run_num is None:
+            run_num = self._core.sets.RUN_NUM
+
+        if max_per_snap is None:
+            max_per_snap = self._core.sets.MAX_DETAILS_PER_SNAP
+
+        fname = self.FNAME_MERGER_DETAILS.format(run_num=run_num, per_snap=max_per_snap)
+        fname = os.path.join(self.output, fname)
         return fname
 
     @property

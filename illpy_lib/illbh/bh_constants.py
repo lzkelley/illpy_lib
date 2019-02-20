@@ -85,7 +85,7 @@ _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 # _DETAILS_TEMP_FILENAME          = "ill-%d_blackhole_details_temp_snap-%d.txt"
 # _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
-_MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
+# _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
 _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
 
 _DETAILS_UNIQUE_IDS_FILENAME     = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
