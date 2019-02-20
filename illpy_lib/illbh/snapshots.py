@@ -64,7 +64,9 @@ def main():
     fname_temp = zio.modify_filename(fname, prepend='_')
 
     log.debug("Writing to temporary file '{}'".format(fname_temp))
-    with h5py.File(fname_temp, 'w') as out:
+    # log.error("WARNING: running in TEMPORARY append mode!")
+    # with h5py.File(fname_temp, 'a') as out:
+    with h5py.File(fname_temp, 'r') as out:
 
         all_ids = set()
 
@@ -82,6 +84,7 @@ def main():
 
             num_bhs = bhs['count']
             log.info("Snap {} Loaded {} BHs".format(snap, num_bhs))
+            group.attrs['count'] = num_bhs
             if num_bhs == 0:
                 continue
 
@@ -94,6 +97,24 @@ def main():
             for kk in keys:
                 group.create_dataset(kk, data=bhs[kk][:][sort])
 
+        '''
+        for snap in core.tqdm(range(NUM_SNAPS), desc='Loading snapshots'):
+
+            log.debug("Loading snap {}".format(snap))
+            snap_str = '{:03d}'.format(snap)
+            group = out[snap_str]
+
+            if 'ParticleIDs' not in group.keys():
+                log.error("Skipping snap {}".format(snap))
+                continue
+
+            ids = group['ParticleIDs']
+            num_bhs = ids.size
+            group.attrs['num'] = num_bhs
+
+            all_ids = all_ids.union(ids)
+        '''
+
         all_ids = np.array(sorted(list(all_ids)))
         first = NUM_SNAPS * np.ones_like(all_ids, dtype=np.uint32)
         last = np.zeros_like(all_ids, dtype=np.uint32)
@@ -101,14 +122,21 @@ def main():
         # Find the first and last snapshot that each BH is found in
         for snap in core.tqdm(range(NUM_SNAPS), desc='Finding first/last'):
             snap_str = '{:03d}'.format(snap)
-            ids = out[snap_str]['ParticleIDs'][:]
+            try:
+                ids = out[snap_str]['ParticleIDs'][:]
+            except KeyError as err:
+                lvl = log.INFO if (snap in [53, 55]) else log.ERROR
+                log.log(lvl, "Failed to access `ParticleIDs` from snap {}".format(snap))
+                log.log(lvl, str(err))
+                continue
+
             slots = np.searchsorted(all_ids, ids)
             first[slots] = np.minimum(first[slots], snap)
             last[slots] = np.maximum(last[slots], snap)
 
-        out.attrs['ids'] = all_ids
-        out.attrs['first_snap'] = first
-        out.attrs['last_snap'] = last
+        out.create_dataset('unique_ids', data=all_ids)
+        out.create_dataset('unique_first_snap', data=first)
+        out.create_dataset('unique_last_snap', data=last)
 
     log.debug("Moving temporary to final file '{}' ==> '{}'".format(fname_temp, fname))
     shutil.move(fname_temp, fname)
