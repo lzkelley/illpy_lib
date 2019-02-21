@@ -4,9 +4,67 @@ import os
 import glob
 
 import numpy as np
+import h5py
 np.seterr(divide='ignore', invalid='ignore')
 
 import pycore
+
+from illpy_lib import NUM_SNAPS
+
+
+class MERGERS:
+    # Meta Data
+    RUN       = 'run'
+    CREATED   = 'created'
+    NUM       = 'num'
+    VERSION   = 'version'
+    FILE      = 'filename'
+
+    # Physical Parameters
+    IDS       = 'ids'
+    SCALES    = 'scales'
+    MASSES    = 'masses'
+
+    # Maps
+    # MAP_STOM  = 's2m'
+    # MAP_MTOS  = 'm2s'
+    # MAP_ONTOP = 'ontop'
+    SNAP_NUMS = "snap_nums"
+    ONTOP_NEXT = "ontop_next"
+    ONTOP_PREV = "ontop_prev"
+
+
+MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
+
+
+class DETAILS:
+    RUN     = 'run'
+    CREATED = 'created'
+    VERSION = 'version'
+    NUM     = 'num'
+    SNAP    = 'snap'
+    FILE    = 'filename'
+
+    IDS     = 'id'
+    SCALES  = 'scales'
+    MASSES  = 'masses'
+    MDOTS   = 'mdots'
+    DMDTS   = 'dmdts'     # differences in masses
+    RHOS    = 'rhos'
+    CS      = 'cs'
+
+    UNIQUE_IDS = 'unique_ids'
+    UNIQUE_INDICES = 'unique_indices'
+    UNIQUE_COUNTS = 'unique_counts'
+
+
+DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
+                         DETAILS.MDOTS, DETAILS.DMDTS, DETAILS.RHOS, DETAILS.CS]
+
+
+class BH_TYPE:
+    IN  = 0
+    OUT = 1
 
 
 class Settings(pycore.Settings):
@@ -204,5 +262,28 @@ class Core(pycore.Core):
         import illpy_lib.illcosmo
         cosmo = illpy_lib.illcosmo.cosmology.Illustris_Cosmology()
         return cosmo
+
+
+def load_hdf5_to_mem(fname):
+    with h5py.File(fname, 'r') as data:
+        out = {kk: data[kk][:] for kk in data.keys()}
+    return out
+
+
+def _distribute_snapshots(comm):
+    """Evenly distribute snapshot numbers across multiple processors.
+    """
+    size = comm.size
+    rank = comm.rank
+    mySnaps = np.arange(NUM_SNAPS)
+    if size > 1:
+        # Randomize which snapshots go to which processor for load-balancing
+        mySnaps = np.random.permutation(mySnaps)
+        # Make sure all ranks are synchronized on initial (randomized) list before splitting
+        mySnaps = comm.bcast(mySnaps, root=0)
+        mySnaps = np.array_split(mySnaps, size)[rank]
+
+    return mySnaps
+
 
 from . import bh_constants  # noqa

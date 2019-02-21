@@ -98,61 +98,6 @@ _BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz
 # _LOG_DIR = "./logs/"
 
 
-class MERGERS:
-    # Meta Data
-    RUN       = 'run'
-    CREATED   = 'created'
-    NUM       = 'num'
-    VERSION   = 'version'
-    FILE      = 'filename'
-
-    # Physical Parameters
-    IDS       = 'ids'
-    SCALES    = 'scales'
-    MASSES    = 'masses'
-
-    # Maps
-    # MAP_STOM  = 's2m'
-    # MAP_MTOS  = 'm2s'
-    # MAP_ONTOP = 'ontop'
-    SNAP_NUMS = "snap_nums"
-    ONTOP_NEXT = "ontop_next"
-    ONTOP_PREV = "ontop_prev"
-
-
-# MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
-
-
-class DETAILS:
-    RUN     = 'run'
-    CREATED = 'created'
-    VERSION = 'version'
-    NUM     = 'num'
-    SNAP    = 'snap'
-    FILE    = 'filename'
-
-    IDS     = 'id'
-    SCALES  = 'scales'
-    MASSES  = 'masses'
-    MDOTS   = 'mdots'
-    DMDTS   = 'dmdts'     # differences in masses
-    RHOS    = 'rhos'
-    CS      = 'cs'
-
-    UNIQUE_IDS = 'unique_ids'
-    UNIQUE_INDICES = 'unique_indices'
-    UNIQUE_COUNTS = 'unique_counts'
-
-
-DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
-                         DETAILS.MDOTS, DETAILS.DMDTS, DETAILS.RHOS, DETAILS.CS]
-
-
-class BH_TYPE:
-    IN  = 0
-    OUT = 1
-
-
 NUM_BH_TYPES = 2
 
 
@@ -396,22 +341,6 @@ def check_log(log, name='log.log', **kwargs):
     return log
 
 
-def _distribute_snapshots(comm):
-    """Evenly distribute snapshot numbers across multiple processors.
-    """
-    size = comm.size
-    rank = comm.rank
-    mySnaps = np.arange(NUM_SNAPS)
-    if size > 1:
-        # Randomize which snapshots go to which processor for load-balancing
-        mySnaps = np.random.permutation(mySnaps)
-        # Make sure all ranks are synchronized on initial (randomized) list before splitting
-        mySnaps = comm.bcast(mySnaps, root=0)
-        mySnaps = np.array_split(mySnaps, size)[rank]
-
-    return mySnaps
-
-
 def _checkLoadSave(fname, loadsave, log):
     """See if a file exists and can be loaded, or if it needs to be reconstructed.
     """
@@ -439,14 +368,10 @@ def _checkLoadSave(fname, loadsave, log):
     return data
 
 
-def load_hdf5_to_mem(fname):
-    with h5py.File(fname, 'r') as data:
-        out = {kk: data[kk][:] for kk in data.keys()}
-    return out
-
-
+'''
 assert BH_TYPE.IN == 0 and BH_TYPE.OUT == 1, \
     "``BH_TYPE.{IN/OUT}`` MUST be in the proper order!"
 
 assert BH_TIME.BEFORE == 0 and BH_TIME.AFTER == 1 and BH_TIME.FIRST == 2, \
     "``BH_TIME.{BEFORE/AFTER/FIRST}`` MUST be in the proper order!"
+'''
