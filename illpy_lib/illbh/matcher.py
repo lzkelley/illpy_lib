@@ -28,7 +28,7 @@ except ImportError:
 from illpy_lib.constants import NUM_SNAPS
 from illpy_lib.illbh import Core
 from illpy_lib.illbh.bh_constants import (
-    MERGERS, DETAILS, _distribute_snapshots, DETAILS_PHYSICAL_KEYS
+    MERGERS, DETAILS, _distribute_snapshots, DETAILS_PHYSICAL_KEYS, load_hdf5_to_mem
 )
 
 # from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
@@ -151,8 +151,8 @@ def _merger_details(core):
     # my_snaps = [100, 101] if rank == 0 else [102, 103]
     # my_snaps = np.array(my_snaps)
 
-    log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
-        rank, size, np.size(my_snaps), np.min(my_snaps), np.max(my_snaps)))
+    log.info("Rank {:d}/{:d} with {:d} Snapshots {}".format(
+        rank, size, np.size(my_snaps), zmath.str_array(my_snaps)))
 
     # Get dets entries for unique merger IDs in snapshot list
     # ----------------------------------------------------------
@@ -175,10 +175,6 @@ def _merger_details(core):
 
             # Iterate over each black-hole and processor, collect results into single arrays
             for ii, mm in enumerate(merger_bh_ids):
-                # if ii > 40:
-                #     log.error("WARNING: TEST BREAK")
-                #     break
-
                 for jj in range(size):
                     temp_ids = temp_mdets[DETAILS.IDS][jj][ii]
                     if np.ndim(temp_ids) > 1:
@@ -260,13 +256,12 @@ def _merger_details(core):
                 dups = dup_scales & dup_masses
                 nd = np.count_nonzero(dups)
                 if nd > 0:
+                    # Delete the latter (later) entries
+                    dups = np.append(False, dups)
                     num_dups[ii, jj] = nd
-                    # scales = np.delete(scales, dups)
-                    # masses = np.delete(masses, dups)
                     scales = scales[~dups]
                     masses = masses[~dups]
                     for kk in DETAILS_PHYSICAL_KEYS:
-                        # mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], dups)
                         mdets[kk][ii, jj] = mdets[kk][ii, jj][~dups]
 
                 # Find and remove non-monotonic entries
@@ -274,13 +269,11 @@ def _merger_details(core):
                 nb = np.count_nonzero(bads)
                 if nb > 0:
                     num_bads[ii, jj] = nb
-                    # scales = np.delete(scales, bads)
-                    # masses = np.delete(masses, bads)
+                    # Delete the former (earlier) entries
                     bads = np.append(bads, False)
                     scales = scales[~bads]
                     masses = masses[~bads]
                     for kk in DETAILS_PHYSICAL_KEYS:
-                        # mdets[kk][ii, jj] = np.delete(mdets[kk][ii, jj], bads)
                         mdets[kk][ii, jj] = mdets[kk][ii, jj][~bads]
 
                 nums[ii, jj] = scales.size
@@ -467,6 +460,19 @@ def _save_merger_details_npz(core, fname, mdets):
     log.warning("Saved merger details to '{}', size {}".format(fname, size_str))
 
     return data
+
+
+def load_merger_details_npz(core):
+    fname = core.paths.fname_merger_details()
+    fname = fname.replace('.hdf5', '.npz')
+    mdets = zio.npzToDict(fname)
+    return mdets
+
+
+def load_merger_details_hdf5(core):
+    fname = core.paths.fname_merger_details()
+    mdets = load_hdf5_to_mem(fname)
+    return mdets
 
 
 '''
