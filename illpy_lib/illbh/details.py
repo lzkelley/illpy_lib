@@ -10,6 +10,7 @@ import numpy as np
 import h5py
 
 import zcode.inout as zio
+import zcode.math as zmath
 
 
 try:
@@ -411,10 +412,14 @@ def calc_dmdt_for_details(core=None):
     """Calculate mass-differences as estimate for accretion rates, add/overwrite in HDF5 files.
     """
     core = Core.load(core)
+    log = core.log
     cosmo = core.cosmo
 
+    # log.warning("WARNING: testing `calc_dmdt_for_details`!")
+    # for snap in [135]:
     for snap in core.tqdm(range(NUM_SNAPS)):
         fname = core.paths.fname_details_snap(snap)
+        log.debug("Snap {}: '{}'".format(snap, fname))
         with h5py.File(fname, 'a') as data:
             scales = data[DETAILS.SCALES]
             if scales.size == 0:
@@ -423,14 +428,15 @@ def calc_dmdt_for_details(core=None):
             # These are already sorted by ID and scale-factor, so contiguous and chronological
             # for each BH
             masses = data[DETAILS.MASSES]
-            mdots = data[DETAILS.MDOTS]
+            # mdots = data[DETAILS.MDOTS]
 
-            # u_ids = data[DETAILS.UNIQUE_IDS]
             u_inds = data[DETAILS.UNIQUE_INDICES]
             u_counts = data[DETAILS.UNIQUE_COUNTS]
 
             # Calculate mass-differences
-            dmdts = np.zeros_like(mdots)
+            dmdts = np.zeros_like(masses)
+            count = 0
+            count_all = 0
             for ii, nn in zip(u_inds, u_counts):
                 j0 = slice(ii, ii+nn-1)
                 j1 = slice(ii+1, ii+nn)
@@ -448,8 +454,10 @@ def calc_dmdt_for_details(core=None):
                 inds = (dt != 0.0)
                 dmdts[j1][inds] = ss[inds] * np.fabs(dm[inds] / dt[inds])
 
-            del data[DETAILS.DMDTS]
-            data.create_dataset(DETAILS.DMDTS, data=dmdts)
+                count += np.count_nonzero(inds)
+                count_all += inds.size
+
+            log.info("dM/dt nonzero : " + zio.frac_str(np.count_nonzero(dmdts), masses.size))
 
     return
 
