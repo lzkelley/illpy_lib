@@ -98,7 +98,7 @@ _BLACKHOLE_TREE_DETAILS_FILENAME = "ill-%d_fin-merger-%d_bh-tree-details_v%s.npz
 # _LOG_DIR = "./logs/"
 
 
-NUM_BH_TYPES = 2
+# NUM_BH_TYPES = 2
 
 
 class BH_TIME:

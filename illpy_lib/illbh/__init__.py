@@ -66,6 +66,24 @@ class BH_TYPE:
     IN  = 0
     OUT = 1
 
+    def __len__(self):
+        return 2
+
+
+class BH_TREE:
+    LAST         = 'last'
+    NEXT         = 'next'
+    LAST_TIME    = 'lastTime'
+    NEXT_TIME    = 'nextTime'
+    NUM_FUTURE   = 'numFuture'
+    NUM_PAST     = 'numPast'
+    TIME_BETWEEN = 'timeBetween'
+
+    CREATED      = 'created'
+    RUN          = 'run'
+    VERSION      = 'version'
+    NUM          = 'num'
+
 
 class Settings(pycore.Settings):
 
@@ -117,6 +135,9 @@ class Paths(pycore.Paths):
 
     # _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
     FNAME_MERGER_DETAILS = "ill-{run_num:d}_blackhole_merger-details_per-snap-{per_snap:03d}.hdf5"
+
+    # _BLACKHOLE_TREE_FILENAME         = "ill-%d_bh-tree_v%.2f.npz"
+    FNAME_MERGER_TREE = "ill-{run_num:d}_blackhole_merger-tree.hdf5"
 
     # The substituted string should be either 'mergers' or 'details'
     _ILL_1_TXT_DIRS = [
@@ -230,6 +251,14 @@ class Paths(pycore.Paths):
             run_num = self._core.sets.RUN_NUM
 
         fname = self.FNAME_MERGERS_FIXED.format(run_num=run_num)
+        fname = os.path.join(self.output, fname)
+        return fname
+
+    def fname_merger_tree(self, run_num=None):
+        if run_num is None:
+            run_num = self._core.sets.RUN_NUM
+
+        fname = self.FNAME_MERGER_TREE.format(run_num=run_num)
         fname = os.path.join(self.output, fname)
         return fname
 
