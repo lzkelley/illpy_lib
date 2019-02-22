@@ -25,10 +25,10 @@ except ImportError:
     import illpy_lib  # noqa
 
 
-from illpy_lib.constants import NUM_SNAPS
-from illpy_lib.illbh import Core
-from illpy_lib.illbh.bh_constants import (
-    MERGERS, DETAILS, _distribute_snapshots, DETAILS_PHYSICAL_KEYS, load_hdf5_to_mem
+from illpy_lib.constants import NUM_SNAPS, CONV_ILL_TO_SOL
+from illpy_lib.illbh import (
+    Core, _distribute_snapshots, load_hdf5_to_mem,
+    DETAILS_PHYSICAL_KEYS, MERGERS, DETAILS, BH_TYPE
 )
 
 # from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
@@ -462,17 +462,121 @@ def _save_merger_details_npz(core, fname, mdets):
     return data
 
 
-def load_merger_details_npz(core):
+def load_merger_details(core):
+    return _load_merger_details_npz(core)
+
+
+def _load_merger_details_npz(core):
     fname = core.paths.fname_merger_details()
     fname = fname.replace('.hdf5', '.npz')
     mdets = zio.npzToDict(fname)
     return mdets
 
 
-def load_merger_details_hdf5(core):
+def _load_merger_details_hdf5(core):
     fname = core.paths.fname_merger_details()
     mdets = load_hdf5_to_mem(fname)
     return mdets
+
+
+def infer_merger_out_masses(core=None, mrgs=None, mdets=None):
+    """
+    """
+    core = Core.load(core)
+    log = core.log
+    log.debug("infer_merger_out_masses()")
+
+    # Load Mergers
+    if (mrgs is None):
+        from illpy_lib.illbh import mergers
+        # mrgs = mergers.load_fixed_mergers(run, verbose=False)
+        mrgs = mergers.load_temp_mergers(core=core)
+
+    m_scales = mrgs[MERGERS.SCALES]
+    m_masses = mrgs[MERGERS.MASSES]
+    # num_mergers = mrgs[MERGERS.NUM]
+    # num_mergers = np.shape(m_scales)[0]
+    del mrgs
+
+    # Load Merger Details
+    if (mdets is None):
+        mdets = load_merger_details(core)
+
+    d_masses = mdets[DETAILS.MASSES]
+    d_scales = mdets[DETAILS.SCALES]
+    del mdets
+
+    # Find dets entries before and after merger
+    mass_bef = np.zeros_like(m_masses)
+    mass_aft = np.zeros_like(m_masses)
+    time_bef = np.zeros_like(m_masses)
+    time_aft = np.zeros_like(m_masses)
+    num_bef = 0
+    num_aft = 0
+    for ii, sc in enumerate(m_scales):
+        for bh in [BH_TYPE.IN, BH_TYPE.OUT]:
+            d_sc = d_scales[ii, bh]
+            d_ma = d_masses[ii, bh]
+            # print(ii, bh, sc, zmath.minmax(d_sc), d_sc.size)
+
+            if (d_scales[ii].size == 0):
+                log.warning("Merger %s with zero dets entries" % str(ii))
+            else:
+                # Find last index before merger
+                # 'before' is ``sc > d_scales``
+                # bef = _indBefAft(sc - d_scales[ii, bh])
+                bef = zmath.argnearest(d_sc, sc, side='left', assume_sorted=True)
+
+                if (bef >= 0):
+                    # print("\tbef", bef, sc, d_sc[bef])
+                    mass_bef[ii, bh] = d_ma[bef]
+                    time_bef[ii, bh] = np.fabs(d_sc[bef] - sc)
+                    num_bef += 0.9
+
+                # 'after' is ``d_scales > sc``
+                # aft = _indBefAft(d_sc - sc)
+                aft = zmath.argnearest(d_sc, sc, side='right', assume_sorted=True)
+                if (aft < d_sc.size):
+                    # print("\taft", aft, sc, d_sc[aft])
+                    mass_aft[ii, bh] = d_ma[aft]
+                    time_aft[ii, bh] = np.fabs(d_sc[aft] - sc)
+                    num_aft += 1
+
+    OUT = BH_TYPE.OUT
+
+    old = np.array(m_masses[:, OUT])
+    t_bef = time_bef[:, OUT]
+    t_aft = time_aft[:, OUT]
+    log.info("Bef: " + zmath.stats_str(t_bef, filter='>'))
+    log.info("Aft: " + zmath.stats_str(t_aft, filter='>'))
+
+    new = np.zeros_like(old)
+
+    # Masses should only be wrong when small
+    _inds = (old * CONV_ILL_TO_SOL.MASS < 1e7)
+    log.info("Wrong masses: " + zio.frac_str(_inds))
+    inds = ~_inds
+    new[inds] = old[inds]
+
+    inds = np.isclose(new, 0.0) & (mass_bef[:, OUT] > 0.0) & (t_bef < 1e-2)
+    log.debug("Fixing with bef: " + zio.frac_str(inds))
+    new[inds] = mass_bef[inds, OUT]
+
+    inds = np.isclose(new, 0.0) & (mass_aft[:, OUT] > 0.0)
+    new[inds] = mass_aft[inds, OUT] - m_masses[inds, BH_TYPE.IN]
+    log.debug("Fixing with aft: " + zio.frac_str(inds))
+
+    inds = np.isclose(new, 0.0)
+    log.info("Unfixed: " + zio.frac_str(inds))
+
+    bads = (new > old)
+    log.info("Bad: " + zio.frac_str(bads))
+    # print(np.where(bads)[0])
+
+    new_masses = np.array(m_masses)
+    new_masses[:, OUT] = new
+
+    return new_masses
 
 
 '''
@@ -681,110 +785,6 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
                             target_ids=bhIDs, target_mergers=mrgInds, final_merger=finMerger)
 
     return
-
-
-def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
-    """Based on 'merger' and 'dets' information, infer the 'out' BH masses at time of mrgs.
-
-    The Illustris 'merger' files have the incorrect values output for the 'out' BH mass.  This
-    method uses the data included in 'dets' entries (via ``details``), which were matched
-    to mrgs here in ``BHMatcher``, to infer the approximate mass of the 'out' BH at the
-    time of merger.
-
-    The ``mergerDetails`` entries have the dets for both 'in' and 'out' BHs both 'before' and
-    'after' merger.  First the 'out' BH's entries just 'before' merger are used directly as the
-    'inferred' mass.  In the few cases where these entries don't exist, the code falls back on
-    calculating the difference between the total mass (given by the 'out' - 'after' entry) and the
-    'in' BH mass recorded by the merger event (which should be correct); if this still doesn't
-    work (which shouldn't ever happen), then the difference between the 'out'-'after' mass and the
-    'in'-'before' mass is used, which should also be good --- but slightly less accurate (because
-    the 'in'-'before' mass might have been recorded some small period of time before the actual
-    merger event.
-
-    Arguments
-    ---------
-       run     <int>  :
-       mrgs <dict> :
-       mdets   <dict> :
-       verbose <str>  :
-       debug   <str>  :
-
-    Returns
-    -------
-       outMass <flt64>[N] : inferred 'out' BH masses at the time of merger
-
-    """
-    if (log is None):
-        log = bh_constants._loadLogger(
-            __file__, verbose=True, debug=False, run=run, tofile=False)
-
-    log.debug("inferMergerOutMasses()")
-
-    # Load Mergers
-    if (mrgs is None):
-        from illpy_lib.illbh import mergers
-        mrgs = mergers.load_fixed_mergers(run, verbose=False)
-    m_scales = mrgs[MERGERS.SCALES]
-    m_masses = mrgs[MERGERS.MASSES]
-    num_mergers = mrgs[MERGERS.NUM]
-    del mrgs
-
-    # Load Merger Details
-    if (mdets is None):
-        mdets = loadMergerDetails(run, log=log)
-    d_masses = mdets[DETAILS.MASSES]
-    d_scales = mdets[DETAILS.SCALES]
-    del mdets
-
-    # Find dets entries before and after merger
-    massBef = np.zeros_like(m_masses)
-    massAft = np.zeros_like(m_masses)
-    for ii, sc in enumerate(m_scales):
-        for bh in [BH_TYPE.IN, BH_TYPE.OUT]:
-            if (d_scales[ii].size == 0):
-                log.warning("Merger %s with zero dets entries" % str(ii))
-            else:
-                # 'before' is ``sc > d_scales``
-                bef = _indBefAft(sc - d_scales[ii, bh])
-                if (bef is not None):
-                    if (np.isfinite(d_masses[ii, bh][bef])):
-                        massBef[ii, bh] = d_masses[ii, bh][bef]
-                    elif (bef > 0):
-                        massBef[ii, bh] = d_masses[ii, bh][bef-1]
-
-                # 'after' is ``d_scales > sc``
-                aft = _indBefAft(d_scales[ii, bh] - sc)
-                if (aft):
-                    massAft[ii, bh] = d_masses[ii, bh][aft]
-
-    # Fix Mass Entries
-    # ----------------
-    massBef = massBef.reshape(2*num_mergers)
-    massAft = massAft.reshape(2*num_mergers)
-    masses = np.zeros_like(massBef)
-    ntot = masses.size
-
-    bads = np.where(np.isfinite(massBef) == False)[0]
-    print(("Bads Before = ", bads))
-    print(("\t", massBef[bads]))
-    bads = np.where(np.isfinite(massAft) == False)[0]
-    print(("Bads After = ", bads))
-    print(("\t", massAft[bads]))
-
-    # Use 'before' masses
-    inds = np.where(massBef > 0.0)
-    masses[inds] = massBef[inds]
-    bads = np.where(masses == 0.0)
-    nfix = np.size(inds)
-    nbad = np.size(bads)
-    frac = nfix/ntot
-    log.info(" - Used %d/%d = %.4f after masses.  %d remain" % (nfix, ntot, frac, nbad))
-
-    massBef = massBef.reshape(num_mergers, 2)
-    massAft = massAft.reshape(num_mergers, 2)
-    masses = masses.reshape(num_mergers, 2)
-
-    return masses
 
 
 def _createRemnantDetails(run, log=None, mrgs=None, mdets=None, tree=None):
@@ -1268,7 +1268,7 @@ def _findNextMerger(myID, myScale, ids, scales):
 def _indBefAft(scaleDiff):
     """Retrieve the index matching the minimum of `scaleDiff` greater-than zero.
 
-    Used by: `inferMergerOutMasses`
+    Used by: `infer_merger_out_masses`
     """
     try:
         ind = zmath.argextrema(scaleDiff, 'min', 'g')
