@@ -390,7 +390,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     return
 
 
-def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
+def infer_merger_out_masses(run, mrgs=None, mdets=None, log=None):
     """Based on 'merger' and 'dets' information, infer the 'out' BH masses at time of mrgs.
 
     The Illustris 'merger' files have the incorrect values output for the 'out' BH mass.  This
@@ -425,7 +425,7 @@ def inferMergerOutMasses(run, mrgs=None, mdets=None, log=None):
         log = bh_constants._loadLogger(
             __file__, verbose=True, debug=False, run=run, tofile=False)
 
-    log.debug("inferMergerOutMasses()")
+    log.debug("infer_merger_out_masses()")
 
     # Load Mergers
     if (mrgs is None):
@@ -1417,7 +1417,7 @@ def _findNextMerger(myID, myScale, ids, scales):
 def _indBefAft(scaleDiff):
     """Retrieve the index matching the minimum of `scaleDiff` greater-than zero.
 
-    Used by: `inferMergerOutMasses`
+    Used by: `infer_merger_out_masses`
     """
     try:
         ind = zmath.argextrema(scaleDiff, 'min', 'g')
