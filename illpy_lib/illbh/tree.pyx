@@ -5,7 +5,8 @@
 import numpy as np
 cimport numpy as np
 
-from BHConstants import BH_TYPE
+# from BHConstants import BH_TYPE
+from illpy_lib.illbh import BH_TYPE
 BH_IN = BH_TYPE.IN
 BH_OUT = BH_TYPE.OUT
 
@@ -13,9 +14,9 @@ BH_OUT = BH_TYPE.OUT
 ctypedef unsigned long long ULNG
 
 
-def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
-              np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,
-              np.ndarray[double, ndim=2] lastTime, np.ndarray[double, ndim=1] nextTime ):
+def build_tree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] times,
+               np.ndarray[long,   ndim=2] last,     np.ndarray[long,   ndim=1] next,
+               np.ndarray[double, ndim=2] lastTime, np.ndarray[double, ndim=1] nextTime ):
     """
     Given the complete list of merger IDs and Times, connect Mergers with the same BHs.
 
@@ -56,16 +57,17 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
 
     cdef ULNG outid
     cdef long ii, jj, next_ind, last_ind
-    cdef long numMergers = ids.shape[0]
-    cdef int hunth = np.int(np.floor(0.01*numMergers))
+    cdef long num_mergers = ids.shape[0]
+    cdef int hunth = np.int(np.floor(0.01*num_mergers))
 
     # Get indices to sort mergers by time
     cdef np.ndarray sort_inds = np.argsort(times)
 
     # Iterate Over Each Merger, In Order of Merger Time
     # -------------------------------------------------
-    for ii in xrange(numMergers):
-        if ( ii > 0 and ii%hunth == 0 ): print("%5d/%d".format(ii, numMergers))
+    for ii in range(num_mergers):
+        if (ii > 0) and (ii % hunth == 0):
+            print("%5d/%d".format(ii, num_mergers))
 
         # Convert to sorted merger index
         last_ind = sort_inds[ii]
@@ -75,8 +77,8 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
 
         # Iterate over all Later Mergers
         #    use a while loop so we can break out of it
-        jj = ii+1
-        while(jj < numMergers):
+        jj = ii + 1
+        while (jj < num_mergers):
             # Convert to sorted index
             next_ind = sort_inds[jj]
 
@@ -98,7 +100,7 @@ def buildTree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] ti
                     nextTime[next_ind] = times[next_ind] - times[last_ind]
 
                     # Break back to highest for-loop over all mergers (ii)
-                    jj = numMergers
+                    jj = num_mergers
                     break
 
             # Increment
