@@ -579,6 +579,194 @@ def infer_merger_out_masses(core=None, mrgs=None, mdets=None):
     return new_masses
 
 
+def _remnant_details(core, mrgs=None, mdets=None, tree=None):
+    """
+    """
+
+    log = core.log
+    log.debug("_remnant_details()")
+
+    # Load Mergers
+    log.debug("Loading Mergers")
+    if mrgs is None:
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.load_fixed_mergers(core=core)
+
+    m_scales = mrgs[MERGERS.SCALES]
+    m_ids = mrgs[MERGERS.IDS]
+    num_mergers = np.int(mrgs[MERGERS.NUM])     # Convert from ``np.array(int)``
+
+    # Load merger-dets file
+    if mdets is None:
+        log.debug("Loading Merger-Details")
+        mdets = load_merger_details(core)
+
+    # Unpack data
+    d_ids = mdets[DETAILS.IDS]
+    d_scales = mdets[DETAILS.SCALES]
+    d_masses = mdets[DETAILS.MASSES]
+    d_dens = mdets[DETAILS.RHOS]
+    d_mdots = mdets[DETAILS.MDOTS]
+    d_csnds = mdets[DETAILS.CS]
+
+    # Load BH Merger Tree
+    if tree is None:
+        log.debug("Loading BHTree")
+        from illpy_lib.illbh import mergers
+        tree = mergers.loadTree(run)
+
+    nextMerger = tree[BH_TREE.NEXT]
+
+    # Initialize data for results
+    ids = np.zeros(num_mergers, dtype=DTYPE.ID)
+    nents = np.zeros(num_mergers, dtype=np.int)
+
+    idnums = num_mergers*[None]
+    mrgnums = num_mergers*[None]
+    scales = num_mergers*[None]
+    masses = num_mergers*[None]
+    dens = num_mergers*[None]
+    mdots = num_mergers*[None]
+    csnds = num_mergers*[None]
+
+    # Iterate over all mrgs
+    # ------------------------
+    log.debug("Matching data to remnants")
+    for ii in range(num_mergers):
+        # First Merger
+        #    Store dets after merger time for 'out' BH
+        inds = np.where(d_scales[ii, BH_TYPE.OUT] > m_scales[ii])[0]
+        if inds.size > 0:
+            # Make sure values are valid
+            temp_mdots = d_mdots[ii, BH_TYPE.OUT][inds]
+            #    Find locations which are <=0.0 or inf
+            bads = np.where((temp_mdots <= 0.0) | (~np.isfinite(temp_mdots)))[0]
+            # Remove bad elements
+            if bads.size > 0:
+                inds = np.delete(inds, bads)
+
+            # If valid elements remain
+            if inds.size > 0:
+                ids[ii] = d_ids[ii, BH_TYPE.OUT][inds[0]]
+                scales[ii] = d_scales[ii, BH_TYPE.OUT][inds]
+                masses[ii] = d_masses[ii, BH_TYPE.OUT][inds]
+                dens[ii] = d_dens[ii, BH_TYPE.OUT][inds]
+                mdots[ii] = d_mdots[ii, BH_TYPE.OUT][inds]
+                csnds[ii] = d_csnds[ii, BH_TYPE.OUT][inds]
+
+                idnums[ii] = d_ids[ii, BH_TYPE.OUT][inds]
+                mrgnums[ii] = ii*np.ones(inds.size, dtype=int)
+
+        else:
+            log.warning("Merger %d without post-merger dets entries!" % (ii))
+            ids[ii] = m_ids[ii, BH_TYPE.OUT]
+            scales[ii] = []
+            masses[ii] = []
+            dens[ii] = []
+            mdots[ii] = []
+            csnds[ii] = []
+
+            idnums[ii] = []
+            mrgnums[ii] = []
+
+        # Subsequent mrgs
+        #    Find the next merger that this 'out' BH participates in
+        next = nextMerger[ii]
+        checkID = m_ids[next, BH_TYPE.OUT]
+        checkScale = m_scales[next]
+        if ids[ii] >= 0 and next >= 0:
+            # Make sure `next` is correct, fix if not
+            if ids[ii] not in m_ids[next]:
+                next = _findNextMerger(ids[ii], m_scales[ii], m_ids, m_scales)
+                checkID = m_ids[next, BH_TYPE.OUT]
+                checkScale = m_scales[next]
+                # Error if still not fixed
+                if next >= 0 and ids[ii] not in m_ids[next]:
+                    errStr = "ids[{}] = {}, merger ids {} = {}"
+                    errStr = errStr.format(ii, ids[ii], next, str(m_ids[next]))
+                    log.error(errStr)
+                    zio.mpiError(comm, log=log, err=errStr)
+
+        #    while a subsequent merger exists... store those entries
+        while next >= 0:
+            nextIDs = d_ids[next, BH_TYPE.OUT][:]
+            # Make sure ID numbers match
+            if checkID:
+                if np.any(checkID != nextIDs):
+                    errStr = "ii = %d, next = %d, IDs don't match!" % (ii, next)
+                    errStr += "\nids[ii] = %d, check = %d" % (ids[ii], checkID)
+                    errStr += "\nd_ids = %s" % (str(nextIDs))
+                    log.error(errStr)
+                    zio.mpiError(comm, log=log, err=errStr)
+
+            if np.size(scales[ii]) > 0:
+                inds = np.where(d_scales[next, BH_TYPE.OUT] > np.max(scales[ii]))[0]
+            else:
+                inds = np.where(d_scales[next, BH_TYPE.OUT] > m_scales[ii])[0]
+
+            if inds.size > 0:
+                # Make sure values are valid
+                temp_mdots = d_mdots[next, BH_TYPE.OUT][inds]
+                #    Find locations which are <=0.0 or inf
+                bads = np.where((temp_mdots <= 0.0) | (~np.isfinite(temp_mdots)))[0]
+                # Remove bad elements
+                if bads.size > 0:
+                    inds = np.delete(inds, bads)
+
+                if inds.size > 0:
+                    scales[ii] = np.append(scales[ii], d_scales[next, BH_TYPE.OUT][inds])
+                    masses[ii] = np.append(masses[ii], d_masses[next, BH_TYPE.OUT][inds])
+                    dens[ii] = np.append(dens[ii], d_dens[next, BH_TYPE.OUT][inds])
+                    mdots[ii] = np.append(mdots[ii], d_mdots[next, BH_TYPE.OUT][inds])
+                    csnds[ii] = np.append(csnds[ii], d_csnds[next, BH_TYPE.OUT][inds])
+
+                    idnums[ii] = np.append(idnums[ii], d_ids[next, BH_TYPE.OUT][inds])
+                    mrgnums[ii] = np.append(mrgnums[ii], next*np.ones(inds.size, dtype=int))
+
+            # Get next merger in Tree
+            next = nextMerger[next]
+            # Make sure `next` is correct, fix if not
+            if checkID not in m_ids[next] and next >= 0:
+                next = _findNextMerger(checkID, checkScale, m_ids, m_scales)
+                # Error if still not fixed
+                if (next >= 0 and ids[ii] not in m_ids[next]):
+                    errStr = "ERROR: ids[{}] = {}, merger ids {} = {}"
+                    errStr = errStr.format(ii, ids[ii], next, str(m_ids[next]))
+                    log.error(errStr)
+                    zio.mpiError(comm, log=log, err=errStr)
+
+            #    Get ID of next out-BH
+            checkID = m_ids[next, BH_TYPE.OUT]
+            checkScale = m_scales[next]
+
+        # Appended entries may no longer be sorted, sort them
+        if np.size(scales[ii]) > 0:
+            inds = np.argsort(scales[ii])
+            scales[ii] = scales[ii][inds]
+            masses[ii] = masses[ii][inds]
+            dens[ii] = dens[ii][inds]
+            mdots[ii] = mdots[ii][inds]
+            csnds[ii] = csnds[ii][inds]
+
+            idnums[ii] = idnums[ii][inds]
+            mrgnums[ii] = mrgnums[ii][inds]
+            nents[ii] = np.size(scales[ii])
+        else:
+            log.warning("Merger %d without ANY entries." % (ii))
+
+        if np.any(~np.isfinite(mdots[ii])):
+            errStr = "Infinite mdots at merger {}\n".format(ii)
+            errStr += "\tmdots = {}".format(mdots[ii])
+            log.error(errStr)
+            raise RuntimeError(errStr)
+
+    log.debug("Remnant dets collected.")
+    _logStats('Number of entries', nents, log)
+
+    return idnums, scales, masses, dens, mdots, csnds
+
+
+
 '''
 def allDetailsForBHLineage(run, mrg, log, reload=False):
     """Load all of the dets entries for a given BH lineage (merger tree).
