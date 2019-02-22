@@ -9,7 +9,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 import pycore
 
-from illpy_lib import NUM_SNAPS
+from illpy_lib.constants import NUM_SNAPS
 
 
 class MERGERS:
@@ -286,4 +286,4 @@ def _distribute_snapshots(comm):
     return mySnaps
 
 
-from . import bh_constants  # noqa
+# from . import bh_constants  # noqa
