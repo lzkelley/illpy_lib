@@ -73,7 +73,7 @@ import h5py
 import tqdm
 
 from .. constants import DTYPE, NUM_SNAPS, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
-from ..illbh.bh_constants import check_log
+# from ..illbh.bh_constants import check_log
 from . Constants import SNAPSHOT
 
 import zcode.inout as zio
@@ -131,6 +131,14 @@ class OFFTAB():
 _FILENAME_OFFSET_TABLE = "offsets/ill{run:d}_snap{snap:03d}_offset-table.hdf5"
 _FILENAME_BH_HOSTS_SNAP_TABLE = "bh-hosts/ill{run:d}_snap{snap:03d}_bh-hosts.hdf5"
 _FILENAME_BH_HOSTS_TABLE = "bh-hosts/ill{run:d}_bh-hosts.hdf5"
+
+
+def check_log(log, name='log.log', **kwargs):
+    if log is not None:
+        return log
+
+    log = zio.get_logger("log", tofile=name, **kwargs)
+    return log
 
 
 def bh_subhalos(run, snap, log, bh_ids, bh_hosts_snap=None):
