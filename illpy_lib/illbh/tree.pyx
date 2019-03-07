@@ -67,7 +67,7 @@ def build_tree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] t
     # -------------------------------------------------
     for ii in range(num_mergers):
         if (ii > 0) and (ii % hunth == 0):
-            print("%5d/%d".format(ii, num_mergers))
+            print("{:5d}/{:d}".format(ii, num_mergers))
 
         # Convert to sorted merger index
         last_ind = sort_inds[ii]
