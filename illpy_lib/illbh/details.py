@@ -10,7 +10,7 @@ import numpy as np
 import h5py
 
 import zcode.inout as zio
-import zcode.math as zmath
+# import zcode.math as zmath
 
 
 try:
@@ -24,9 +24,9 @@ except ImportError:
     import illpy_lib  # noqa
 
 
-from illpy_lib.constants import DTYPE, NUM_SNAPS
-from illpy_lib.illbh import Core
-from illpy_lib.illbh.bh_constants import DETAILS, load_hdf5_to_mem
+from illpy_lib.constants import DTYPE, NUM_SNAPS, CONV_ILL_TO_CGS
+from illpy_lib.illbh import Core, DETAILS, load_hdf5_to_mem
+# from illpy_lib.illbh.bh_constants import DETAILS, load_hdf5_to_mem
 
 VERSION = 0.3                                    # Version of details
 
@@ -296,6 +296,9 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
         m1 = masses[j1]
         dt = t1 - t0
         dmdts[j1] = (m1 - m0) / dt
+
+    # Convert dmdts to same units as mdots
+    dmdts = dmdts * CONV_ILL_TO_CGS.MASS / CONV_ILL_TO_CGS.MDOT
 
     with h5py.File(out_fname, 'w') as out:
         out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
