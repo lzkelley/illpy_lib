@@ -26,12 +26,12 @@ import os
 import logging
 from glob import glob
 
-import numpy as np
-import h5py
+# import numpy as np
+# import h5py
 
 import zcode.inout as zio
 
-from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, NUM_SNAPS
+from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE  # , NUM_SNAPS
 
 
 # Illustris Parameters
