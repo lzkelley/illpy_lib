@@ -4,12 +4,12 @@ import os
 import glob
 
 import numpy as np
-import h5py
+# import h5py
 np.seterr(divide='ignore', invalid='ignore')
 
 import pycore
 
-from illpy_lib.constants import NUM_SNAPS
+from illpy_lib.constants import NUM_SNAPS  # noqa
 
 
 class MERGERS:
@@ -62,11 +62,18 @@ DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
                          DETAILS.MDOTS, DETAILS.DMDTS, DETAILS.RHOS, DETAILS.CS]
 
 
-class BH_TYPE:
+class _LenMeta(type):
+
+    def __len__(self):
+        return self.__len__()
+
+
+class BH_TYPE(metaclass=_LenMeta):
     IN  = 0
     OUT = 1
 
-    def __len__(self):
+    @classmethod
+    def __len__(cls):
         return 2
 
 
