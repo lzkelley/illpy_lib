@@ -431,7 +431,8 @@ def _construct_tree(core, mrgs, fname_tree):
     # Convert merger scale factors to ages
     scales = mrgs[MERGERS.SCALES]
     # times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
-    times = cosmo.scales_to_age(scales)
+    redz = cosmo._a_to_z(scales)
+    times = cosmo.z_to_tage(redz)
 
     # Construct Merger Tree from node IDs
     log.info("Building BH Merger Tree")
@@ -456,9 +457,10 @@ def _construct_tree(core, mrgs, fname_tree):
     }
 
     log.warning("Saving merger-tree to '{}'".format(fname_tree))
+
     _save_hdf5(core, fname_tree, tree, backup=True)
 
-    return
+    return tree
 
 
 def _save_hdf5(core, fname_out, data, backup=True):
@@ -479,7 +481,7 @@ def _save_hdf5(core, fname_out, data, backup=True):
         out['version'] = VERSION
         out['filename'] = fname_out
 
-        for key in out.keys():
+        for key in data.keys():
             out.create_dataset(key, data=data[key])
 
     log.info("Renaming temporary file")
