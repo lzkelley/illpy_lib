@@ -296,7 +296,7 @@ class Core(pycore.Core):
 
     def _load_cosmology(self):
         import illpy_lib.illcosmo
-        cosmo = illpy_lib.illcosmo.cosmology.Illustris_Cosmology()
+        cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
         return cosmo
 
 

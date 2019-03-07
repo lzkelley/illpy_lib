@@ -766,7 +766,6 @@ def _remnant_details(core, mrgs=None, mdets=None, tree=None):
     return idnums, scales, masses, dens, mdots, csnds
 
 
-
 '''
 def allDetailsForBHLineage(run, mrg, log, reload=False):
     """Load all of the dets entries for a given BH lineage (merger tree).

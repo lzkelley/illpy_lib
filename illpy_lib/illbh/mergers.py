@@ -173,7 +173,7 @@ def _reorganize_files(core, fname_out):
 
 def _map_to_snapshots(scales):
     import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
+    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
     snap_scales = cosmo.scales()
 
     snap_nums = np.searchsorted(snap_scales, scales, side='left')
@@ -413,8 +413,8 @@ def _construct_tree(core, mrgs, fname_tree):
     log.debug("_construct_tree()")
 
     # from . import tree
-    from illpy_lib import illcosmo
-    cosmo = illcosmo.cosmology.Illustris_Cosmology()
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
 
     import pyximport
     pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)

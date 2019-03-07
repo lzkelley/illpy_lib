@@ -112,7 +112,7 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
     log.debug("details._reorganize_files()")
 
     import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
+    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
     snap_scales = cosmo.scales()
 
     temps = [zio.modify_filename(tt, prepend='_') for tt in temp_fnames]

@@ -240,13 +240,13 @@ def _constructBHTree(run, mrgs, verbose=True):
 
     """
     from . import BuildTree
-    import illpy.illcosmo
+    # import illpy.illcosmo
 
     if verbose: print(" - - BHTree.constructBHTree()")
 
     # cosmo = Cosmology()
-    from illpy_lib import illcosmo
-    cosmo = illcosmo.cosmology.Cosmology()
+    import illpy_lib.illcosmo
+    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
 
     import pyximport
     pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
