@@ -3,3 +3,4 @@ scipy
 mpi4py
 cython
 zcode
+cosmopy

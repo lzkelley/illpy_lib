@@ -4,25 +4,48 @@
 
 import os
 import numpy as np
-import scipy as sp
-import scipy.interpolate
-import astropy as ap
-import astropy.cosmology  # noqa
+# import scipy as sp
+# import scipy.interpolate
+# import astropy as ap
+# import astropy.cosmology
 
-from illpy_lib.constants import BOX_LENGTH
-from zcode.constants import HPAR, H0, SPLC, KPC
+# from illpy_lib.constants import BOX_LENGTH
+# from zcode.constants import HPAR, H0, SPLC, KPC
+import cosmopy
 
 # Get local path, and data directory
 _DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
 # Contains cosmological values for each snapshot
 _TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"
 
-INTERP = "quadratic"                     # Type of interpolation for scipy
-FLT_TYPE = np.float32
-IMPOSE_FLOOR = True                # Enforce a minimum for certain parameters (e.g. comDist)
-MAXIMUM_SCALE_FACTOR = 0.9999      # Scalefactor for minimum of certain parameters (e.g. comDist)
+# INTERP = "quadratic"                     # Type of interpolation for scipy
+# FLT_TYPE = np.float32
+# IMPOSE_FLOOR = True                # Enforce a minimum for certain parameters (e.g. comDist)
+# MAXIMUM_SCALE_FACTOR = 0.9999      # Scalefactor for minimum of certain parameters (e.g. comDist)
 
 
+class Illustris_Cosmology(cosmopy.Cosmology):
+
+    Omega0 = 0.2726
+    OmegaLambda = 0.7274
+    OmegaBaryon = 0.0456
+    HubbleParam = 0.704
+    H0 = HubbleParam * 100.0
+
+    _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
+    _INTERP_POINTS = 40
+
+    def __init__(self):
+        super().__init__()
+
+        fname = os.path.join(_DATA_PATH, _TIMES_FILENAME)
+        cosmo_data = np.load(fname)
+        self.snapshot_scales = cosmo_data['scale']
+
+        return
+
+
+'''
 class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
     """Astropy cosmology object with illustris parameters and additional functions and wrappers.
 
@@ -173,8 +196,9 @@ class Illustris_Cosmology(ap.cosmology.FlatLambdaCDM):
         """
         zz = self._interp(age, self._grid_age, self._grid_z, self._sort_age)
         return self.scale_factor(zz)
+'''
 
-
+'''
 class Cosmology(object):
     """
     Class to access cosmological parameters over Illustris simulation times.
@@ -281,12 +305,12 @@ class Cosmology(object):
         else:
             return False
 
-    '''
+    """
     def snapshotTimes(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
         if (num == None): return self.__cosmo[self.__SCALEFACT]
         else:              return self.__cosmo[self.__SCALEFACT][num]
-    '''
+    """
 
     def scales(self, num=None):
         """ Get scalefactor for all snapshots, or given snapshot number """
@@ -435,3 +459,4 @@ class Cosmology(object):
         # Convert strains to cosmological strains
         cosmoFactor = density*cosmoVolume
         return cosmoFactor
+'''
