@@ -78,13 +78,16 @@ class BH_TYPE(metaclass=_LenMeta):
 
 
 class BH_TREE:
-    LAST         = 'last'
+    PREV         = 'prev'
     NEXT         = 'next'
-    LAST_TIME    = 'lastTime'
-    NEXT_TIME    = 'nextTime'
-    NUM_FUTURE   = 'numFuture'
-    NUM_PAST     = 'numPast'
-    TIME_BETWEEN = 'timeBetween'
+    SCALE_PREV   = 'scale_prev'
+    SCALE_NEXT   = 'scale_next'
+    TIME_PREV    = 'time_prev'
+    TIME_NEXT    = 'time_next'
+
+    NUM_BEF      = 'num_bef'
+    NUM_AFT      = 'num_aft'
+    TIME_BETWEEN = 'time_between'
 
     CREATED      = 'created'
     RUN          = 'run'

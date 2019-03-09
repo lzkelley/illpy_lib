@@ -425,10 +425,12 @@ def _construct_tree(core, mrgs, fname_tree):
     NUM_BH_TYPES = len(BH_TYPE)
 
     num_mergers = mrgs[MERGERS.NUM]
-    last_ind = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
-    next_ind = -1 * np.ones([num_mergers], dtype=DTYPE.INDEX)
-    last_time = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
-    next_time = -1 * np.ones([num_mergers], dtype=DTYPE.SCALAR)
+    ind_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
+    ind_next = -1 * np.ones(num_mergers, dtype=DTYPE.INDEX)
+    scale_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
+    scale_next = -1 * np.ones(num_mergers, dtype=DTYPE.SCALAR)
+    time_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
+    time_next = -1 * np.ones(num_mergers, dtype=DTYPE.SCALAR)
 
     # Convert merger scale factors to ages
     scales = mrgs[MERGERS.SCALES]
@@ -441,37 +443,48 @@ def _construct_tree(core, mrgs, fname_tree):
     # Construct Merger Tree from node IDs
     log.info("Building BH Merger Tree")
     mids = mrgs[MERGERS.IDS]
-    illpy_lib.illbh.tree.build_tree(mids, times, last_ind, next_ind, last_time, next_time)
+    illpy_lib.illbh.tree.build_tree(mids, scales, times, ind_prev, ind_next,
+                                    scale_prev, scale_next, time_prev, time_next)
 
     # Was having some sporadic issues with `build_tree` cython code finding bad matches,
     # It could now be fixed, but not sure... run the check to confirm, doesnt take long
     log.info("Checking mergers")
     for ii in core.tqdm(range(num_mergers), desc='Mergers'):
-        next = next_ind[ii]
+        next = ind_next[ii]
         if next < 0:
             continue
+
+        if scale_next[ii] <= 0.0:
+            raise ValueError("`scale_next[{}]` = {}  (next = {})!!".format(
+                ii, scale_next[ii], next))
+
+        if time_next[ii] <= -0.1:
+            raise ValueError("`time_next[{}]` = {}   (next = {})!!".format(
+                ii, time_next[ii], next))
 
         this_id = mrgs['ids'][ii, BH_TYPE.OUT]
         next_id = mrgs['ids'][next, :]
         if this_id not in next_id:
             print(ii, next, this_id, next_id)
-            prev = last_ind[next]
+            prev = ind_prev[next]
             print("prev", prev)
             print("\t", [mrgs['ids'][pp] for pp in prev if pp > 0])
             raise RuntimeError("Tree error!")
 
-    num_bad = np.count_nonzero(last_ind < 0)
+    num_bad = np.count_nonzero(ind_prev < 0)
     log.info("{:d} Missing 'last_ind'".format(num_bad))
 
-    num_bad = np.count_nonzero(next_ind < 0)
+    num_bad = np.count_nonzero(ind_next < 0)
     log.info("{:d} Missing 'next_ind'".format(num_bad))
 
     # Create dictionary to store data
     tree = {
-        BH_TREE.LAST: last_ind,
-        BH_TREE.NEXT: next_ind,
-        BH_TREE.LAST_TIME: last_time,
-        BH_TREE.NEXT_TIME: next_time,
+        BH_TREE.PREV: ind_prev,
+        BH_TREE.NEXT: ind_next,
+        BH_TREE.TIME_PREV: time_prev,
+        BH_TREE.TIME_NEXT: time_next,
+        BH_TREE.SCALE_PREV: scale_prev,
+        BH_TREE.SCALE_NEXT: scale_next,
 
         BH_TREE.RUN: core.sets.RUN_NUM,
         BH_TREE.NUM: num_mergers,
