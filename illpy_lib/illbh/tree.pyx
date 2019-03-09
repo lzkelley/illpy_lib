@@ -1,3 +1,4 @@
+#cython: language_level=3
 """
 
 """
@@ -55,22 +56,23 @@ def build_tree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] t
 
     """
 
-    cdef ULNG outid
+    cdef ULNG outid, test_id
     cdef long ii, jj, next_ind, last_ind
     cdef long num_mergers = ids.shape[0]
     cdef int hunth = np.int(np.floor(0.01*num_mergers))
 
     # Get indices to sort mergers by time
-    cdef np.ndarray sort_inds = np.argsort(times)
+    # cdef np.ndarray sort_inds = np.argsort(times)
 
     # Iterate Over Each Merger, In Order of Merger Time
     # -------------------------------------------------
     for ii in range(num_mergers):
         if (ii > 0) and (ii % hunth == 0):
-            print("{:5d}/{:d}".format(ii, num_mergers))
+            print("{:3d}/100  -  {:5d}/{:d}".format(ii//hunth, ii, num_mergers))
 
         # Convert to sorted merger index
-        last_ind = sort_inds[ii]
+        # last_ind = sort_inds[ii]
+        last_ind = ii
 
         # Get the output ID from this merger
         outid = ids[last_ind, BH_OUT]
@@ -80,12 +82,16 @@ def build_tree(np.ndarray[ULNG,   ndim=2] ids,      np.ndarray[double, ndim=1] t
         jj = ii + 1
         while (jj < num_mergers):
             # Convert to sorted index
-            next_ind = sort_inds[jj]
+            # next_ind = sort_inds[jj]
+            next_ind = jj
 
             # If previous merger goes into this one; save relationships
             for BH in [BH_IN, BH_OUT]:
 
-                if (ids[next_ind, BH] == outid):
+                test_id = ids[next_ind, BH]
+
+                # if (test_id == outid):
+                if np.equal(test_id, outid):
 
                     # For the 'next' Merger
                     #    set index of previous merger

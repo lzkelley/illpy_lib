@@ -418,7 +418,9 @@ def _construct_tree(core, mrgs, fname_tree):
 
     import pyximport
     pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
-    from . import tree
+    import illpy_lib.illbh.tree
+    # from importlib import reload
+    # reload(illpy_lib.illbh.tree)
 
     NUM_BH_TYPES = len(BH_TYPE)
 
@@ -433,11 +435,30 @@ def _construct_tree(core, mrgs, fname_tree):
     # times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
     redz = cosmo._a_to_z(scales)
     times = cosmo.z_to_tage(redz)
+    if any(np.diff(times) < 0.0):
+        raise RuntimeError("Non-monotonic merger times!")
 
     # Construct Merger Tree from node IDs
     log.info("Building BH Merger Tree")
     mids = mrgs[MERGERS.IDS]
-    tree.build_tree(mids, times, last_ind, next_ind, last_time, next_time)
+    illpy_lib.illbh.tree.build_tree(mids, times, last_ind, next_ind, last_time, next_time)
+
+    # Was having some sporadic issues with `build_tree` cython code finding bad matches,
+    # It could now be fixed, but not sure... run the check to confirm, doesnt take long
+    log.info("Checking mergers")
+    for ii in core.tqdm(range(num_mergers), desc='Mergers'):
+        next = next_ind[ii]
+        if next < 0:
+            continue
+
+        this_id = mrgs['ids'][ii, BH_TYPE.OUT]
+        next_id = mrgs['ids'][next, :]
+        if this_id not in next_id:
+            print(ii, next, this_id, next_id)
+            prev = last_ind[next]
+            print("prev", prev)
+            print("\t", [mrgs['ids'][pp] for pp in prev if pp > 0])
+            raise RuntimeError("Tree error!")
 
     num_bad = np.count_nonzero(last_ind < 0)
     log.info("{:d} Missing 'last_ind'".format(num_bad))
