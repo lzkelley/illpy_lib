@@ -5,6 +5,9 @@ import glob
 
 import pycore
 
+import illpy
+import illpy.snapshot
+
 
 class Settings(pycore.Settings):
 
@@ -13,13 +16,27 @@ class Settings(pycore.Settings):
     RUN_NUM = 1
 
     INPUT = "/n/ghernquist/Illustris/Runs/L75n1820FP/"
+    # INPUT = "/n/hernquistfs3/IllustrisTNG/Runs/L75n1820TNG/output"
     # OUTPUT = "/n/regal/hernquist_lab/lkelley/illustris-processed/"
     OUTPUT = "/n/scratchlfs/hernquist_lab/lzkelley/illustris-processed/"
+
+    # NOTE: this is automatically reset
+    TNG = None
 
     RECREATE = False
     BREAK_ON_FAIL = False
 
     MAX_DETAILS_PER_SNAP = 10
+
+    def __init__(self, parse_cl=None, **kwargs):
+        super().__init__(parse_cl=None, **kwargs)
+        tng_flag = self.check_tng()
+        if self.TNG is not None:
+            raise ValueError("Do not set `TNG` flag manually!")
+
+        self.TNG = tng_flag
+        print("Running in TNG mode: '{}'".format(tng_flag))
+        return
 
     def add_arguments(argself, parser):
         '''
@@ -28,6 +45,22 @@ class Settings(pycore.Settings):
             help='type of simulation being processed')
         '''
         return
+
+    def check_tng(self):
+        inpath = self.INPUT
+        tng_flag = ('tng' in inpath.lower())
+        inpath = os.path.join(inpath, 'output', '')
+
+        # Double check based on header information
+        header = illpy.snapshot.get_header(inpath)
+        keys = [kk.lower() for kk in header.keys()]
+        check1 = ('git_commit' in keys)
+        check2 = (header['HubbleParam'] < 0.7)
+        checks = [tng_flag, check1, check2]
+        if not all(checks) and any(checks):
+            raise RuntimeError("Cannot confirm whether TNG or TOS!  {}".format(checks))
+
+        return tng_flag
 
 
 class Paths(pycore.Paths):
@@ -117,7 +150,8 @@ class Paths(pycore.Paths):
             num_fils = len(_fils)
             if num_fils == 0:
                 raise RuntimeError("No {} files found matching '{}'".format(name, pattern))
-            log.debug("    Found '{}' files, e.g. '{}'".format(num_fils, os.path.basename(_fils[0])))
+            log.debug("    Found '{}' files, e.g. '{}'".format(
+                num_fils, os.path.basename(_fils[0])))
             files += _fils
 
         log.debug("Found {} {} files".format(len(files), name))
@@ -229,5 +263,8 @@ class Core(pycore.Core):
 
     def _load_cosmology(self):
         import illpy_lib.illcosmo
-        cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
+        cosmo = illpy_lib.illcosmo.Illustris_Cosmology(self)
         return cosmo
+
+    def finalize(self):
+        pass
