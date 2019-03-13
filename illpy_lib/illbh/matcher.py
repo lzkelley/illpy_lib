@@ -2,7 +2,7 @@
 """
 
 import os
-import sys
+# import sys
 import shutil
 # import logging
 from datetime import datetime
@@ -13,21 +13,19 @@ import h5py
 import zcode.inout as zio
 import zcode.math as zmath
 
+# try:
+# import illpy_lib
+# except ImportError:
+#     PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
+#     if PATH_ILLPY_LIB not in sys.path:
+#         print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
+#         sys.path.append(PATH_ILLPY_LIB)
+#
+#     import illpy_lib  # noqa
 
-try:
-    import illpy_lib
-except ImportError:
-    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-    if PATH_ILLPY_LIB not in sys.path:
-        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-        sys.path.append(PATH_ILLPY_LIB)
-
-    import illpy_lib  # noqa
-
-
-from illpy_lib.constants import NUM_SNAPS, CONV_ILL_TO_SOL, DTYPE
+from illpy_lib.constants import NUM_SNAPS, CONV_ILL_TO_SOL  # , DTYPE
 from illpy_lib.illbh import (
-    Core, _distribute_snapshots, load_hdf5_to_mem,
+    Core, _distribute_snapshots,  # load_hdf5_to_mem,
     DETAILS_PHYSICAL_KEYS, MERGERS, DETAILS, BH_TYPE, BH_TREE
 )
 
@@ -580,6 +578,7 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
 
     log = core.log
     log.debug("_remnant_details()")
+    # TEST_NUM = 368
 
     # Load Mergers
     log.debug("Loading Mergers")
@@ -594,7 +593,8 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
     bads = (np.diff(m_scales) < 0.0)
     if any(bads):
         ex = np.argmax(bads)
-        log.error("Found {} non-monotonic merger-scales, e.g. {}".format(np.count_nonzero(bads), ex))
+        log.error("Found {} non-monotonic merger-scales, e.g. {}".format(
+            np.count_nonzero(bads), ex))
         inds = [ex-1, ex, ex+1]
         log.error("\tscales: {} = {}".format(
             zmath.str_array(inds), zmath.str_array(m_scales[inds])))
@@ -618,8 +618,9 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
     next_merger = tree[BH_TREE.NEXT]
 
     # Initialize data for results
-    ids = np.zeros(num_mergers, dtype=DTYPE.ID)
+    # ids = np.zeros(num_mergers, dtype=DTYPE.ID)
     nents = np.zeros(num_mergers, dtype=np.int)
+    ids = num_mergers * [None]
 
     rem_dets = {key: num_mergers*[None] for key in DETAILS_PHYSICAL_KEYS}
 
@@ -630,59 +631,48 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
         # First Merger
         #    Store dets after merger time for 'out' BH
         inds = (d_scales[ii, BH_TYPE.OUT] > m_scales[ii])
-        if np.count_nonzero(inds) > 0:
-            ids[ii] = d_ids[ii, BH_TYPE.OUT][inds][0]
-        else:
-            log.warning("Merger {} without post-merger dets entries!".format(ii))
-            ids[ii] = m_ids[ii, BH_TYPE.OUT]
 
-        for key in DETAILS_PHYSICAL_KEYS:
-            rem_dets[key][ii] = mrg_dets[key][ii, BH_TYPE.OUT][inds]
+        if np.count_nonzero(inds) > 0:
+            ids[ii] = [d_ids[ii, BH_TYPE.OUT][inds][0]]
+            for key in DETAILS_PHYSICAL_KEYS:
+                rem_dets[key][ii] = mrg_dets[key][ii, BH_TYPE.OUT][inds]
+
+        else:
+            log.error("No post-merger details for merger {}, next = {}".format(
+                ii, next_merger[ii]))
+            # for key in DETAILS_PHYSICAL_KEYS:
+            #     rem_dets[key][ii] = [0.0]
+            # continue
+            # raise RuntimeError("Merger {} without post-merger dets entries!".format(ii))
 
         # Subsequent mrgs
-        # Find the next merger that this 'out' BH participates in
         next = next_merger[ii]
-        check_id = m_ids[next, BH_TYPE.OUT]
-        if ids[ii] >= 0 and next >= 0:
-            # Make sure `next` is correct, fix if not
-            if ids[ii] not in m_ids[next]:
-                log.error("ii = {}, next = {}; ID = {} = {}, next IDs = {}, {}".format(
-                    ii, next, ids[ii], check_id, *m_ids[next]))
-                raise RuntimeError("Bad merger match for subsequent mergers!")
-
-        scales = rem_dets[DETAILS.SCALES][ii]
-
         # while a subsequent merger exists... store those entries
         while next >= 0:
-            next_ids = d_ids[next, BH_TYPE.OUT][:]
-            # Make sure ID numbers match
-            if check_id:
-                if np.any(check_id != next_ids):
-                    log.error("ii = %d, next = %d, IDs don't match!" % (ii, next))
-                    log.error("\tids[ii] = %d, check = %d" % (ids[ii], check_id))
-                    log.error("\td_ids = %s" % (str(next_ids)))
-                    raise RuntimeError("Merger <--> details ID mismatch!")
+            if ids[ii][-1] not in m_ids[next]:
+                raise RuntimeError("Merger: {}, next: {} - Last ID not in next IDs!".format(
+                    ii, next))
 
-            if np.size(scales) > 0:
-                inds = (d_scales[next, BH_TYPE.OUT] > np.max(scales))
-            else:
-                inds = (d_scales[next, BH_TYPE.OUT] > m_scales[ii])
+            next_mid = m_ids[next, BH_TYPE.OUT]
+            next_scale = m_scales[next]
+            ids[ii].append(next_mid)
+            # if TEST:
+            #     log.warning("Next: {}, scale: {}, ids: {}, {}".format(
+            #         next, next_scale, *m_ids[next]))
+            next_dids = d_ids[next, BH_TYPE.OUT][:]
+            if not np.all(next_mid == next_dids):
+                raise RuntimeError("Details IDs for next: {} do not match merger ID!".format(next))
 
+            inds = (d_scales[next, BH_TYPE.OUT] > next_scale)
+            # if TEST:
+            #     log.warning("Found {} matches for next merger".format(np.count_nonzero(inds)))
             if np.count_nonzero(inds) > 0:
                 for key in DETAILS_PHYSICAL_KEYS:
-                    rem_dets[key][ii] = np.append(rem_dets[key][ii], mrg_dets[key][next, BH_TYPE.OUT][inds])
+                    rem_dets[key][ii] = np.append(rem_dets[key][ii],
+                                                  mrg_dets[key][next, BH_TYPE.OUT][inds])
 
             # Get next merger in Tree
             next = next_merger[next]
-            # Make sure `next` is correct, fix if not
-            if check_id not in m_ids[next] and next >= 0:
-                log.error("ii = %d, next = %d, IDs don't match!" % (ii, next))
-                log.error("\tids[ii] = %d, check = %d" % (ids[ii], check_id))
-                log.error("\td_ids = %s" % (str(next_ids)))
-                raise RuntimeError("Merger <--> merger IDs mismatch!")
-
-            # Get ID of next out-BH
-            check_id = m_ids[next, BH_TYPE.OUT]
 
         scales = rem_dets[DETAILS.SCALES][ii]
 
@@ -692,9 +682,18 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
             nents[ii] = np.size(scales)
             for key in DETAILS_PHYSICAL_KEYS:
                 rem_dets[key][ii] = rem_dets[key][ii][inds]
-
         else:
             log.warning("Merger %d without ANY entries." % (ii))
+
+        # if TEST:
+        #     log.warning("Finished test merger")
+        #     log.warning("Found {} ids, {} entries".format(len(ids[ii]), nents[ii]))
+        #     masses = rem_dets['masses'][ii]
+        #     bads = (np.diff(masses) < 0.0)
+        #     if np.count_nonzero(bads) > 0:
+        #         raise RuntimeError("Found negative mass changes!")
+        #
+        #     raise
 
     log.debug("Remnant dets collected.")
     log.info("Number of entries: " + zmath.stats_str(nents))
