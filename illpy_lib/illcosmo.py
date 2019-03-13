@@ -4,24 +4,14 @@
 
 import os
 import numpy as np
-# import scipy as sp
-# import scipy.interpolate
-# import astropy as ap
-# import astropy.cosmology
 
-# from illpy_lib.constants import BOX_LENGTH
-# from zcode.constants import HPAR, H0, SPLC, KPC
 import cosmopy
 
 # Get local path, and data directory
 _DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
 # Contains cosmological values for each snapshot
 _TIMES_FILENAME = "illustris-snapshot-cosmology-data.npz"
-
-# INTERP = "quadratic"                     # Type of interpolation for scipy
-# FLT_TYPE = np.float32
-# IMPOSE_FLOOR = True                # Enforce a minimum for certain parameters (e.g. comDist)
-# MAXIMUM_SCALE_FACTOR = 0.9999      # Scalefactor for minimum of certain parameters (e.g. comDist)
+_TIMES_FILENAME_TNG = "illustris-tng_snapshot-cosmology-data.npz"
 
 
 class Illustris_Cosmology(cosmopy.Cosmology):
@@ -35,14 +25,23 @@ class Illustris_Cosmology(cosmopy.Cosmology):
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self):
+    def __init__(self, core):
         super().__init__()
+        log = core.log
+        log.debug("Initializing `Illustris_Cosmology`")
 
-        fname = os.path.join(_DATA_PATH, _TIMES_FILENAME)
+        tng_flag = core.sets.TNG
+        fname = _TIMES_FILENAME_TNG if tng_flag else _TIMES_FILENAME
+        fname = os.path.join(_DATA_PATH, fname)
+
         cosmo_data = np.load(fname)
         self.snapshot_scales = cosmo_data['scale']
+        log.info("Loaded {} snapshot scales (tng: {})".format(self.snapshot_scales.size, tng_flag))
 
         return
+
+    def scales(self):
+        return np.array(self.snapshot_scales)
 
 
 '''

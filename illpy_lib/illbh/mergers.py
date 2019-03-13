@@ -137,10 +137,8 @@ def _reorganize_files(core, fname_out):
     return fname_out
 
 
-def _map_to_snapshots(scales):
-    import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
-    snap_scales = cosmo.scales()
+def _map_to_snapshots(core, scales):
+    snap_scales = core.cosmo.scales()
 
     snap_nums = np.searchsorted(snap_scales, scales, side='left')
     # Find mergers which are at almost exactly the same time as their subsequent snapshot
@@ -232,8 +230,8 @@ def _crosscheck_mergers(core, fname_out):
     masses = masses[goods]
 
     # Recalculate maps
-    mapM2S, mapS2M, ontop = _map_to_snapshots(scales)
-    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(scales)
+    # mapM2S, mapS2M, ontop = _map_to_snapshots(core, scales)
+    # snap_nums, ontop_next, ontop_prev = _map_to_snapshots(core, scales)
 
     # Fix Merger 'Out' Masses
     masses = mrgs[MERGERS.MASSES]
@@ -255,7 +253,7 @@ def _save_mergers(core, mrgs, fname_out):
     log = core.log
     log.debug("Calculating merger snapshots")
     scales = mrgs[MERGERS.SCALES]
-    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(scales)
+    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(core, scales)
     num_mergers = len(scales)
 
     fname_temp = zio.modify_filename(fname_out, prepend='_')
@@ -369,15 +367,11 @@ def _construct_tree(core, mrgs, fname_tree):
     log = core.log
     log.debug("_construct_tree()")
 
-    # from . import tree
-    import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.Illustris_Cosmology()
+    cosmo = core.cosmo
 
     import pyximport
     pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
     import illpy_lib.illbh.tree
-    # from importlib import reload
-    # reload(illpy_lib.illbh.tree)
 
     NUM_BH_TYPES = len(BH_TYPE)
 
