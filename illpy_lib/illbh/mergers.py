@@ -134,40 +134,6 @@ def _reorganize_files(core, fname_out):
 
     _save_mergers(core, mrgs, fname_out)
 
-    # Create Mapping Between Mergers and Snapshots
-    # mapM2S, mapS2M, ontop = _map_to_snapshots(scales)
-
-    # Find the snapshot that each merger directly precedes
-    '''
-    log.debug("Calculating merger snapshots")
-    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(scales)
-
-    fname_temp = zio.modify_filename(fname_out, prepend='_')
-    log.info("Writing to file '{}'".format(fname_temp))
-    with h5py.File(fname_temp, 'w') as out:
-
-        out.attrs[MERGERS.RUN] = core.sets.RUN_NUM
-        out.attrs[MERGERS.NUM] = len(scales)
-        out.attrs[MERGERS.CREATED] = str(datetime.now().ctime())
-        out.attrs[MERGERS.VERSION] = VERSION
-        out.attrs[MERGERS.FILE] = fname_out
-
-        out.create_dataset(MERGERS.SCALES, data=scales)
-        out.create_dataset(MERGERS.IDS, data=mids)
-        out.create_dataset(MERGERS.MASSES, data=masses)
-
-        out.create_dataset(MERGERS.SNAP_NUMS, data=snap_nums)
-        out.create_dataset(MERGERS.ONTOP_NEXT, data=ontop_next)
-        out.create_dataset(MERGERS.ONTOP_PREV, data=ontop_prev)
-
-    log.info("Renaming temporary file")
-    log.debug("\t'{}' ==> '{}'".format(fname_temp, fname_out))
-    shutil.move(fname_temp, fname_out)
-
-    size_str = zio.get_file_size(fname_out)
-    log.info("Saved {} mergers to '{}', size {}".format(num_mergers, fname_out, size_str))
-    '''
-
     return fname_out
 
 
@@ -296,11 +262,6 @@ def _save_mergers(core, mrgs, fname_out):
     log.info("Writing to file '{}'".format(fname_temp))
     with h5py.File(fname_temp, 'w') as out:
 
-        # out.attrs[MERGERS.RUN] = core.sets.RUN_NUM
-        # out.attrs[MERGERS.NUM] = len(scales)
-        # out.attrs[MERGERS.CREATED] = str(datetime.now().ctime())
-        # out.attrs[MERGERS.VERSION] = VERSION
-        # out.attrs[MERGERS.FILE] = fname_out
         out[MERGERS.RUN] = core.sets.RUN_NUM
         out[MERGERS.NUM] = num_mergers
         out[MERGERS.CREATED] = str(datetime.now().ctime())
@@ -309,10 +270,6 @@ def _save_mergers(core, mrgs, fname_out):
 
         for key in MERGERS_PHYSICAL_KEYS:
             out.create_dataset(key, data=mrgs[key])
-
-        # out.create_dataset(MERGERS.SCALES, data=scales)
-        # out.create_dataset(MERGERS.IDS, data=mids)
-        # out.create_dataset(MERGERS.MASSES, data=masses)
 
         out.create_dataset(MERGERS.SNAP_NUMS, data=snap_nums)
         out.create_dataset(MERGERS.ONTOP_NEXT, data=ontop_next)
@@ -525,205 +482,6 @@ def _save_hdf5(core, fname_out, data, backup=True):
     size_str = zio.get_file_size(fname_out)
     log.info("Saved to '{}', size {}".format(fname_out, size_str))
     return
-
-
-'''
-
-def analyzeTree(tree, verbose=True):
-    """Analyze the merger tree data to obtain typical number of repeats, etc.
-
-    Arguments
-    ---------
-        tree : <dict> container for tree data - see BHTree doc
-        verbose : <bool>, Print verbose output
-
-    Returns
-    -------
-
-
-    """
-
-    if verbose: print(" - - BHTree.analyzeTree()")
-
-    last         = tree[BH_TREE.LAST]
-    next         = tree[BH_TREE.NEXT]
-    timeNext     = tree[BH_TREE.NEXT_TIME]
-    num_mergers   = len(next)
-
-    aveFuture    = 0.0
-    avePast      = 0.0
-    aveFutureNum = 0
-    avePastNum   = 0
-    numPast      = np.zeros(num_mergers, dtype=int)
-    numFuture    = np.zeros(num_mergers, dtype=int)
-
-    if verbose: print((" - - - {:d} Mergers".format(num_mergers)))
-
-    # Find number of unique merger BHs (i.e. no previous mrgs)
-    inds = np.where((last[:, BH_TYPE.IN] < 0) & (last[:, BH_TYPE.OUT] < 0) & (next[:] < 0))
-    numTwoIsolated = len(inds[0])
-    # Find those with one or the other
-    inds = np.where(((last[:, BH_TYPE.IN] < 0) ^ (last[:, BH_TYPE.OUT] < 0)) & (next[:] < 0))
-    numOneIsolated = len(inds[0])
-
-    if verbose:
-        print((" - - - Mergers with neither  BH previously merged = {:d}".format(numTwoIsolated)))
-        print((" - - - Mergers with only one BH previously merged = {:d}".format(numOneIsolated)))
-
-    for ii in range(num_mergers):
-        # Count Forward from First Mergers #
-        #    If this is a first merger
-        if all(last[ii, :] < 0):
-            # Count the number of mrgs that the 'out' BH  from this merger, will later be in
-            numFuture[ii] = _countFutureMergers(next, ii)
-            # Accumulate for averaging
-            aveFuture += numFuture[ii]
-            aveFutureNum += 1
-
-        # Count Backward from Last Mergers #
-        #    If this is a final merger
-        if next[ii] < 0:
-            # Count the number of mrgs along the longest branch of past merger tree
-            numPast[ii] = _countPastMergers(last, ii)
-            # Accumulate for averaging
-            avePast += numPast[ii]
-            avePastNum += 1
-
-    # Calculate averages
-    if avePastNum   > 0:
-        avePast /= avePastNum
-    if aveFutureNum > 0:
-        aveFuture /= aveFutureNum
-
-    inds = np.where(next >= 0)[0]
-    numRepeats = len(inds)
-    fracRepeats = 1.0*numRepeats/num_mergers
-
-    indsInt = np.where(timeNext >= 0.0)[0]
-    numInts = len(indsInt)
-    timeStats = np.average(timeNext[indsInt]), np.std(timeNext[indsInt])
-    inds = np.where(timeNext == 0.0)[0]
-    numZeroInts = len(inds)
-
-    if verbose:
-        print((" - - - Repeated mergers = {:d}/{:d} = {:.4f}".format(
-            numRepeats, num_mergers, fracRepeats)))
-        print((" - - - Average number past, future  =  {:.3f}, {:.3f}".format(avePast, aveFuture)))
-        print((" - - - Number of merger intervals    = {:d}".format(numInts)))
-        print((" - - - - Time between = {:.4e} +- {:.4e} [Myr]".format(
-            timeStats[0]/MYR, timeStats[1]/MYR)))
-        print((" - - - Number of zero time intervals = {:d}".format(numZeroInts)))
-
-    timeBetween = timeNext[indsInt]
-
-    # Store data to tree dictionary
-    tree[BH_TREE.NUM_PAST] = numPast
-    tree[BH_TREE.NUM_FUTURE] = numFuture
-    tree[BH_TREE.TIME_BETWEEN] = timeBetween
-
-    return timeBetween, numPast, numFuture
-
-
-def allIDsForTree(run, mrg, tree=None, mrgs=None):
-    """Get all of the ID numbers for BH in the same merger-tree as the given merger.
-
-    Arguments
-    ---------
-    run : int
-        Illustris simulation run number {1,3}.
-    mrg : int
-        Index of the target BH merger.  Any merger number in the same tree will yield the same
-        results.
-    tree : dict or `None`
-        BHTree object will merger-tree data.  Loaded if not provided.
-    mrgs : dict or `None`
-        mergers object will merger data.  Loaded if not provided.
-
-    Returns
-    -------
-    fin : int
-        Index of the final merger this bh-tree participates in.  Acts as a unique identifier.
-    allIDs : list of int
-        List of all ID numbers of BHs which participate in this merger tree.
-
-    """
-    if not tree:
-        tree = loadTree(run)
-
-    nextMerg = tree[BH_TREE.NEXT]
-    lastMerg = tree[BH_TREE.LAST]
-
-    if not mrgs:
-        from illpy_lib.illbh import mergers
-        mrgs = mergers.load_fixed_mergers(run)
-
-    m_ids = mrgs[MERGERS.IDS]
-
-    # Go to the last merger
-    fin = mrg
-    while nextMerg[fin] >= 0:
-        fin = nextMerg[fin]
-
-    # Go backwards to get all IDs
-    allIDs, mrgInds = _getPastIDs(m_ids, lastMerg, fin)
-    return fin, allIDs, mrgInds
-
-
-def _countFutureMergers(next, ind):
-    """Use the map of `next` mrgs and a starting index to count the future number of mrgs.
-    """
-    count = 0
-    ii = ind
-    while next[ii] >= 0:
-        count += 1
-        ii = next[ii]
-    return count
-
-
-def _countPastMergers(last, ind):
-    """Use the map of `last` mrgs and a starting index to count the past number of mrgs.
-    """
-    last_in  = last[ind, BH_TYPE.IN]
-    last_out = last[ind, BH_TYPE.OUT]
-    num_in   = 0
-    num_out  = 0
-    if last_in >= 0:
-        num_in = _countPastMergers(last, last_in)
-    if last_out >= 0:
-        num_out = _countPastMergers(last, last_out)
-    return np.max([num_in, num_out])+1
-
-
-def _getPastIDs(m_ids, lastMerg, ind, idlist=[], mrglist=[]):
-    """Get all BH IDs in past-mrgs of this BHTree.
-
-    Arguments
-    ---------
-    m_ids : (N,2) array of int
-        Merger BH ID numbers.
-    last : (N,2) array of int
-        For a given merger, give the index of the merger for each of the constituent BHs.
-        `-1` if there was no previous merger.
-    ind : int
-        Index of merger to follow.
-    idlist : list of int
-        Existing list of merger IDs to append to.  Uses a `set` type intermediate to assure unique
-        values.
-
-    Used by: `allIDsForTree`.
-    """
-    ids_in = [m_ids[ind, BH_TYPE.IN]]
-    ids_out = [m_ids[ind, BH_TYPE.OUT]]
-    mrg_in = [ind]
-    mrg_out = [ind]
-    last_in  = lastMerg[ind, BH_TYPE.IN]
-    last_out = lastMerg[ind, BH_TYPE.OUT]
-    if last_in >= 0:
-        ids_in, mrg_in = _getPastIDs(m_ids, lastMerg, last_in, ids_in, mrg_in)
-    if last_out >= 0:
-        ids_out, mrg_out = _getPastIDs(m_ids, lastMerg, last_out, ids_out, mrg_out)
-    return list(set(ids_in + ids_out + idlist)), list(set(mrg_in + mrg_out + mrglist))
-'''
 
 
 if __name__ == "__main__":
