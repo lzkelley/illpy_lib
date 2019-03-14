@@ -2,9 +2,7 @@
 """
 
 import os
-# import sys
 import shutil
-# import logging
 from datetime import datetime
 
 import numpy as np
@@ -13,30 +11,10 @@ import h5py
 import zcode.inout as zio
 import zcode.math as zmath
 
-# try:
-# import illpy_lib
-# except ImportError:
-#     PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-#     if PATH_ILLPY_LIB not in sys.path:
-#         print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-#         sys.path.append(PATH_ILLPY_LIB)
-#
-#     import illpy_lib  # noqa
-
-from illpy_lib.constants import NUM_SNAPS, CONV_ILL_TO_SOL  # , DTYPE
 from illpy_lib.illbh import (
     Core, _distribute_snapshots,  # load_hdf5_to_mem,
     DETAILS_PHYSICAL_KEYS, MERGERS, DETAILS, BH_TYPE, BH_TREE
 )
-
-# from illpy_lib.illbh.Details_UniqueIDs import loadAllUniqueIDs
-# from illpy_lib.illbh.bh_constants import MERGERS, DETAILS, BH_TREE, BH_TYPE, \
-#     GET_MERGER_DETAILS_FILENAME, GET_REMNANT_DETAILS_FILENAME, _MAX_DETAILS_PER_SNAP, \
-#     _distribute_snapshots, GET_BLACKHOLE_TREE_DETAILS_FILENAME
-# from illpy_lib.constants import DTYPE, NUM_SNAPS
-
-# __version__ = '0.25'
-# _GET_KEYS = [DETAILS.SCALES, DETAILS.MASSES, DETAILS.MDOTS, DETAILS.RHOS, DETAILS.CS]
 
 VERSION = 1.0
 
@@ -119,6 +97,8 @@ def _merger_details(core):
     log = core.log
     log.debug("_merger_details()")
 
+    NUM_SNAPS = core.sets.NUM_SNAPS
+
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.rank
@@ -145,7 +125,7 @@ def _merger_details(core):
     merger_bh_ids = comm.bcast(merger_bh_ids, root=0)
 
     # Distribute snapshots to each processor
-    my_snaps = _distribute_snapshots(comm)
+    my_snaps = _distribute_snapshots(core, comm)
     # my_snaps = [100, 101] if rank == 0 else [102, 103]
     # my_snaps = np.array(my_snaps)
 
@@ -478,6 +458,7 @@ def infer_merger_out_masses(core=None, mrgs=None, mdets=None):
     core = Core.load(core)
     log = core.log
     log.debug("infer_merger_out_masses()")
+    CONV_ILL_TO_SOL = core.sets.CONV_ILL_TO_SOL
 
     # Load Mergers
     if (mrgs is None):
@@ -809,7 +790,7 @@ def allDetailsForBHLineage(run, mrg, log, reload=False):
     # Distribute snapshots to each processor
     log.debug(" - Barrier.")
     comm.Barrier()
-    my_snaps = _distribute_snapshots(comm)
+    my_snaps = _distribute_snapshots(core, comm)
     log.info("Rank {:d}/{:d} with {:d} Snapshots [{:d} ... {:d}]".format(
         rank, size, my_snaps.size, my_snaps.min(), my_snaps.max()))
 

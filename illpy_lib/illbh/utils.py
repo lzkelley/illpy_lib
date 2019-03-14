@@ -4,8 +4,6 @@
 import numpy as np
 import h5py
 
-from illpy_lib.illbh import NUM_SNAPS
-
 
 def load_hdf5_to_mem(fname):
     with h5py.File(fname, 'r') as data:
@@ -16,12 +14,12 @@ def load_hdf5_to_mem(fname):
     return out
 
 
-def _distribute_snapshots(comm):
+def _distribute_snapshots(core, comm):
     """Evenly distribute snapshot numbers across multiple processors.
     """
     size = comm.size
     rank = comm.rank
-    mySnaps = np.arange(NUM_SNAPS)
+    mySnaps = np.arange(core.sets.NUM_SNAPS)
     if size > 1:
         # Randomize which snapshots go to which processor for load-balancing
         mySnaps = np.random.permutation(mySnaps)

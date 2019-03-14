@@ -12,21 +12,8 @@ import h5py
 import zcode.inout as zio
 import zcode.math as zmath
 
-
-# try:
-# import illpy_lib  #
-# except ImportError:
-#     PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-#     if PATH_ILLPY_LIB not in sys.path:
-#         print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-#         sys.path.append(PATH_ILLPY_LIB)
-#
-#     import illpy_lib  # noqa
-
-
-from illpy_lib.constants import DTYPE, NUM_SNAPS, CONV_ILL_TO_CGS
+from illpy_lib.constants import DTYPE
 from illpy_lib.illbh import Core, DETAILS, load_hdf5_to_mem
-# from illpy_lib.illbh.bh_constants import DETAILS, load_hdf5_to_mem
 
 VERSION = 0.3                                    # Version of details
 
@@ -65,6 +52,7 @@ def reorganize(core=None):
     log.debug("details.reorganize()")
 
     RUN = core.sets.RUN_NUM
+    NUM_SNAPS = core.sets.NUM_SNAPS
 
     # temp_fnames = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
     temp_fnames = [core.paths.fname_details_temp_snap(snap, RUN) for snap in range(NUM_SNAPS)]
@@ -111,6 +99,7 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
     log = core.log
     log.debug("details._reorganize_files()")
 
+    NUM_SNAPS = core.sets.NUM_SNAPS
     snap_scales = core.cosmo.scales()
 
     temps = [zio.modify_filename(tt, prepend='_') for tt in temp_fnames]
@@ -212,6 +201,7 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
 def reformat(core=None):
     core = Core.load(core)
     log = core.log
+    NUM_SNAPS = core.sets.NUM_SNAPS
 
     log.debug("details.reformat()")
 
@@ -257,6 +247,7 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     cosmo = core.cosmo
     log.debug("details._reformat_to_hdf5()")
     log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
+    CONV_ILL_TO_CGS = core.sets.CONV_ILL_TO_CGS
 
     loadsave = (not core.sets.RECREATE)
 
@@ -428,6 +419,8 @@ def calc_dmdt_for_details(core=None):
     core = Core.load(core)
     log = core.log
     cosmo = core.cosmo
+    NUM_SNAPS = core.sets.NUM_SNAPS
+    CONV_ILL_TO_CGS = core.sets.CONV_ILL_TO_CGS
 
     # log.warning("WARNING: testing `calc_dmdt_for_details`!")
     # for snap in [135]:

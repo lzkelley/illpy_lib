@@ -5,7 +5,7 @@ import numpy as np
 # import h5py
 np.seterr(divide='ignore', invalid='ignore')
 
-from illpy_lib.constants import NUM_SNAPS  # noqa
+# from illpy_lib.constants import NUM_SNAPS  # noqa
 
 from . deep_core import Core  # noqa
 
