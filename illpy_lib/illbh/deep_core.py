@@ -3,11 +3,11 @@
 import os
 import glob
 
-import numpy as np
+# import numpy as np
 
 import pycore
 
-from zcode.constants import KPC, MSOL, YR
+# from zcode.constants import KPC, MSOL, YR
 
 import illpy
 import illpy.snapshot
@@ -46,7 +46,7 @@ class Settings(pycore.Settings):
         else:
             self.setup_tos()
 
-        self._setup()
+        # self._setup()
 
         return
 
@@ -75,52 +75,13 @@ class Settings(pycore.Settings):
         return tng_flag
 
     def setup_tos(self):
-        self.HPAR = 0.704
+        # self.HPAR = 0.704
         self.NUM_SNAPS = 136
         return
 
     def setup_tng(self):
-        self.HPAR = 0.6774
+        # self.HPAR = 0.6774
         self.NUM_SNAPS = 100
-        return
-
-    def _setup(self):
-
-        class CONV_ILL_TO_CGS:
-            """Convert from illustris units to physical [cgs] units (multiply).
-            """
-            MASS = 1.0e10*MSOL/self.HPAR          # Convert from e10 Msol to [g]
-            MDOT = 10.22*MSOL/YR                  # Multiply by this to get [g/s]
-            DENS = 6.77025e-22                    # (1e10 Msol/h)/(ckpc/h)^3 to g/cm^3 *COMOVING*
-            DIST = KPC/self.HPAR                  # Convert from [ckpc/h] to [comoving cm]
-            VEL  = 1.0e5                          # [km/s] to [cm/s]
-            CS   = 1.0                            # ??????? FIX
-
-        class CONV_CGS_TO_SOL:
-            """Convert from cgs units to (standard) solar units, e.g. Msol, PC, etc, by multiplication
-            """
-            MASS  = 1.0/MSOL                       # [g] ==> Msol
-            MDOT  = YR/MSOL                        # [g/s] ==> [Msol/yr]
-            DENS  = np.power(KPC/1000.0, 3.0)/MSOL          # [g/cm^3] ==> [Msol/pc^3]
-            NDENS = np.power(KPC/1000.0, 3.0)               # [1/cm^3] ==> [1/pc^3]
-            DIST  = 1000.0/KPC                         # [cm] ==> [pc]
-            VEL   = 1.0e-5                         # [cm/s] ==> [km/s]
-            ENER  = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
-
-        class CONV_ILL_TO_SOL:
-            """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
-            """
-            MASS = CONV_ILL_TO_CGS.MASS * CONV_CGS_TO_SOL.MASS  # e10 Msol to [Msol]
-            MDOT = CONV_ILL_TO_CGS.MDOT * CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
-            DENS = CONV_ILL_TO_CGS.DENS * CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
-            DIST = CONV_ILL_TO_CGS.DIST * CONV_CGS_TO_SOL.DIST  # to comoving-pc
-
-            VEL = 1.0
-
-        self.CONV_ILL_TO_CGS = CONV_ILL_TO_CGS
-        self.CONV_CGS_TO_SOL = CONV_CGS_TO_SOL
-        self.CONV_ILL_TO_SOL = CONV_ILL_TO_SOL
-
         return
 
 
@@ -240,9 +201,10 @@ class Paths(pycore.Paths):
         return os.path.join(self.OUTPUT, self.FNAME_MERGERS_CLEAN)
 
     @property
-    def output_plots(self):
-        path = os.path.join('.', self._DNAME_PLOTS, "")
+    def output_figs(self):
+        # path = os.path.join('.', self._DNAME_PLOTS, "")
         # path = os.path.realpath(path)
+        path = os.path.join('.', self._core.sets.NAME.lower(), "")
         path = self.check_path(path)
         return path
 
@@ -324,7 +286,11 @@ class Core(pycore.Core):
 
     def _load_cosmology(self):
         import illpy_lib.illcosmo
-        cosmo = illpy_lib.illcosmo.Illustris_Cosmology(self)
+        if self.sets.TNG:
+            cosmo = illpy_lib.illcosmo.Illustris_Cosmology_TNG(self)
+        else:
+            cosmo = illpy_lib.illcosmo.Illustris_Cosmology_TOS(self)
+
         return cosmo
 
     def finalize(self):
