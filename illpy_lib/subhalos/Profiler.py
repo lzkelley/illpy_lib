@@ -12,11 +12,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import warnings
 import numpy as np
 
-from illpy_lib.constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE, BOX_LENGTH
+from illpy_lib.constants import GET_ILLUSTRIS_DM_MASS, PARTICLE, DTYPE  #, BOX_LENGTH
 
-from . import Subhalo
-# import constants
-from . Constants import SNAPSHOT, SUBHALO
+from illpy_lib.subhalos import Subhalo
+from illpy_lib.subhalos.Constants import SNAPSHOT, SUBHALO
 
 import zcode.math as zmath
 import zcode.inout as zio
@@ -254,15 +253,18 @@ def reflectPos(pos, center=None):
         fix    <flt>[N, 3] : array of 'fixed' positions with bad elements reflected
 
     """
+    from illpy_lib.illcosmo import Illustris_Cosmology_TOS
+    COSMO = Illustris_Cosmology_TOS()
 
-    FULL = BOX_LENGTH
+    FULL = COSMO.BOX_LENGTH
     HALF = 0.5*FULL
 
     # Create a copy of input positions
     fix = np.array(pos)
 
     # Use median position as center if not provided
-    if (center is None): center = np.median(fix, axis=0)
+    if (center is None):
+        center = np.median(fix, axis=0)
 
     # Find distances to center
     offsets = fix - center

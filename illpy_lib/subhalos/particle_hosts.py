@@ -65,16 +65,15 @@ Notes
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-# import sys
 from datetime import datetime
 
 import numpy as np
 import h5py
 import tqdm
 
-from .. constants import DTYPE, NUM_SNAPS, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR, GET_BAD_SNAPS
-from ..illbh.bh_constants import check_log
-from . Constants import SNAPSHOT
+from illpy_lib.constants import DTYPE, PARTICLE, GET_ILLUSTRIS_OUTPUT_DIR  # , GET_BAD_SNAPS, NUM_SNAPS
+from illpy_lib.subhalos.Constants import SNAPSHOT
+from illpy_lib.illcosmo import Illustris_Cosmology_TOS
 
 import zcode.inout as zio
 
@@ -83,19 +82,6 @@ import zcode.inout as zio
 #    formerly: "/n/home00/lkelley/hernquistfs1/illustris/data/%s/output/postprocessing/"
 _PROCESSED_DIR = "/n/home00/lkelley/illustris/data/{}/output/postprocessing/"
 
-'''
-illustris_python_path = "/n/home00/lkelley/illustris/"
-if not os.path.exists(illustris_python_path):
-    print("Path '{}' does not exist...".format(illustris_python_path))
-    illustris_python_path = "/Users/lzkelley/Research/working/arepo/illustris/"
-    if not os.path.exists(illustris_python_path):
-        raise ImportError("Path to `illustris_python` '{}' does not exist!".format(
-            illustris_python_path))
-
-if illustris_python_path not in sys.path:
-    sys.path.append(illustris_python_path)
-import illustris_python as ill
-'''
 import illpy as ill
 
 _VERSION = '1.0'
@@ -217,7 +203,7 @@ def _load_bh_hosts_table(run, log=None, load_saved=True, version=None):
     bh_hosts <dict> : table of hosts for all snapshots
 
     """
-    log = check_log(log, run=run)
+    # log = check_log(log, run=run)
     log.debug("particle_hosts._load_bh_hosts_table()")
     beg_all = datetime.now()
 
@@ -241,6 +227,7 @@ def _load_bh_hosts_table(run, log=None, load_saved=True, version=None):
     # -----------------------
     if not load_saved:
         log.info("Constructing Hosts Table")
+        COSMO = Illustris_Cosmology_TOS()
 
         if version is not None:
             log.raise_error("Can only create version '{}'".format(_VERSION))
@@ -259,7 +246,7 @@ def _load_bh_hosts_table(run, log=None, load_saved=True, version=None):
             host_table.attrs[OFFTAB.CREATED]     = datetime.now().ctime()
             host_table.attrs[OFFTAB.FILENAME]    = fname_bh_hosts
 
-            for snap in tqdm.trange(NUM_SNAPS, desc="Loading snapshots"):
+            for snap in tqdm.trange(COSMO.NUM_SNAPS, desc="Loading snapshots"):
                 # Load Snapshot BH-Hosts
                 htab_snap = _load_bh_hosts_snap_table(run, snap, log, load_saved=True)
                 # Extract and store target data
@@ -317,6 +304,7 @@ def _load_bh_hosts_snap_table(run, snap, log, version=None, load_saved=True):
     # -----------------------
     if not load_saved:
         log.info("Constructing Offset Table for Snap {}".format(snap))
+        COSMO = Illustris_Cosmology_TOS()
 
         if version is not None:
             log.raise_error("Can only create version '{}'".format(_VERSION))
@@ -332,7 +320,7 @@ def _load_bh_hosts_snap_table(run, snap, log, version=None, load_saved=True):
             bh_inds, bh_ids = _construct_bh_index_table(run, snap, log)
         except:
             # If this is a known bad snapshot, set values to None
-            if snap in GET_BAD_SNAPS(run):
+            if snap in COSMO.GET_BAD_SNAPS(run):
                 log.info("bad snapshot: run {}, snap {}".format(run, snap))
                 bh_inds  = None
                 bh_ids   = None
