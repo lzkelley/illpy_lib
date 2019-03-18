@@ -35,8 +35,6 @@ def main():
     log.warning("Loading merger tree")
     tree = illpy_lib.illbh.mergers.load_tree(core=core, mrgs=mrgs)
 
-
-
     log.warning("Loading remmant-details")
     rdets = illpy_lib.illbh.matcher.load_remnant_details(core)
 
