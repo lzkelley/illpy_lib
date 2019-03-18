@@ -3,11 +3,7 @@
 import os
 import glob
 
-# import numpy as np
-
 import pycore
-
-# from zcode.constants import KPC, MSOL, YR
 
 import illpy
 import illpy.snapshot
