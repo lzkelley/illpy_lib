@@ -28,14 +28,18 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
     BOX_LENGTH = 75000                          # [ckpc/h]
     BOX_VOLUME_MPC3 = None
     BOX_VOLUME_CGS = None
+    NUM_SNAPS = None
+    _BAD_SNAPS = None
 
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self, core=None):
+    def __init__(self, core=None, log=None):
         super().__init__()
-        if core is not None:
+        if log is None and core is not None:
             log = core.log
+
+        if log is not None:
             log.debug("Initializing `Illustris_Cosmology`")
 
         # tng_flag = core.sets.TNG
@@ -44,7 +48,11 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
 
         cosmo_data = np.load(fname)
         self.snapshot_scales = cosmo_data['scale']
-        log.info("Loaded {} snapshot scales".format(self.snapshot_scales.size))
+        msg = "Loaded cosmology with {} snapshot scales".format(self.snapshot_scales.size)
+        if log is None:
+            print(msg)
+        else:
+            log.info(msg)
 
         class CONV_ILL_TO_CGS:
             """Convert from illustris units to physical [cgs] units (multiply).
@@ -89,6 +97,9 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
     def scales(self):
         return np.array(self.snapshot_scales)
 
+    def GET_BAD_SNAPS(self, run):
+        return self._BAD_SNAPS[run]
+
 
 class Illustris_Cosmology_TOS(_Illustris_Cosmology):
 
@@ -99,6 +110,11 @@ class Illustris_Cosmology_TOS(_Illustris_Cosmology):
     H0 = HPAR * 100.0
 
     FNAME = _TIMES_FILENAME_TOS
+    NUM_SNAPS = 136
+
+    _BAD_SNAPS = {1: [53, 55],
+                  2: [],
+                  3: []}
 
 
 class Illustris_Cosmology_TNG(_Illustris_Cosmology):
@@ -110,3 +126,8 @@ class Illustris_Cosmology_TNG(_Illustris_Cosmology):
     H0 = HPAR * 100.0
 
     FNAME = _TIMES_FILENAME_TNG
+    NUM_SNAPS = 100
+
+    _BAD_SNAPS = {1: [],
+                  2: [],
+                  3: []}
