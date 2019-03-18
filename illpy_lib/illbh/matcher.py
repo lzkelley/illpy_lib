@@ -20,12 +20,12 @@ VERSION = 1.0
 
 
 def main():
-    # run=1, verbose=True, debug=True, loadsave=True, redo_mergers=False, redo_remnants=True):
     from mpi4py import MPI
 
     # Initialization
     # --------------
-    core = Core(sets=dict(LOG_FILENAME='log_illbh-matcher.log'))
+    # core = Core(sets=dict(LOG_FILENAME='log_illbh-matcher.log'))
+    core = Core()
     log = core.log
     log.info("matcher.main()")
 
@@ -440,13 +440,15 @@ def _save_merger_details_npz(core, fname, mdets):
     return data
 
 
-def load_merger_details(core):
-    fname = core.paths.fname_merger_details()
+def load_merger_details(core, fname=None):
+    if fname is None:
+        fname = core.paths.fname_merger_details()
 
-    core.log.info("Warning loading from 'npz' instead of 'hdf5'")
-    fname = fname.replace('.hdf5', '.npz')
+    if fname.endswith('.hdf5'):
+        core.log.info("Warning loading from 'npz' instead of 'hdf5'")
+        fname = fname.replace('.hdf5', '.npz')
+
     mdets = zio.npzToDict(fname)
-
     # mdets = load_hdf5_to_mem(fname)
     core.log.info("Loaded merger-details, keys: {}".format(mdets.keys()))
     return mdets
@@ -458,7 +460,7 @@ def infer_merger_out_masses(core=None, mrgs=None, mdets=None):
     core = Core.load(core)
     log = core.log
     log.debug("infer_merger_out_masses()")
-    CONV_ILL_TO_SOL = core.sets.CONV_ILL_TO_SOL
+    CONV_ILL_TO_SOL = core.cosmo.CONV_ILL_TO_SOL
 
     # Load Mergers
     if (mrgs is None):
@@ -594,7 +596,7 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
     if tree is None:
         log.debug("Loading BHTree")
         import illpy_lib.illbh.mergers
-        tree = illpy_lib.illbh.mergers.load_tree(core, mergers=mrgs)
+        tree = illpy_lib.illbh.mergers.load_tree(core, mrgs=mrgs)
 
     next_merger = tree[BH_TREE.NEXT]
 
@@ -621,22 +623,35 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
         else:
             log.error("No post-merger details for merger {}, next = {}".format(
                 ii, next_merger[ii]))
-            # for key in DETAILS_PHYSICAL_KEYS:
-            #     rem_dets[key][ii] = [0.0]
-            # continue
+            for key in DETAILS_PHYSICAL_KEYS:
+                rem_dets[key][ii] = [0.0]
+            continue
             # raise RuntimeError("Merger {} without post-merger dets entries!".format(ii))
 
         # Subsequent mrgs
         next = next_merger[ii]
         # while a subsequent merger exists... store those entries
         while next >= 0:
+            next_mid = m_ids[next, BH_TYPE.OUT]
+            next_scale = m_scales[next]
+
+            '''
+            if ids[ii] is not None:
+                if ids[ii][-1] not in m_ids[next]:
+                    raise RuntimeError("Merger: {}, next: {} - Last ID not in next IDs!".format(
+                        ii, next))
+
+                ids[ii].append(next_mid)
+            else:
+                ids[ii] = [next_mid]
+            '''
+
             if ids[ii][-1] not in m_ids[next]:
                 raise RuntimeError("Merger: {}, next: {} - Last ID not in next IDs!".format(
                     ii, next))
 
-            next_mid = m_ids[next, BH_TYPE.OUT]
-            next_scale = m_scales[next]
             ids[ii].append(next_mid)
+
             # if TEST:
             #     log.warning("Next: {}, scale: {}, ids: {}, {}".format(
             #         next, next_scale, *m_ids[next]))
@@ -686,15 +701,29 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
     return
 
 
-def load_remnant_details(core):
-    fname = core.paths.fname_remnant_details()
+def load_remnant_details(core=None, recreate=None):
+    core = Core.load(core)
+    log = core.log
+    log.debug("load_remnant_details()")
 
+    if recreate is None:
+        recreate = core.sets.RECREATE
+
+    fname = core.paths.fname_remnant_details()
     core.log.info("Warning loading from 'npz' instead of 'hdf5'")
     fname = fname.replace('.hdf5', '.npz')
+    exists = os.path.exists(fname)
+    log.debug("Remnant-details file '{}' exists: {}".format(fname, exists))
+
+    if recreate or not exists:
+        log.warning("Creating remnant details")
+
+        _remnant_details(core)
+
     rdets = zio.npzToDict(fname)
 
     # mdets = load_hdf5_to_mem(fname)
-    core.log.info("Loaded remnant-details, keys: {}".format(rdets.keys()))
+    log.info("Loaded remnant-details, keys: {}".format(rdets.keys()))
     return rdets
 
 

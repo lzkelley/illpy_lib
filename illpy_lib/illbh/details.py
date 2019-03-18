@@ -247,7 +247,7 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     cosmo = core.cosmo
     log.debug("details._reformat_to_hdf5()")
     log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
-    CONV_ILL_TO_CGS = core.sets.CONV_ILL_TO_CGS
+    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
 
     loadsave = (not core.sets.RECREATE)
 
@@ -420,7 +420,7 @@ def calc_dmdt_for_details(core=None):
     log = core.log
     cosmo = core.cosmo
     NUM_SNAPS = core.sets.NUM_SNAPS
-    CONV_ILL_TO_CGS = core.sets.CONV_ILL_TO_CGS
+    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
 
     # log.warning("WARNING: testing `calc_dmdt_for_details`!")
     # for snap in [135]:
