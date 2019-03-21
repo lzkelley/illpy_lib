@@ -109,6 +109,8 @@ class Paths(pycore.Paths):
     # _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
     FNAME_REMNANT_DETAILS = "ill-{run_num:d}_blackhole_remnant-details_per-snap-{per_snap:03d}.hdf5"
 
+    FNAME_REMNANT_DETAILS_FIXED = "ill-{run_num:d}_blackhole_remnant-details-fixed_per-snap-{per_snap:03d}.hdf5"
+
     # _BLACKHOLE_TREE_FILENAME         = "ill-%d_bh-tree_v%.2f.npz"
     FNAME_MERGER_TREE = "ill-{run_num:d}_blackhole_merger-tree.hdf5"
 
@@ -263,6 +265,17 @@ class Paths(pycore.Paths):
             max_per_snap = self._core.sets.MAX_DETAILS_PER_SNAP
 
         fname = self.FNAME_REMNANT_DETAILS.format(run_num=run_num, per_snap=max_per_snap)
+        fname = os.path.join(self.output, fname)
+        return fname
+
+    def fname_remnant_details_fixed(self, run_num=None, max_per_snap=None):
+        if run_num is None:
+            run_num = self._core.sets.RUN_NUM
+
+        if max_per_snap is None:
+            max_per_snap = self._core.sets.MAX_DETAILS_PER_SNAP
+
+        fname = self.FNAME_REMNANT_DETAILS_FIXED.format(run_num=run_num, per_snap=max_per_snap)
         fname = os.path.join(self.output, fname)
         return fname
 
