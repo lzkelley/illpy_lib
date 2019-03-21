@@ -10,6 +10,7 @@ import h5py
 
 import zcode.inout as zio
 import zcode.math as zmath
+# import zcode.astro as zastro
 
 from illpy_lib.illbh import (
     Core, _distribute_snapshots,  # load_hdf5_to_mem,
@@ -609,7 +610,7 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
 
     # Iterate over all mrgs
     # ------------------------
-    log.debug("Matching data to remnants")
+    log.warning("Constructing remnant-details")
     for ii in core.tqdm(range(num_mergers), desc='Mergers'):
         # First Merger
         #    Store dets after merger time for 'out' BH
@@ -624,7 +625,7 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
             log.error("No post-merger details for merger {}, next = {}".format(
                 ii, next_merger[ii]))
             for key in DETAILS_PHYSICAL_KEYS:
-                rem_dets[key][ii] = [0.0]
+                rem_dets[key][ii] = np.array([0.0])
             continue
             # raise RuntimeError("Merger {} without post-merger dets entries!".format(ii))
 
@@ -635,33 +636,17 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
             next_mid = m_ids[next, BH_TYPE.OUT]
             next_scale = m_scales[next]
 
-            '''
-            if ids[ii] is not None:
-                if ids[ii][-1] not in m_ids[next]:
-                    raise RuntimeError("Merger: {}, next: {} - Last ID not in next IDs!".format(
-                        ii, next))
-
-                ids[ii].append(next_mid)
-            else:
-                ids[ii] = [next_mid]
-            '''
-
             if ids[ii][-1] not in m_ids[next]:
                 raise RuntimeError("Merger: {}, next: {} - Last ID not in next IDs!".format(
                     ii, next))
 
             ids[ii].append(next_mid)
 
-            # if TEST:
-            #     log.warning("Next: {}, scale: {}, ids: {}, {}".format(
-            #         next, next_scale, *m_ids[next]))
             next_dids = d_ids[next, BH_TYPE.OUT][:]
             if not np.all(next_mid == next_dids):
                 raise RuntimeError("Details IDs for next: {} do not match merger ID!".format(next))
 
             inds = (d_scales[next, BH_TYPE.OUT] > next_scale)
-            # if TEST:
-            #     log.warning("Found {} matches for next merger".format(np.count_nonzero(inds)))
             if np.count_nonzero(inds) > 0:
                 for key in DETAILS_PHYSICAL_KEYS:
                     rem_dets[key][ii] = np.append(rem_dets[key][ii],
@@ -680,16 +665,6 @@ def _remnant_details(core, mrgs=None, mrg_dets=None, tree=None):
                 rem_dets[key][ii] = rem_dets[key][ii][inds]
         else:
             log.warning("Merger %d without ANY entries." % (ii))
-
-        # if TEST:
-        #     log.warning("Finished test merger")
-        #     log.warning("Found {} ids, {} entries".format(len(ids[ii]), nents[ii]))
-        #     masses = rem_dets['masses'][ii]
-        #     bads = (np.diff(masses) < 0.0)
-        #     if np.count_nonzero(bads) > 0:
-        #         raise RuntimeError("Found negative mass changes!")
-        #
-        #     raise
 
     log.debug("Remnant dets collected.")
     log.info("Number of entries: " + zmath.stats_str(nents))
@@ -724,6 +699,172 @@ def load_remnant_details(core=None, recreate=None):
 
     # mdets = load_hdf5_to_mem(fname)
     log.info("Loaded remnant-details, keys: {}".format(rdets.keys()))
+    return rdets
+
+
+def _fix_remnant_details(core, mrgs=None, tree=None, rdets_in=None):
+    log = core.log
+    log.debug("_fix_remnant_details()")
+
+    log.debug("Loading remnant-details")
+    if rdets_in is None:
+        rdets_in = load_remnant_details(core=core)
+
+    CONV_MASS = core.cosmo.CONV_ILL_TO_CGS.MASS
+    CONV_MDOT = core.cosmo.CONV_ILL_TO_CGS.MDOT
+
+    log.debug("Loading Mergers")
+    if mrgs is None:
+        from illpy_lib.illbh import mergers
+        mrgs = mergers.load_fixed_mergers(core=core)
+
+    num_mergers = np.int(mrgs[MERGERS.NUM])     # Convert from ``np.array(int)``
+
+    # Load BH Merger Tree
+    if tree is None:
+        log.debug("Loading BHTree")
+        import illpy_lib.illbh.mergers
+        tree = illpy_lib.illbh.mergers.load_tree(core, mrgs=mrgs)
+
+    next_merger = tree['next']
+
+    rem_dets = {key: num_mergers*[None] for key in DETAILS_PHYSICAL_KEYS}
+
+    num_goods = np.zeros(num_mergers, dtype=int)
+    num_bads = np.zeros_like(num_goods)
+
+    log.warning("Fixing remnant-details")
+    for mrg in core.tqdm(np.arange(num_mergers), desc='Mergers'):
+
+        scales = rdets_in['scales'][mrg]
+        if np.size(scales) < 2:
+            log.error("SKIPPING: Merger {} with {} rdets".format(mrg, np.size(scales)))
+            continue
+
+        masses_in = rdets_in['masses'][mrg]   # * CONV_MASS
+        goods = np.ones_like(scales, dtype=bool)
+
+        bads = np.append((np.diff(scales) <= 0.0), False)
+        if any(bads):
+            bads = np.where(bads)[0]
+            for bb in bads:
+                next_scale = scales[bb+1]
+                idx = (scales >= next_scale)
+                idx[bb+1:] = False
+                goods[idx] = False
+
+        bads = (np.diff(scales[goods]) <= 0.0)
+        if np.count_nonzero(bads) > 0:
+            raise
+
+        numg = np.count_nonzero(goods)
+        num_goods[mrg] = numg
+
+        for key in DETAILS_PHYSICAL_KEYS:
+            rem_dets[key][mrg] = rdets_in[key][mrg][goods]
+
+        scales = scales[goods]
+        masses_in = masses_in[goods]
+        rdids = rdets_in['id'][mrg][goods]
+
+        # Calculate dM/dt using these masses to get Eddington factors
+        times = core.cosmo.a_to_tage(scales)
+        dt = np.diff(times)
+        dm = np.diff(masses_in)  # * CONV_MASS
+
+        dmdts = np.append(dm/dt, 0.0)
+        fedd = dmdts / masses_in
+
+        nxt = next_merger[mrg]
+        masses = np.array(masses_in)
+
+        while nxt >= 0:
+            m_scale = mrgs[DETAILS.SCALES][nxt]
+            m_mass = mrgs[DETAILS.MASSES][nxt]   # * CONV_MASS
+
+            idx = (scales > m_scale)
+
+            num_aft = np.count_nonzero(idx)
+            num_bef = np.count_nonzero(~idx)
+
+            if num_aft == 0 or num_bef == 0:
+                log.debug("Merger: {}, next: {} -- numbers bef: {}, aft: {} -- skipping!".format(
+                    mrg, nxt, num_bef, num_aft))
+            else:
+                mass_aft = masses[idx][0]
+                mass_bef = masses[~idx][-1]
+
+                # Get the last ID before merger
+                rdid_bef = rdids[~idx][-1]
+
+                # Find which BH matches the previous ID number
+                jj = (rdid_bef == mrgs[MERGERS.IDS][nxt])
+                # Subtract the *other* mass
+                if np.count_nonzero(jj) != 1:
+                    log.debug(
+                        "Merger: {}, next: {}\n\t"
+                        "rdets ID: {}, merger IDs: {}, {} -- skipping!".format(
+                            mrg, nxt, rdid_bef, *mrgs[MERGERS.IDS][nxt])
+                    )
+                else:
+                    sub_mass = m_mass[~jj]
+                    if mass_aft - sub_mass < mass_bef:
+                        log.debug(
+                            "Merger: {}, next: {}\n\t"
+                            "Mass bef, aft: {}, {}; subtract: {} -- skipping!".format(
+                                mrg, nxt, mass_bef, mass_aft, sub_mass)
+                        )
+                    else:
+                        masses[idx] = masses[idx] - sub_mass
+
+            nxt = next_merger[nxt]
+
+        # Use the fixed masses to convert back to absolute accretion rates
+        dmdts = fedd * masses
+        # Update values in output dictionary
+        rem_dets[DETAILS.MASSES][mrg] = masses
+        # Convert from mass/time to mdot units
+        rem_dets[DETAILS.DMDTS][mrg] = dmdts * CONV_MASS / CONV_MDOT
+
+        goods = (dmdts >= 0.0)
+        nbad = np.count_nonzero(~goods)
+        num_bads[mrg] += nbad
+        if nbad > 0:
+            for key in DETAILS_PHYSICAL_KEYS:
+                rem_dets[key][mrg] = rem_dets[key][mrg][goods]
+
+    log.info("Goods: {}".format(zmath.stats_str(num_goods)))
+    log.info("Bads1: {}".format(zmath.stats_str(num_bads)))
+
+    fname_out = core.paths.fname_remnant_details_fixed()
+    log.warning("WARNING: saving to `npz` not `hdf5`!")
+    _save_merger_details_npz(core, fname_out, rem_dets)
+    return
+
+
+def load_remnant_details_fixed(core=None, recreate=None, **kwargs):
+    core = Core.load(core)
+    log = core.log
+    log.debug("load_remnant_details_fixed()")
+
+    if recreate is None:
+        recreate = core.sets.RECREATE
+
+    fname = core.paths.fname_remnant_details_fixed()
+    core.log.info("Warning loading from 'npz' instead of 'hdf5'")
+    fname = fname.replace('.hdf5', '.npz')
+    exists = os.path.exists(fname)
+    log.debug("Remnant-details-fixed file '{}' exists: {}".format(fname, exists))
+
+    if recreate or not exists:
+        log.warning("Fixing remnant details")
+
+        _fix_remnant_details(core, **kwargs)
+
+    rdets = zio.npzToDict(fname)
+
+    # mdets = load_hdf5_to_mem(fname)
+    log.info("Loaded remnant-details-fixed, keys: {}".format(rdets.keys()))
     return rdets
 
 
