@@ -55,18 +55,25 @@ class Settings(pycore.Settings):
         return
 
     def check_tng(self):
+        log = self._core.log
+        log.debug("check_tng()")
+        
         inpath = self.INPUT
         tng_flag = ('tng' in inpath.lower())
         inpath = os.path.join(inpath, 'output', '')
 
         # Double check based on header information
-        header = illpy.snapshot.get_header(inpath)
-        keys = [kk.lower() for kk in header.keys()]
-        check1 = ('git_commit' in keys)
-        check2 = (header['HubbleParam'] < 0.7)
-        checks = [tng_flag, check1, check2]
-        if not all(checks) and any(checks):
-            raise RuntimeError("Cannot confirm whether TNG or TOS!  {}".format(checks))
+        try:
+            header = illpy.snapshot.get_header(inpath)
+        except OSError as err:
+            log.error("{}".format(str(err)))
+        else:
+            keys = [kk.lower() for kk in header.keys()]
+            check1 = ('git_commit' in keys)
+            check2 = (header['HubbleParam'] < 0.7)
+            checks = [tng_flag, check1, check2]
+            if not all(checks) and any(checks):
+                raise RuntimeError("Cannot confirm whether TNG or TOS!  {}".format(checks))
 
         return tng_flag
 
