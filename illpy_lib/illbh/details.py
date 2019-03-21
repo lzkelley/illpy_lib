@@ -2,7 +2,7 @@
 """
 
 import os
-import sys
+# import sys
 import shutil
 from datetime import datetime
 
@@ -12,21 +12,8 @@ import h5py
 import zcode.inout as zio
 import zcode.math as zmath
 
-
-try:
-    import illpy_lib
-except ImportError:
-    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-    if PATH_ILLPY_LIB not in sys.path:
-        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-        sys.path.append(PATH_ILLPY_LIB)
-
-    import illpy_lib  # noqa
-
-
-from illpy_lib.constants import DTYPE, NUM_SNAPS
-from illpy_lib.illbh import Core
-from illpy_lib.illbh.bh_constants import DETAILS, load_hdf5_to_mem
+from illpy_lib.constants import DTYPE
+from illpy_lib.illbh import Core, DETAILS, load_hdf5_to_mem
 
 VERSION = 0.3                                    # Version of details
 
@@ -65,6 +52,7 @@ def reorganize(core=None):
     log.debug("details.reorganize()")
 
     RUN = core.sets.RUN_NUM
+    NUM_SNAPS = core.sets.NUM_SNAPS
 
     # temp_fnames = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
     temp_fnames = [core.paths.fname_details_temp_snap(snap, RUN) for snap in range(NUM_SNAPS)]
@@ -111,9 +99,8 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
     log = core.log
     log.debug("details._reorganize_files()")
 
-    import illpy_lib.illcosmo
-    cosmo = illpy_lib.illcosmo.cosmology.Cosmology()
-    snap_scales = cosmo.scales()
+    NUM_SNAPS = core.sets.NUM_SNAPS
+    snap_scales = core.cosmo.scales()
 
     temps = [zio.modify_filename(tt, prepend='_') for tt in temp_fnames]
 
@@ -214,6 +201,7 @@ def _reorganize_files(core, raw_fnames, temp_fnames):
 def reformat(core=None):
     core = Core.load(core)
     log = core.log
+    NUM_SNAPS = core.sets.NUM_SNAPS
 
     log.debug("details.reformat()")
 
@@ -259,6 +247,7 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     cosmo = core.cosmo
     log.debug("details._reformat_to_hdf5()")
     log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
+    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
 
     loadsave = (not core.sets.RECREATE)
 
@@ -290,12 +279,28 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     for ii, nn in zip(u_inds, u_counts):
         j0 = slice(ii, ii+nn-1)
         j1 = slice(ii+1, ii+nn)
-        t0 = cosmo.scale_to_age(scales[j0])
-        t1 = cosmo.scale_to_age(scales[j1])
+        # t0 = cosmo.scale_to_age(scales[j0])
+        # t1 = cosmo.scale_to_age(scales[j1])
+        z0 = cosmo._a_to_z(scales[j0])
+        z1 = cosmo._a_to_z(scales[j1])
+        t0 = cosmo.age(z0).cgs.value
+        t1 = cosmo.age(z1).cgs.value
         m0 = masses[j0]
         m1 = masses[j1]
+        dm = m1 - m0
         dt = t1 - t0
-        dmdts[j1] = (m1 - m0) / dt
+
+        # dmdts[j1] = (m1 - m0) / dt
+
+        ss = np.ones_like(dm)
+        neg = (dm < 0.0) | (dt < 0.0)
+        ss[neg] *= -1
+
+        inds = (dt != 0.0)
+        dmdts[j1][inds] = ss[inds] * np.fabs(dm[inds] / dt[inds])
+
+    # Convert dmdts to same units as mdots
+    dmdts = dmdts * CONV_ILL_TO_CGS.MASS / CONV_ILL_TO_CGS.MDOT
 
     with h5py.File(out_fname, 'w') as out:
         out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
@@ -414,6 +419,8 @@ def calc_dmdt_for_details(core=None):
     core = Core.load(core)
     log = core.log
     cosmo = core.cosmo
+    NUM_SNAPS = core.sets.NUM_SNAPS
+    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
 
     # log.warning("WARNING: testing `calc_dmdt_for_details`!")
     # for snap in [135]:
@@ -427,8 +434,8 @@ def calc_dmdt_for_details(core=None):
 
             # These are already sorted by ID and scale-factor, so contiguous and chronological
             # for each BH
-            masses = data[DETAILS.MASSES]
-            # mdots = data[DETAILS.MDOTS]
+            masses = data[DETAILS.MASSES][:] * CONV_ILL_TO_CGS.MASS
+            mdots = data[DETAILS.MDOTS]
 
             u_inds = data[DETAILS.UNIQUE_INDICES]
             u_counts = data[DETAILS.UNIQUE_COUNTS]
@@ -437,11 +444,16 @@ def calc_dmdt_for_details(core=None):
             dmdts = np.zeros_like(masses)
             count = 0
             count_all = 0
+
             for ii, nn in zip(u_inds, u_counts):
                 j0 = slice(ii, ii+nn-1)
                 j1 = slice(ii+1, ii+nn)
-                t0 = cosmo.scale_to_age(scales[j0])
-                t1 = cosmo.scale_to_age(scales[j1])
+                # t0 = cosmo.a_to_tage(scales[j0])
+                # t1 = cosmo.a_to_tage(scales[j1])
+                z0 = cosmo._a_to_z(scales[j0])
+                z1 = cosmo._a_to_z(scales[j1])
+                t0 = cosmo.age(z0).cgs.value
+                t1 = cosmo.age(z1).cgs.value
                 m0 = masses[j0]
                 m1 = masses[j1]
                 dm = m1 - m0
@@ -457,7 +469,10 @@ def calc_dmdt_for_details(core=None):
                 count += np.count_nonzero(inds)
                 count_all += inds.size
 
+            dmdts = dmdts / CONV_ILL_TO_CGS.MDOT
             log.info("dM/dt nonzero : " + zio.frac_str(np.count_nonzero(dmdts), masses.size))
+            log.info("mdots : " + zmath.stats_str(mdots, filter='>'))
+            log.info("dmdts : " + zmath.stats_str(dmdts, filter='>'))
 
     return
 

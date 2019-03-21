@@ -26,12 +26,12 @@ import os
 import logging
 from glob import glob
 
-import numpy as np
-import h5py
+# import numpy as np
+# import h5py
 
 import zcode.inout as zio
 
-from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE, NUM_SNAPS
+from illpy_lib.constants import GET_ILLUSTRIS_RUN_NAMES, _PROCESSED_DIR, DTYPE  # , NUM_SNAPS
 
 
 # Illustris Parameters
@@ -86,7 +86,7 @@ _PROCESSED_DETAILS_DIR          = _PROCESSED_DIR + "blackhole_details/"
 # _DETAILS_SAVE_FILENAME          = "ill-%d_blackhole_details_save_snap-%d_v%.2f.npz"
 
 # _MERGER_DETAILS_FILENAME        = 'ill-%d_blackhole_merger-details_persnap-%03d_v%s.npz'
-_REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
+# _REMNANT_DETAILS_FILENAME       = 'ill-%d_blackhole_remnant-details_persnap-%03d_v%s.npz'
 
 _DETAILS_UNIQUE_IDS_FILENAME     = 'ill-%d_blackhole_details_unique-ids_snap-%03d_v%s.npz'
 _DETAILS_ALL_UNIQUE_IDS_FILENAME = 'ill-%d_blackhole_details_all-unique-ids_v%s.npz'

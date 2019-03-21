@@ -54,15 +54,12 @@ import zcode.inout as zio
 import zcode.math as zmath
 # from zcode.constants import PC
 
+from illpy_lib.constants import DTYPE, GET_PROCESSED_DIR  # , CONV_ILL_TO_SOL, GET_BAD_SNAPS
+from illpy_lib.illbh import MERGERS, BH_TYPE
+
+from illpy_lib.subhalos import Subhalo, Profiler, particle_hosts
+from illpy_lib.subhalos.particle_hosts import OFFTAB
 from illpy_lib.subhalos.Constants import SUBHALO
-from illpy_lib.constants import DTYPE, GET_BAD_SNAPS, GET_PROCESSED_DIR, CONV_ILL_TO_SOL
-
-from . import Subhalo
-from . import Profiler
-from . import particle_hosts
-from . particle_hosts import OFFTAB
-
-from illpy_lib.illbh.bh_constants import MERGERS, BH_TYPE
 
 # Hard Settings
 _VERSION      = 1.4
@@ -119,34 +116,43 @@ class _ENVSTAT():
 
 
 # Post-Processed Files
-# --------------------
 
 _MERGER_SUBHALO_FILENAME_BASE = "snap{1:03d}/ill{0:d}_snap{1:03d}_subhalo{2:06d}_v{3:.2f}.npz"
+
+
 def _GET_MERGER_SUBHALO_FILENAME(run, snap, subhalo, version=_VERSION):
     pDir = GET_PROCESSED_DIR(run) + "subhalos/"
     fname = pDir + _MERGER_SUBHALO_FILENAME_BASE.format(run, snap, subhalo, version)
     return fname
 
+
 _MERGER_ENVIRONMENT_FILENAME = "ill%d_merger-environments_v%.2f.npz"
+
+
 def _GET_MERGER_ENVIRONMENT_FILENAME(run, version=_VERSION):
     pDir = GET_PROCESSED_DIR(run)
     fname = pDir + _MERGER_ENVIRONMENT_FILENAME % (run, version)
     return fname
 
-# Temporary Files
-# ---------------
 
+# Temporary Files
 _MISSING_LIST_FILENAME = "ill%d_missing_merger-subhalos_v%.2f.txt"
+
+
 def _GET_MISSING_LIST_FILENAME(run, version=_VERSION):
     return _MISSING_LIST_FILENAME % (run, version)
 
 
 _FAILED_LIST_FILENAME = "ill%d_failed_merger-subhalos_v%.2f.txt"
+
+
 def _GET_FAILED_LIST_FILENAME(run, version=_VERSION):
     return _FAILED_LIST_FILENAME % (run, version)
 
 
 _ENVIRONMENTS_STATUS_FILENAME = 'stat_Environments_ill%d_v%.2f.txt'
+
+
 def _GET_ENVIRONMENTS_STATUS_FILENAME(run):
     return _ENVIRONMENTS_STATUS_FILENAME % (run, _VERSION)
 
@@ -169,10 +175,12 @@ def get_merger_and_subhalo_indices(run, verbose=True):
     """
     if verbose: print(" - - Environments.get_merger_and_subhalo_indices()")
 
+    from illpy_lib.illcosmo import Illustris_Cosmology_TOS
+    COSMO = Illustris_Cosmology_TOS()
+
     if verbose: print(" - - - Loading Mergers")
-    from illpy_lib import illbh
-    import illpy_lib.illbh.mergers
-    mergers = illbh.mergers.loadFixedMergers(run, verbose=verbose)
+    from illpy_lib.illbh import mergers as illbh_mergers   # noqa
+    mergers = illbh_mergers.loadFixedMergers(run, verbose=verbose)
     if verbose: print((" - - - - Loaded %d mergers" % (mergers[MERGERS.NUM])))
 
     if verbose: print(" - - - Loading BH Hosts Catalog")
@@ -215,7 +223,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
             if bh_hosts_snap_out[OFFTAB.BH_IDS].item() is None: bad_flag_out = True
         # Check for bad Snapshots (or other problems)
         if bad_flag_out:
-            if snap in GET_BAD_SNAPS(run):
+            if snap in COSMO.GET_BAD_SNAPS(run):
                 if verbose: print((" - - - - out BAD SNAPSHOT: Run %d, Snap %d" % (run, snap)))
             else:
                 raise RuntimeError("Run %d, Snap %d: Bad BH_IDS out" % (run, snap))
@@ -231,7 +239,7 @@ def get_merger_and_subhalo_indices(run, verbose=True):
             if bh_hosts_snap_in[OFFTAB.BH_IDS].item() is None: bad_flag_in = True
         # Check for bad Snapshots (or other problems)
         if bad_flag_in:
-            if snap in GET_BAD_SNAPS(run):
+            if snap in COSMO.GET_BAD_SNAPS(run):
                 if verbose: print((" - - - - in BAD SNAPSHOT: Run %d, Snap %d" % (run, snap)))
             else:
                 # raise RuntimeError("Run {}, Snap {}: Bad BH_IDS in:{}".format(
@@ -270,7 +278,7 @@ def _runMaster(run, comm):
     from mpi4py import MPI
 
     stat = MPI.Status()
-    rank = comm.rank
+    # rank = comm.rank
     size = comm.size
 
     print(" - Initializing")
@@ -1095,6 +1103,8 @@ def main():
     # -------------------------
 
     from mpi4py import MPI
+    from illpy_lib.illcosmo import Illustris_Cosmology_TOS
+    COSMO = Illustris_Cosmology_TOS()
 
     comm = MPI.COMM_WORLD
     rank = comm.rank
@@ -1115,7 +1125,7 @@ def main():
     elif args.nocheck: CHECK_EXISTS = False
 
     # Create Radial Bins (in simulation units)
-    radExtrema = np.array(RAD_EXTREMA)/CONV_ILL_TO_SOL.DIST.value   # [pc] ==> [ill]
+    radExtrema = np.array(RAD_EXTREMA)/COSMO.CONV_ILL_TO_SOL.DIST.value   # [pc] ==> [ill]
     radBins = zmath.spacing(radExtrema, num=RAD_BINS)
 
     # Master Process
