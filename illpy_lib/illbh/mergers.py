@@ -220,8 +220,8 @@ def _crosscheck_mergers(core, fname_out):
             jj += 1
             next_ind = sort[jj]
 
-    log.info("Num duplicates       = {}".format(zio.frac_str(bads)))
-    log.info("Num mismatched times = {}".format(zio.frac_str(mismatch)))
+    log.info("Num duplicates       = {}".format(zmath.frac_str(bads)))
+    log.info("Num mismatched times = {}".format(zmath.frac_str(mismatch)))
 
     # Remove Duplicate Entries
     goods = ~bads

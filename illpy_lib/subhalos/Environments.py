@@ -1189,4 +1189,6 @@ def _mpiError(comm, err="ERROR"):
     comm.Abort(rank)
     return
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()

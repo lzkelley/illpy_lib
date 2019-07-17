@@ -120,7 +120,7 @@ def _merger_details(core):
         #    these are now 1D and sorted
         merger_bh_ids, rev_inds = np.unique(mrg_ids, return_inverse=True)
         num_unique = np.size(merger_bh_ids)
-        log.info("Unique BH IDs: {}".format(zio.frac_str(num_unique, num_mergers)))
+        log.info("Unique BH IDs: {}".format(zmath.frac_str(num_unique, num_mergers)))
 
     # Send unique IDs to all processors
     merger_bh_ids = comm.bcast(merger_bh_ids, root=0)
@@ -531,23 +531,23 @@ def infer_merger_out_masses(core=None, mrgs=None, mdets=None):
 
     # Masses should only be wrong when small
     _inds = (old * CONV_ILL_TO_SOL.MASS < 1e7)
-    log.info("Wrong masses: " + zio.frac_str(_inds))
+    log.info("Wrong masses: " + zmath.frac_str(_inds))
     inds = ~_inds
     new[inds] = old[inds]
 
     inds = np.isclose(new, 0.0) & (mass_bef[:, OUT] > 0.0) & (t_bef < 1e-2)
-    log.debug("Fixing with bef: " + zio.frac_str(inds))
+    log.debug("Fixing with bef: " + zmath.frac_str(inds))
     new[inds] = mass_bef[inds, OUT]
 
     inds = np.isclose(new, 0.0) & (mass_aft[:, OUT] > 0.0)
     new[inds] = mass_aft[inds, OUT] - m_masses[inds, BH_TYPE.IN]
-    log.debug("Fixing with aft: " + zio.frac_str(inds))
+    log.debug("Fixing with aft: " + zmath.frac_str(inds))
 
     inds = np.isclose(new, 0.0)
-    log.info("Unfixed: " + zio.frac_str(inds))
+    log.info("Unfixed: " + zmath.frac_str(inds))
 
     bads = (new > old)
-    log.info("Bad: " + zio.frac_str(bads))
+    log.info("Bad: " + zmath.frac_str(bads))
     # print(np.where(bads)[0])
 
     new_masses = np.array(m_masses)

@@ -272,7 +272,7 @@ def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
     # Find unique ID numbers, their first occurence indices, and the number of occurences
     u_ids, u_inds, u_counts = np.unique(ids, return_index=True, return_counts=True)
     num_unique = u_ids.size
-    log.info("\tunique IDs: {}".format(zio.frac_str(num_unique, ids.size)))
+    log.info("\tunique IDs: {}".format(zmath.frac_str(num_unique, ids.size)))
 
     # Calculate mass-differences
     dmdts = np.zeros_like(mdots)
@@ -470,7 +470,7 @@ def calc_dmdt_for_details(core=None):
                 count_all += inds.size
 
             dmdts = dmdts / CONV_ILL_TO_CGS.MDOT
-            log.info("dM/dt nonzero : " + zio.frac_str(np.count_nonzero(dmdts), masses.size))
+            log.info("dM/dt nonzero : " + zmath.frac_str(np.count_nonzero(dmdts), masses.size))
             log.info("mdots : " + zmath.stats_str(mdots, filter='>'))
             log.info("dmdts : " + zmath.stats_str(dmdts, filter='>'))
 
