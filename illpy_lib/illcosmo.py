@@ -7,7 +7,7 @@ import numpy as np
 
 import cosmopy
 
-from zcode.constants import KPC, MSOL, YR
+from zcode.constants import KPC, MSOL, YR, MPC
 
 # Get local path, and data directory
 _DATA_PATH = "%s/data/" % os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +25,7 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
     FNAME = None
     H0 = None
 
-    BOX_LENGTH = 75000                          # [ckpc/h]
+    BOX_LENGTH_COM_MPC = 75                          # [cMpc = Mpc/h]
     BOX_VOLUME_MPC3 = None
     BOX_VOLUME_CGS = None
     NUM_SNAPS = None
@@ -34,13 +34,16 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self, core=None, log=None):
+    def __init__(self, core=None, log=None, BOX_LENGTH_COM_MPC=None):
         super().__init__()
         if log is None and core is not None:
             log = core.log
 
         if log is not None:
             log.debug("Initializing `Illustris_Cosmology`")
+
+        if BOX_LENGTH_COM_MPC is not None:
+            self.BOX_LENGTH_COM_MPC = BOX_LENGTH_COM_MPC
 
         # tng_flag = core.sets.TNG
         # fname = _TIMES_FILENAME_TNG if tng_flag else _TIMES_FILENAME
@@ -89,8 +92,10 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
         self.CONV_CGS_TO_SOL = CONV_CGS_TO_SOL
         self.CONV_ILL_TO_SOL = CONV_ILL_TO_SOL
 
-        self.BOX_VOLUME_MPC3 = np.power(self.BOX_LENGTH*1e-3/self.HPAR, 3.0)
-        self.BOX_VOLUME_CGS = np.power(self.BOX_LENGTH*KPC/self.HPAR, 3.0)
+        self.BOX_VOLUME_COM_MPC3 = np.power(self.BOX_LENGTH_COM_MPC, 3.0)
+        self.BOX_VOLUME_COM_CGS = np.power(self.BOX_LENGTH_COM_MPC*MPC, 3.0)
+        self.BOX_VOLUME_MPC3 = np.power(self.BOX_LENGTH_COM_MPC/self.HPAR, 3.0)
+        self.BOX_VOLUME_CGS = np.power(self.BOX_LENGTH_COM_MPC*MPC/self.HPAR, 3.0)
 
         return
 
@@ -131,3 +136,28 @@ class Illustris_Cosmology_TNG(_Illustris_Cosmology):
     _BAD_SNAPS = {1: [],
                   2: [],
                   3: []}
+
+
+def sim_cosmo(sim_name, **kwargs):
+    if os.path.sep in sim_name:
+        sim_name = os.path.join(sim_name, '')
+        sim_name = os.path.split(os.path.dirname(sim_name))[-1]
+
+    import re
+    matches = re.findall('^L([0-9]{2,3})n([0-9]{2,4})([a-zA-Z]+)$', sim_name)
+    if len(matches) != 1 or len(matches[0]) != 3:
+        err = "Failed to match sim_name '{}' with Illustris specification!".format(sim_name)
+        raise ValueError(err)
+
+    length, pnum, name = matches[0]
+    length = int(length)
+    pnum = int(pnum)
+
+    if name == 'TNG':
+        cosmo = Illustris_Cosmology_TNG
+    elif name == 'FP':
+        cosmo = Illustris_Cosmology_TOS
+    else:
+        raise ValueError("Failed to match sim specification '{}'!".format(name))
+
+    return cosmo(BOX_LENGTH_COM_MPC=int(length), **kwargs)
