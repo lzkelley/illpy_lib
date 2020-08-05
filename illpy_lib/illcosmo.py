@@ -2,6 +2,7 @@
 
 """
 
+from collections import OrderedDict
 import os
 import numpy as np
 
@@ -34,7 +35,12 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self, core=None, log=None, BOX_LENGTH_COM_MPC=None):
+    def __init__(self, core=None, log=None, BOX_LENGTH_COM_MPC=None, **kwargs):
+        for kk, vv in kwargs.items():
+            if not hasattr(self, kk):
+                raise ValueError("Additional `kwargs` must already be defined in class definition!")
+            setattr(self, kk, vv)
+
         super().__init__()
         if log is None and core is not None:
             log = core.log
@@ -78,19 +84,9 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
             VEL   = 1.0e-5                         # [cm/s] ==> [km/s]
             ENER  = 1.0e-10                        # [erg/g] ==> [(km/s)^2]
 
-        class CONV_ILL_TO_SOL:
-            """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
-            """
-            MASS = CONV_ILL_TO_CGS.MASS * CONV_CGS_TO_SOL.MASS  # e10 Msol to [Msol]
-            MDOT = CONV_ILL_TO_CGS.MDOT * CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
-            DENS = CONV_ILL_TO_CGS.DENS * CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
-            DIST = CONV_ILL_TO_CGS.DIST * CONV_CGS_TO_SOL.DIST  # to comoving-pc
-
-            VEL = 1.0
-
         self.CONV_ILL_TO_CGS = CONV_ILL_TO_CGS
         self.CONV_CGS_TO_SOL = CONV_CGS_TO_SOL
-        self.CONV_ILL_TO_SOL = CONV_ILL_TO_SOL
+        self._CONV_ILL_TO_SOL = None
 
         self.BOX_VOLUME_COM_MPC3 = np.power(self.BOX_LENGTH_COM_MPC, 3.0)
         self.BOX_VOLUME_COM_CGS = np.power(self.BOX_LENGTH_COM_MPC*MPC, 3.0)
@@ -98,6 +94,23 @@ class _Illustris_Cosmology(cosmopy.Cosmology):
         self.BOX_VOLUME_CGS = np.power(self.BOX_LENGTH_COM_MPC*MPC/self.HPAR, 3.0)
 
         return
+
+    @property
+    def CONV_ILL_TO_SOL(self):
+        if self._CONV_ILL_TO_SOL is None:
+            class CONV_ILL_TO_SOL:
+                """Convert from illustris units to standard solar units (e.g. Msol, pc), by multiplication
+                """
+                MASS = self.CONV_ILL_TO_CGS.MASS * self.CONV_CGS_TO_SOL.MASS  # e10 Msol to [Msol]
+                MDOT = self.CONV_ILL_TO_CGS.MDOT * self.CONV_CGS_TO_SOL.MDOT  # to [Msol/yr]
+                DENS = self.CONV_ILL_TO_CGS.DENS * self.CONV_CGS_TO_SOL.DENS  # to [Msol/pc^3]
+                DIST = self.CONV_ILL_TO_CGS.DIST * self.CONV_CGS_TO_SOL.DIST  # to comoving-pc
+
+                VEL = 1.0
+
+            self._CONV_ILL_TO_SOL = CONV_ILL_TO_SOL
+
+        return self._CONV_ILL_TO_SOL
 
     def scales(self):
         return np.array(self.snapshot_scales)
@@ -138,7 +151,8 @@ class Illustris_Cosmology_TNG(_Illustris_Cosmology):
                   3: []}
 
 
-def sim_cosmo(sim_name, **kwargs):
+# def sim_cosmo(sim_name, **kwargs):
+def cosmo_from_name(sim_name, **kwargs):
     if os.path.sep in sim_name:
         sim_name = os.path.join(sim_name, '')
         sim_name = os.path.split(os.path.dirname(sim_name))[-1]
@@ -161,3 +175,63 @@ def sim_cosmo(sim_name, **kwargs):
         raise ValueError("Failed to match sim specification '{}'!".format(name))
 
     return cosmo(BOX_LENGTH_COM_MPC=int(length), **kwargs)
+
+
+def cosmo_from_path(sim_path):
+    fname_params = os.path.join(sim_path, 'param.txt-usedvalues')
+    params = _load_used_params(fname_params)
+
+    kwargs = {}
+    cosmo_pars = ['Omega0', 'OmegaLambda', 'OmegaBaryon', ]
+    for cp in cosmo_pars:
+        kwargs[cp] = params[cp]
+
+    hpar = params['HubbleParam']
+    kwargs['HPAR'] = hpar
+    kwargs['H0'] = hpar * 100.0
+    box_length_mpc = params['BoxSize'] / 1000.0
+    cosmo = Illustris_Cosmology_TNG(BOX_LENGTH_COM_MPC=box_length_mpc, **kwargs)
+
+    mass = params['UnitMass_in_g'] / hpar
+    dist = params['UnitLength_in_cm'] / hpar
+    vel = params['UnitVelocity_in_cm_per_s']
+    dens = mass / np.power(dist, 3.0)
+    time = dist / vel
+    mdot = mass / time
+
+    cosmo.CONV_ILL_TO_CGS.MASS = mass
+    cosmo.CONV_ILL_TO_CGS.MDOT = mdot
+    cosmo.CONV_ILL_TO_CGS.DIST = dist
+    cosmo.CONV_ILL_TO_CGS.DENS = dens
+    cosmo.CONV_ILL_TO_CGS.VEL = vel
+    cosmo._usedparams = params
+
+    return cosmo
+
+
+def _load_used_params(fname):
+    params = OrderedDict()
+    with open(fname, 'r') as load:
+        for line in load.readlines():
+            line = line.strip()
+            if len(line) == 0:
+                continue
+
+            kk, vv = line.split()
+            for tt in [np.int, np.float]:
+                try:
+                    vv = tt(vv)
+                except ValueError:
+                    pass
+                else:
+                    break
+            else:
+                vv = str(vv)
+
+            try:
+                params[kk] = vv
+            except:
+                print(f"kk = {kk} ({type(kk)}), vv = {vv} ({type(vv)})")
+                raise
+        
+    return params
