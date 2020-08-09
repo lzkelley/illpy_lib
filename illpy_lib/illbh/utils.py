@@ -28,3 +28,9 @@ def _distribute_snapshots(core, comm):
         mySnaps = np.array_split(mySnaps, size)[rank]
 
     return mySnaps
+
+
+# def git_hash():
+#     import subprocess
+#     cwd = os.path.abspath(illpy_lib.__file__)
+#     hash = subprocess.check_output(["git", "describe", "--always"], cwd=cwd).strip().decode()

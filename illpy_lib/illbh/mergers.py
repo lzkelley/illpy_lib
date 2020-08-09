@@ -3,8 +3,11 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-import sys
-import shutil
+# import enum
+# import sys
+# import shutil
+import glob
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -13,470 +16,322 @@ import h5py
 import zcode.inout as zio
 import zcode.math as zmath
 
-
-try:
-    import illpy_lib
-except ImportError:
-    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-    if PATH_ILLPY_LIB not in sys.path:
-        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-        sys.path.append(PATH_ILLPY_LIB)
-
-    import illpy_lib  # noqa
-
-
-from illpy_lib.illbh import (
-    Core, load_hdf5_to_mem,
-    MERGERS, BH_TYPE, MERGERS_PHYSICAL_KEYS, BH_TREE
-)
-from illpy_lib.constants import DTYPE
-
-
-VERSION = 0.4
-
-
-def main(reorganize_flag=True, crosscheck_flag=True):
-
-    core = Core(sets=dict(LOG_FILENAME='log_illbh-mergers.log'))
-    log = core.log
-    log.info("mergers.main()")
-
-    log.debug("`reorganize_flag` = {}".format(reorganize_flag))
-    if reorganize_flag:
-        load_temp_mergers(core=core)
-
-    log.debug("`crosscheck_flag` = {}".format(crosscheck_flag))
-    if crosscheck_flag:
-        load_fixed_mergers(core=core)
-
-    return
-
-
-def load_temp_mergers(core=None, recreate=None):
-    core = Core.load(core)
-    log = core.log
-    log.debug("load_temp_mergers()")
-
-    if recreate is None:
-        recreate = core.sets.RECREATE
-
-    fname_temp = core.paths.fname_mergers_temp()
-    exists = os.path.exists(fname_temp)
-    log.debug("Temporary merger file '{}' exists: {}".format(fname_temp, exists))
-
-    if recreate or not exists:
-        log.warning("Reoganizing merger files to temporary file '{}'".format(fname_temp))
-        _reorganize_files(core, fname_temp)
-
-    data = load_hdf5_to_mem(fname_temp)
-    keys = list(data.keys())
-    log.info("Loaded {} temporary mergers, keys: {}".format(
-        data[MERGERS.SCALES].size, keys))
-
-    return data
-
-
-def _reorganize_files(core, fname_out):
-    """
-    """
-
-    core = Core.load(core)
-    log = core.log
-    log.debug("mergers._reorganize_files()")
-
-    # Use a size guaranteed to be larger than needed (need ~ 3e4)
-    BUFFER_SIZE = int(1e5)
-    scales = np.zeros(BUFFER_SIZE, dtype=DTYPE.SCALAR)
-    masses = np.zeros((BUFFER_SIZE, 2), dtype=DTYPE.SCALAR)
-    mids = np.zeros((BUFFER_SIZE, 2), dtype=DTYPE.ID)
-
-    raw_fnames = core.paths.mergers_input
-    cnt = 0
-    for ii, raw in enumerate(core.tqdm(raw_fnames, desc='Raw files')):
-        log.debug("File {}: '{}'".format(ii, raw))
-
-        file_cnt = cnt
-        with open(raw, 'r') as data:
-            for line in data.readlines():
-                time, out_id, out_mass, in_id, in_mass = _parse_merger_line(line)
-
-                scales[cnt] = time
-                # mids[cnt, :] = [out_id, in_id]
-                # masses[cnt, :] = [out_mass, in_mass]
-                mids[cnt, BH_TYPE.OUT] = out_id
-                mids[cnt, BH_TYPE.IN] = in_id
-                masses[cnt, BH_TYPE.OUT] = out_mass
-                masses[cnt, BH_TYPE.IN] = in_mass
-                cnt += 1
-
-            file_cnt = cnt - file_cnt
-            log.debug("\tRead {} lines".format(file_cnt))
-
-    num_mergers = cnt
-    log.info("Read {} mergers".format(num_mergers))
-
-    # Cutoff unused section of arrays
-    scales = scales[:cnt]
-    mids = mids[:cnt]
-    masses = masses[:cnt]
-
-    # Sort by scale-factors
-    inds = np.argsort(scales)
-    scales = scales[inds]
-    mids = mids[inds, :]
-    masses = masses[inds, :]
-
-    mrgs = {
-        MERGERS.SCALES: scales,
-        MERGERS.IDS: mids,
-        MERGERS.MASSES: masses
-    }
-
-    _save_mergers(core, mrgs, fname_out)
-
-    return fname_out
-
-
-def _map_to_snapshots(core, scales):
-    snap_scales = core.cosmo.scales()
-
-    snap_nums = np.searchsorted(snap_scales, scales, side='left')
-    # Find mergers which are at almost exactly the same time as their subsequent snapshot
-    ontop_next = np.isclose(scales, snap_scales[snap_nums], rtol=1e-4, atol=1e-6)
-    # Find mergers which are at almost exactly the same time as their previous snapshot
-    ontop_prev = np.isclose(scales, snap_scales[snap_nums-1], rtol=1e-4, atol=1e-6)
-
-    return snap_nums, ontop_next, ontop_prev
-
-
-def load_fixed_mergers(core=None, recreate=None):
-    core = Core.load(core)
-    log = core.log
-    log.info("load_fixed_mergers()")
-
-    if recreate is None:
-        recreate = core.sets.RECREATE
-
-    fname_fixed = core.paths.fname_mergers_fixed()
-    exists = os.path.exists(fname_fixed)
-    log.debug("Fixed merger file '{}' exists: {}".format(fname_fixed, exists))
-
-    if recreate or not exists:
-        log.warning("Crosschecking mergers")
-        _crosscheck_mergers(core, fname_fixed)
-
-    data = load_hdf5_to_mem(fname_fixed)
-    keys = list(data.keys())
-    log.info("Loaded {} fixed mergers, keys: {}".format(
-        data[MERGERS.NUM], keys))
-
-    return data
-
-
-def _crosscheck_mergers(core, fname_out):
-    log = core.log
-    log.info("mergers._crosscheck_mergers()")
-
-    from illpy_lib.illbh import matcher
-
-    mrgs = load_temp_mergers(core=core)
-    scales = mrgs[MERGERS.SCALES]
-    mids = mrgs[MERGERS.IDS]
-    masses = mrgs[MERGERS.MASSES]
-
-    num_mergers_temp = scales.size
-    log.info("Loaded {} raw mergers".format(num_mergers_temp))
-
-    # Remove entries where IDs match a second time (IS THIS ENOUGH?!)
-
-    # First sort by ``BH_TYPE.IN`` then ``BH_TYPE.OUT`` (reverse of given order)
-    sort = np.lexsort((mids[:, BH_TYPE.OUT], mids[:, BH_TYPE.IN]))
-
-    bads = np.zeros_like(scales, dtype=bool)
-    mismatch = np.zeros_like(bads)
-
-    # Iterate over all entries
-    for ii in range(num_mergers_temp - 1):
-        this_ind = sort[ii]
-
-        this = mids[this_ind]
-        jj = ii+1
-        next_ind = sort[jj]
-
-        # Look through all examples of same BH_TYPE.IN
-        while (mids[next_ind, BH_TYPE.IN] == this[BH_TYPE.IN]):
-            # If BH_TYPE.OUT also matches, this is a duplicate -- store first entry as bad
-            if (mids[next_ind, BH_TYPE.OUT] == this[BH_TYPE.OUT]):
-
-                # Double check that time also matches
-                if (not np.isclose(scales[this_ind], scales[next_ind])):
-                    # num_mismatch += 1
-                    mismatch[ii] = True
-
-                # bad_inds.append(this_ind)
-                bads[ii] = True
-                break
-
-            jj += 1
-            next_ind = sort[jj]
-
-    log.info("Num duplicates       = {}".format(zmath.frac_str(bads)))
-    log.info("Num mismatched times = {}".format(zmath.frac_str(mismatch)))
-
-    # Remove Duplicate Entries
-    goods = ~bads
-    scales = scales[goods]
-    mids = mids[goods]
-    masses = masses[goods]
-
-    # Recalculate maps
-    # mapM2S, mapS2M, ontop = _map_to_snapshots(core, scales)
-    # snap_nums, ontop_next, ontop_prev = _map_to_snapshots(core, scales)
-
-    # Fix Merger 'Out' Masses
-    masses = mrgs[MERGERS.MASSES]
-    bef = zmath.stats_str(masses[:, BH_TYPE.OUT])
-
-    # WARNING: Probably dont really need this???
-    masses = matcher.infer_merger_out_masses(core=core, mrgs=mrgs)
-    aft = zmath.stats_str(masses[:, BH_TYPE.OUT])
-    log.info("Out masses: {} ==> {}".format(bef, aft))
-    mrgs[MERGERS.MASSES] = masses
-
-    _save_mergers(core, mrgs, fname_out)
-
-    return
-
-
-def _save_mergers(core, mrgs, fname_out):
-
-    log = core.log
-    log.debug("Calculating merger snapshots")
-    scales = mrgs[MERGERS.SCALES]
-    snap_nums, ontop_next, ontop_prev = _map_to_snapshots(core, scales)
-    num_mergers = len(scales)
-
-    fname_temp = zio.modify_filename(fname_out, prepend='_')
-    log.info("Writing to file '{}'".format(fname_temp))
-    with h5py.File(fname_temp, 'w') as out:
-
-        out[MERGERS.RUN] = core.sets.RUN_NUM
-        out[MERGERS.NUM] = num_mergers
-        out[MERGERS.CREATED] = str(datetime.now().ctime())
-        out[MERGERS.VERSION] = VERSION
-        out[MERGERS.FILE] = fname_out
-
-        for key in MERGERS_PHYSICAL_KEYS:
-            out.create_dataset(key, data=mrgs[key])
-
-        out.create_dataset(MERGERS.SNAP_NUMS, data=snap_nums)
-        out.create_dataset(MERGERS.ONTOP_NEXT, data=ontop_next)
-        out.create_dataset(MERGERS.ONTOP_PREV, data=ontop_prev)
-
-    log.info("Renaming temporary file")
-    log.debug("\t'{}' ==> '{}'".format(fname_temp, fname_out))
-    shutil.move(fname_temp, fname_out)
-
-    size_str = zio.get_file_size(fname_out)
-    log.info("Saved {} mergers to '{}', size {}".format(num_mergers, fname_out, size_str))
-    return fname_out
-
-
-def _parse_merger_line(line):
-    """
-    Get target quantities from each line of the merger files.
-
-    See 'http://www.illustris-project.org/w/index.php/Blackhole_Files' for
-    dets regarding the illustris BH file structure.
-
-    The format of each line is:
-        "PROC-NUM  TIME  ID1  MASS1  ID2  MASS2"
-        see: http://www.illustris-project.org/w/index.php/Blackhole_Files
-        where
-            '1' corresponds to the 'out'/'accretor'/surviving BH
-            '2' corresponds to the 'in' /'accreted'/eliminated BH
-        NOTE: that MASS1 is INCORRECT (dynamical mass, instead of BH)
-
-    Returns
-    -------
-    time     : scalar, redshift of merger
-    out_id   : long, id number of `out` BH
-    out_mass : scalar, mass of `out` BH in simulation units (INCORRECT VALUE)
-    in_id    : long, id number of `in` BH
-    in_mass  : scalar, mass of `in` BH in simulation units
-
-    """
-
-    strs     = line.split()
-    # Convert to proper types
-    time     = DTYPE.SCALAR(strs[1])
-    out_id   = DTYPE.ID(strs[2])
-    out_mass = DTYPE.SCALAR(strs[3])
-    in_id    = DTYPE.ID(strs[4])
-    in_mass  = DTYPE.SCALAR(strs[5])
-
-    return time, out_id, out_mass, in_id, in_mass
-
-
-def load_tree(core=None, mrgs=None, recreate=None):
-    """
-    """
-
-    core = Core.load(core)
-    log = core.log
-    log.debug("load_tree()")
-
-    if recreate is None:
-        recreate = core.sets.RECREATE
-
-    fname_tree = core.paths.fname_merger_tree()
-
-    exists = os.path.exists(fname_tree)
-    log.debug("Merger tree file '{}' exists: {}".format(fname_tree, exists))
-
-    if recreate or not exists:
-        log.warning("Creating merger tree")
-
-        if mrgs is None:
-            mrgs = load_fixed_mergers(core=core)
-
-        _construct_tree(core, mrgs, fname_tree)
-
-    data = load_hdf5_to_mem(fname_tree)
-    keys = list(data.keys())
-    log.info("Loaded {} merger tree elements, keys: {}".format(
-        data[BH_TREE.NUM], keys))
-
-    return data
-
-
-def _construct_tree(core, mrgs, fname_tree):
-    """Use merger data to find and connect BHs which merge multiple times.
-
-    Arguments
-    ---------
-        run     : <int>, Illlustris run number {1, 3}
-        mrgs : <dict>, mergers dictionary
-        verbose : <bool>, (optional=True), Print verbose output
-
-    Returns
-    -------
-        tree : <dict>  container for tree data - see BHTree doc
-
-    """
-    log = core.log
-    log.debug("_construct_tree()")
-
-    cosmo = core.cosmo
-
-    import pyximport
-    pyximport.install(setup_args={"include_dirs": np.get_include()}, reload_support=True)
-    import illpy_lib.illbh.tree
-
-    NUM_BH_TYPES = len(BH_TYPE)
-
-    num_mergers = mrgs[MERGERS.NUM]
-    ind_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.INDEX)
-    ind_next = -1 * np.ones(num_mergers, dtype=DTYPE.INDEX)
-    scale_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
-    scale_next = -1 * np.ones(num_mergers, dtype=DTYPE.SCALAR)
-    time_prev = -1 * np.ones([num_mergers, NUM_BH_TYPES], dtype=DTYPE.SCALAR)
-    time_next = -1 * np.ones(num_mergers, dtype=DTYPE.SCALAR)
-
-    # Convert merger scale factors to ages
-    scales = mrgs[MERGERS.SCALES]
-    # times = np.array([cosmo.age(sc) for sc in scales], dtype=DTYPE.SCALAR)
-    redz = cosmo._a_to_z(scales)
-    times = cosmo.z_to_tage(redz)
-    if any(np.diff(times) < 0.0):
-        raise RuntimeError("Non-monotonic merger times!")
-
-    # Construct Merger Tree from node IDs
-    log.info("Building BH Merger Tree")
-    mids = mrgs[MERGERS.IDS]
-    illpy_lib.illbh.tree.build_tree(mids, scales, times, ind_prev, ind_next,
-                                    scale_prev, scale_next, time_prev, time_next)
-
-    # Was having some sporadic issues with `build_tree` cython code finding bad matches,
-    # It could now be fixed, but not sure... run the check to confirm, doesnt take long
-    log.info("Checking mergers")
-    for ii in core.tqdm(range(num_mergers), desc='Mergers'):
-        next = ind_next[ii]
-        if next < 0:
-            continue
-
-        if scale_next[ii] <= 0.0:
-            raise ValueError("`scale_next[{}]` = {}  (next = {})!!".format(
-                ii, scale_next[ii], next))
-
-        if time_next[ii] <= -0.1:
-            raise ValueError("`time_next[{}]` = {}   (next = {})!!".format(
-                ii, time_next[ii], next))
-
-        this_id = mrgs['ids'][ii, BH_TYPE.OUT]
-        next_id = mrgs['ids'][next, :]
-        if this_id not in next_id:
-            print(ii, next, this_id, next_id)
-            prev = ind_prev[next]
-            print("prev", prev)
-            print("\t", [mrgs['ids'][pp] for pp in prev if pp > 0])
-            raise RuntimeError("Tree error!")
-
-    num_bad = np.count_nonzero(ind_prev < 0)
-    log.info("{:d} Missing 'last_ind'".format(num_bad))
-
-    num_bad = np.count_nonzero(ind_next < 0)
-    log.info("{:d} Missing 'next_ind'".format(num_bad))
-
-    # Create dictionary to store data
-    tree = {
-        BH_TREE.PREV: ind_prev,
-        BH_TREE.NEXT: ind_next,
-        BH_TREE.TIME_PREV: time_prev,
-        BH_TREE.TIME_NEXT: time_next,
-        BH_TREE.SCALE_PREV: scale_prev,
-        BH_TREE.SCALE_NEXT: scale_next,
-
-        BH_TREE.RUN: core.sets.RUN_NUM,
-        BH_TREE.NUM: num_mergers,
-    }
-
-    log.warning("Saving merger-tree to '{}'".format(fname_tree))
-
-    _save_hdf5(core, fname_tree, tree, backup=True)
-
-    return tree
-
-
-def _save_hdf5(core, fname_out, data, backup=True):
-    log = core.log
-    log.debug("_save_hdf5()")
-
-    exists = os.path.exists(fname_out)
-    if backup and exists:
-        fname_back = zio.modify_filename(fname_out, prepend='_backup_')
-        log.info("File exists, moving to backup: '{}' ==> '{}'".format(fname_out, fname_back))
-        shutil.move(fname_out, fname_back)
-
-    fname_temp = zio.modify_filename(fname_out, prepend='_')
-    log.info("Writing to temporary file '{}'".format(fname_temp))
-
-    with h5py.File(fname_temp, 'w') as out:
-        out['created'] = str(datetime.now().ctime())
-        out['version'] = VERSION
-        out['filename'] = fname_out
-
-        for key in data.keys():
-            out.create_dataset(key, data=data[key])
-
-    log.info("Renaming temporary file")
-    log.debug("\t'{}' ==> '{}'".format(fname_temp, fname_out))
-    shutil.move(fname_temp, fname_out)
-
-    size_str = zio.get_file_size(fname_out)
-    log.info("Saved to '{}', size {}".format(fname_out, size_str))
-    return
-
-
-if __name__ == "__main__":
-    main(reorganize_flag=True, crosscheck_flag=False)
+import illpy_lib  # noqa
+from illpy_lib.illbh import BH_TYPE, Processed, _ENUM
+# import illpy_lib.illcosmo
+
+
+VERSION = 0.5
+
+
+class Mergers_New(Processed):
+
+    _PROCESSED_FILENAME = "bh-mergers.hdf5"
+
+    class KEYS(_ENUM):
+        SCALE = 'scale'
+        SNAP = 'snap'
+        TASK = 'task'
+
+        ID = 'id'
+        MASS = 'mass'
+        POS = 'pos'
+
+    def _load_raw_mergers(self):
+
+        sim_path = self._sim_path
+
+        if sim_path is None:
+            err = "ERROR: `sim_path` is not set, cannot load raw mergers!"
+            logging.error(err)
+            raise ValueError(err)
+
+        if not os.path.isdir(sim_path):
+            err = "ERROR: `sim_path` '{}' does not exist!".format(sim_path)
+            logging.error(err)
+            raise ValueError(err)
+
+        def parse_merger_line(line):
+            """
+            "%g %d  %llu %g %g %g %g  %llu %g %g %g %g\n",
+                All.Time, ThisTask,
+                /* remnant BH */
+                (long long) id, mass, pos[0], pos[1], pos[2],
+                /* consumed BH */
+                (long long) P[no].ID, BPP(no).BH_Mass, P[no].Pos[0], P[no].Pos[1], P[no].Pos[2]);
+            """
+            types = [np.float, np.uint,
+                     np.uint64, np.float64, np.float64, np.float64, np.float64,
+                     np.uint64, np.float64, np.float64, np.float64, np.float64]
+            line = line.strip().split()
+            if len(line) != len(types):
+                raise ValueError(f"unexpected line length: '{line}'!")
+
+            temp = [tt(ll) for tt, ll in zip(types, line)]
+            return temp, types
+
+        cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=self._verbose)
+        scale = cosmo.scale
+        mergers = []
+        msnaps = []
+
+        num_mrgs = 0
+        for snap in range(len(scale)):
+            mdir = 'mergers_{:03d}'.format(snap)
+            mdir = os.path.join(self._sim_path, 'output', 'blackholes', mdir)
+            mfils = os.path.join(mdir, "blackhole_mergers_*.txt")
+            mfils = sorted(glob.glob(mfils))
+            if len(mfils) == 0:
+                err = "ERROR: snap={} : no files found in '{}'".format(snap, mdir)
+                raise FileNotFoundError(err)
+
+            lo = scale[snap-1] if snap > 0 else 0.0
+            hi = scale[snap]
+
+            for ii, mf in enumerate(mfils):
+                prev = None
+                for line in open(mf, 'r').readlines():
+                    vals, types = parse_merger_line(line)
+                    sc = vals[0]
+                    if prev is None:
+                        prev = sc
+                    elif sc < prev:
+                        err = f"Snap: {snap}, file: {ii} - scale:{sc:.8f} is before previous:{prev:.8f}!"
+                        logging.error(err)
+                        raise ValueError(err)
+
+                    if (sc < lo) or (sc > hi):
+                        # print(num_mrgs)
+                        err = f"Snap: {snap}, file: {ii} - scale:{sc:.8f} is not between [{lo:.8f}, {hi:.8f}]!"
+                        logging.error(err)
+                        # raise ValueError(err)
+                    mergers.append(vals)
+                    msnaps.append(snap)
+                    num_mrgs += 1
+
+        mrgs = {
+            'scale': np.zeros(num_mrgs, dtype=types[0]),
+            'snap': np.zeros(num_mrgs, dtype=np.uint32),
+            'task': np.zeros(num_mrgs, dtype=types[1]),
+            'id1': np.zeros(num_mrgs, dtype=types[2]),
+            'mass1': np.zeros(num_mrgs, dtype=types[3]),
+            'pos1': np.zeros((num_mrgs, 3), dtype=types[3]),
+            'id2': np.zeros(num_mrgs, dtype=types[2]),
+            'mass2': np.zeros(num_mrgs, dtype=types[3]),
+            'pos2': np.zeros((num_mrgs, 3), dtype=types[3]),
+        }
+        for ii in range(num_mrgs):
+            mm = mergers[ii]
+            mrgs['scale'][ii] = mm[0]
+            mrgs['task'][ii] = mm[1]
+            mrgs['snap'][ii] = msnaps[ii]
+
+            for kk in range(2):
+                jj = 2 + kk*5
+                mrgs[f'id{kk+1}'][ii] = mm[jj]
+                mrgs[f'mass{kk+1}'][ii] = mm[jj+1]
+                mrgs[f'pos{kk+1}'][ii, :] = [mm[jj+2+kk] for kk in range(3)]
+
+        idx = np.argsort(mrgs['scale'])
+        for kk, vv in mrgs.items():
+            mrgs[kk] = vv[idx, ...]
+
+        if self._verbose:
+            print("Loaded {} raw mergers".format(idx.size))
+
+        return mrgs
+
+    def _process(self):
+        # Check output filename
+        fname = self.filename
+        path = os.path.dirname(fname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        # Load merger events directly from Illustris blackhole_mergers txt files, unmodified
+        mrgs = self._load_raw_mergers()
+        if self._verbose:
+            print("Loaded ", mrgs['scale'].size, "mergers!")
+
+        # Construct merger tree ('next' and 'prev' arrays) and do some consistency checks
+        mrgs = self._build_tree(mrgs)
+        if self._verbose:
+            print("Merger tree constructed with {} next and {} prev links".format(
+                np.count_nonzero(mrgs['next'] >= 0), np.count_nonzero(mrgs['prev'] >= 0)))
+
+        # Save values to file
+        KEYS = self.KEYS
+        with h5py.File(fname, 'w') as save:
+            save.attrs['created'] = str(datetime.now())
+            save.attrs['version'] = str(VERSION)
+            save.attrs['script'] = str(os.path.abspath(__file__))
+            save.attrs['sim_path'] = str(self._sim_path)
+
+            ids = np.array([mrgs['id1'], mrgs['id2']]).T
+            mass = np.array([mrgs['mass1'], mrgs['mass2']]).T
+            pos = np.moveaxis(np.array([mrgs['pos1'], mrgs['pos2']]), 0, 1)
+
+            save.create_dataset(str(KEYS.SCALE), data=mrgs['scale'])
+            save.create_dataset(str(KEYS.SNAP), data=mrgs['snap'])
+            save.create_dataset(str(KEYS.TASK), data=mrgs['task'])
+
+            save.create_dataset(str(KEYS.ID), data=ids)
+            save.create_dataset(str(KEYS.MASS), data=mass)
+            save.create_dataset(str(KEYS.POS), data=pos)
+
+        if self._verbose:
+            msg = "Saved data for {} mergers to '{}' size {}".format(
+                len(mrgs['scale']), fname, zio.get_file_size(fname))
+            print(msg)
+
+        return
+
+    def _build_tree(self, mrgs):
+        """
+        The first BH is the "out" (remaining) BH, second BH is "in" (removed) BH
+        """
+
+        def mstr(mm):
+            msg = "{:6d} a={:.8f} s={:3d} ".format(mm, mrgs['scale'][mm], mrgs['snap'][mm])
+            msg += " in id={:20s} mass={:.8f} ".format(str(mrgs['id1'][mm]), mrgs['mass1'][mm])
+            msg += "out id={:20s} mass={:.8f} ".format(str(mrgs['id2'][mm]), mrgs['mass2'][mm])
+            return msg
+
+        num = mrgs['scale'].size
+        next = np.ones(num, np.int32) * -1
+        prev = np.ones((num, 2), np.int32) * -1
+
+        for mm in range(num):
+            mids = [mrgs['id1'][mm], mrgs['id2'][mm]]
+            ma = mrgs['scale'][mm]
+            for nn in range(mm+1, num):
+                nids = [mrgs['id1'][nn], mrgs['id2'][nn]]
+                na = mrgs['scale'][nn]
+                # Make sure scales are not decreasing (data is already sorted; should be impossible)
+                if na < ma:
+                    err = f"ERROR: scale regression: {mm}={ma} ==> {nn}={na}!"
+                    logging.error(err)
+                    raise ValueError(err)
+
+                # make sure 'in' BH is never in another merger
+                if mids[BH_TYPE.IN] in nids:
+                    err = "ERROR: 'in' BH from merger {} found in merger {}!".format(mm, nn)
+                    logging.error(err)
+                    logging.error(mstr(mm))
+                    logging.error(mstr(nn))
+                    raise ValueError(err)
+
+                # Check if 'out' BH is in a subsequent merger
+                if mids[BH_TYPE.OUT] in nids:
+                    next[mm] = nn
+                    for jj in range(2):
+                        if mids[BH_TYPE.OUT] == nids[jj]:
+                            prev[nn, jj] = mm
+                            # Make sure masses increased
+                            if mrgs['mass' + str(jj+1)][nn] < mrgs['mass2'][mm]:
+                                err = "ERROR: BH mass loss between merger {} and {}".format(mm, nn)
+                                logging.error(err)
+                                logging.error(mstr(mm))
+                                logging.error(mstr(nn))
+                                raise ValueError(err)
+
+                            break  # if
+
+                    break  # for jj
+
+        mrgs['next'] = next
+        mrgs['prev'] = prev
+        # num_next = np.zeros_like(next)
+        # num_prev = np.zeros_like(prev)
+
+        if self._verbose:
+
+            def count_prev(idx, cnt):
+                if cnt >= next.size:
+                    raise RuntimeError()
+
+                temp = 0
+                for bh in range(2):
+                    if prev[idx, bh] >= 0:
+                        # msg = " " * (cnt + temp)
+                        temp += 1
+                        # msg += "{} : {} ==> {} ({})".format(idx, bh, prev[idx, bh], temp + cnt)
+                        # print(msg)
+                        temp += count_prev(prev[idx, bh], cnt)
+
+                # print(" " * (cnt + temp) + "{} = {}".format(idx, temp))
+                return temp + cnt
+
+            num_next = (next >= 0)
+            print("Mergers with subsequent mergers: {}".format(zmath.frac_str(num_next)))
+            print("Mergers that are final remnants: {}".format(zmath.frac_str(~num_next)))
+            mult = -1 * np.ones_like(next)
+            for mm in range(num):
+                # Only consider final mergers
+                if next[mm] >= 0:
+                    continue
+                mult[mm] = count_prev(mm, 0)
+
+            mult = mult[mult >= 0]
+            print("Remnant merger-multiplicity:")
+            print("\tzero = {}".format(zmath.frac_str(mult == 0)))
+            print("\tave  = {:.2f}".format(mult.mean()))
+            print("\tmed  = {:.2f}".format(np.median(mult)))
+            print("\t{}".format(zmath.stats_str(mult)))
+
+        return mrgs
+
+    def _load_from_save(self):
+        fname = self.filename
+        with h5py.File(fname, 'r') as load:
+            vers = load.attrs['version']
+            if vers != str(VERSION):
+                msg = "WARNING: loaded version '{}' does not match current '{}'!".format(
+                    vers, VERSION)
+                logging.warning(msg)
+            spath = load.attrs['sim_path']
+            if self._sim_path is not None:
+                if os.path.abspath(self._sim_path).lower() != os.path.abspath(spath).lower():
+                    msg = "WARNING: loaded sim_path '{}' does not match current '{}'!".format(
+                        spath, self._sim_path)
+                    logging.warning(msg)
+            else:
+                self._sim_path = spath
+
+            size = None
+            keys = self.keys()
+            for kk in keys:
+                try:
+                    vals = load[str(kk)][:]
+                    ss = np.shape(vals)[0]
+                    if size is None:
+                        size = ss
+                    elif size != ss:
+                        msg = (
+                            "WARNING: loaded array for '{}' has size {} ".format(kk, ss) +
+                            "different from expected {}".format(size)
+                        )
+                        logging.warning(msg)
+
+                    setattr(self, kk, vals)
+                except Exception as err:
+                    msg = "ERROR: failed to load '{}' from '{}'!".format(kk, fname)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise
+
+            for kk in load.keys():
+                if kk not in keys:
+                    err = "WARNING: '{}' has unexpected data '{}'".format(fname, kk)
+                    logging.warning(err)
+
+            if self._verbose:
+                dt = load.attrs['created']
+                print("Loaded {} mergers from '{}', created '{}'".format(size, fname, dt))
+
+        self._size = size
+        return

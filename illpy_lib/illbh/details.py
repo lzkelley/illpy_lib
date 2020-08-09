@@ -20,6 +20,8 @@ VERSION = 0.3                                    # Version of details
 _DEF_PRECISION = -8                               # Default precision
 
 
+
+
 def main(reorganize_flag=True, reformat_flag=True):
 
     core = Core(sets=dict(LOG_FILENAME='log_illbh-details.log'))
