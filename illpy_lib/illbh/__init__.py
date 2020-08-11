@@ -16,10 +16,29 @@ import numpy as np
 PATH_PROCESSED = ["output", "processed"]
 
 
+'''
 @enum.unique
 class _ENUM(enum.Enum):
     def __str__(self):
         return str(self.value)
+'''
+
+
+class _ENUM(type):
+
+    def __iter__(self):
+        for kk in self.names():
+            yield getattr(self, kk)
+
+    def keys(self):
+        return list(iter(self))
+
+    def names(self):
+        return sorted([kk for kk in dir(self) if not kk.startswith('_')])
+
+
+class ENUM(metaclass=_ENUM):
+    pass
 
 
 @enum.unique
@@ -37,7 +56,7 @@ class Processed:
 
     _PROCESSED_FILENAME = None
 
-    class KEYS(_ENUM):
+    class KEYS(ENUM):
         pass
 
     def __init__(self, sim_path=None, filename=None, verbose=True, recreate=False):

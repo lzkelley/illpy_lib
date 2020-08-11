@@ -1,5 +1,7 @@
 """
 """
+import os
+from datetime import datetime
 
 import numpy as np
 import h5py
@@ -28,6 +30,14 @@ def _distribute_snapshots(core, comm):
         mySnaps = np.array_split(mySnaps, size)[rank]
 
     return mySnaps
+
+
+def _save_meta_to_hdf5(save_hdf5, sim_path, version, script_file):
+    save_hdf5.attrs['created'] = str(datetime.now())
+    save_hdf5.attrs['version'] = str(version)
+    save_hdf5.attrs['script'] = str(os.path.abspath(script_file))
+    save_hdf5.attrs['sim_path'] = str(sim_path)
+    return
 
 
 # def git_hash():

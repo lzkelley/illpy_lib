@@ -3,12 +3,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-# import enum
-# import sys
-# import shutil
 import glob
 import logging
-from datetime import datetime
 
 import numpy as np
 import h5py
@@ -17,8 +13,7 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 import illpy_lib  # noqa
-from illpy_lib.illbh import BH_TYPE, Processed, _ENUM
-# import illpy_lib.illcosmo
+from illpy_lib.illbh import BH_TYPE, Processed, utils
 
 
 VERSION = 0.5
@@ -28,7 +23,7 @@ class Mergers_New(Processed):
 
     _PROCESSED_FILENAME = "bh-mergers.hdf5"
 
-    class KEYS(_ENUM):
+    class KEYS(Processed.KEYS):
         SCALE = 'scale'
         SNAP = 'snap'
         TASK = 'task'
@@ -166,22 +161,19 @@ class Mergers_New(Processed):
         # Save values to file
         KEYS = self.KEYS
         with h5py.File(fname, 'w') as save:
-            save.attrs['created'] = str(datetime.now())
-            save.attrs['version'] = str(VERSION)
-            save.attrs['script'] = str(os.path.abspath(__file__))
-            save.attrs['sim_path'] = str(self._sim_path)
+            utils._save_meta_to_hdf5(save, self._sim_path, VERSION, __file__)
 
             ids = np.array([mrgs['id1'], mrgs['id2']]).T
             mass = np.array([mrgs['mass1'], mrgs['mass2']]).T
             pos = np.moveaxis(np.array([mrgs['pos1'], mrgs['pos2']]), 0, 1)
 
-            save.create_dataset(str(KEYS.SCALE), data=mrgs['scale'])
-            save.create_dataset(str(KEYS.SNAP), data=mrgs['snap'])
-            save.create_dataset(str(KEYS.TASK), data=mrgs['task'])
+            save.create_dataset(KEYS.SCALE, data=mrgs['scale'])
+            save.create_dataset(KEYS.SNAP, data=mrgs['snap'])
+            save.create_dataset(KEYS.TASK, data=mrgs['task'])
 
-            save.create_dataset(str(KEYS.ID), data=ids)
-            save.create_dataset(str(KEYS.MASS), data=mass)
-            save.create_dataset(str(KEYS.POS), data=pos)
+            save.create_dataset(KEYS.ID, data=ids)
+            save.create_dataset(KEYS.MASS, data=mass)
+            save.create_dataset(KEYS.POS, data=pos)
 
         if self._verbose:
             msg = "Saved data for {} mergers to '{}' size {}".format(

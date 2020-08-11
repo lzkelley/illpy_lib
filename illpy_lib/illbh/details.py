@@ -2,484 +2,511 @@
 """
 
 import os
-# import sys
-import shutil
+import sys
+import glob
+import logging
 from datetime import datetime
 
 import numpy as np
 import h5py
+from mpi4py import MPI
 
 import zcode.inout as zio
-import zcode.math as zmath
+# import zcode.math as zmath
 
-from illpy_lib.constants import DTYPE
-from illpy_lib.illbh import Core, DETAILS, load_hdf5_to_mem
+import illpy_lib  # noqa
+from illpy_lib.illbh import Processed, utils, PATH_PROCESSED
 
-VERSION = 0.3                                    # Version of details
+VERBOSE = True
+VERSION = 0.4                                    # Version of details
+DETS_RESOLUTION_TARGET = 1.0e-3                # in units of scale-factor
+DETS_RESOLUTION_TOLERANCE = 0.5              # allowed fraction below `DETS_RESOLUTION_TARGET`
+DETS_RESOLUTION_MIN_NUM = 10
 
-_DEF_PRECISION = -8                               # Default precision
+comm = MPI.COMM_WORLD
+
+# Start
+
+if DETS_RESOLUTION_MIN_NUM < 10:
+    raise ValueError("ERROR: `DETS_RESOLUTION_MIN_NUM` must be >= 10!")
 
 
+class Details_New(Processed):
+
+    _PROCESSED_FILENAME = "bh-details.hdf5"
+
+    class KEYS(Processed.KEYS):
+        SCALE  = 'scale'
+        ID     = 'id'
+        POT    = 'potential'
+        MASS   = 'mass'
+        MDOT   = 'mdot'
+        MDOT_B = 'mdot_bondi'
+        POS    = 'pos'
+        VEL    = 'vel'
+        TASK   = 'task'
+        # RHO   = 'rho'
+        # CS    = 'cs'
+
+        U_IDS = 'unique_ids'
+        U_INDICES = 'unique_indices'
+        U_COUNTS = 'unique_counts'
+
+        _INTERP_KEYS = [POT, MASS, MDOT, MDOT_B, POS, VEL]
+
+    def _process(self):
+        if self._sim_path is None:
+            err = "ERROR: cannot process {} without `sim_path` set!".format(self.__class__)
+            logging.error(err)
+            raise ValueError(err)
+
+        snap = 0
+        KEYS = self.KEYS
+        verb = self._verbose
+        first = True
+        tot_input = 0
+        tot_output = 0
+        tot_count = 0
+        ave_ratio = 0.0
+
+        dets = {}
+        while True:
+            if verb:
+                print("snap = {}".format(snap))
+
+            try:
+                dets_snap = Details_Snap_New(snap, sim_path=self._sim_path)
+            except FileNotFoundError as err:
+                if snap < 2:
+                    msg = "ERROR: snap {} details missing! Has `details.py` been run?".format(snap)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise err
+                else:
+                    break
+
+            scales = dets_snap[KEYS.SCALE]
+            ids = dets_snap[KEYS.ID]
+            tot_num = scales.size
+            if verb:
+                print("\ttot_num = {}".format(tot_num))
+
+            if tot_num == 0:
+                snap += 1
+                continue
+
+            u_ids = dets_snap[KEYS.U_IDS]
+            u_indices = dets_snap[KEYS.U_INDICES]
+            u_counts = dets_snap[KEYS.U_COUNTS]
+            for ii, xx, nn in zip(u_ids, u_indices, u_counts):
+                if verb:
+                    print("\t{} - {} - {}:{} - {}:{}".format(
+                        ii, nn, xx, xx+nn-1, scales[xx], scales[xx+nn-1]))
+                    # print("\t{}".format(scales[xx:xx+nn]))
+
+                if not np.all(ids[xx] == ids[xx:xx+nn]):
+                    err = "ERROR: snap {}, ids inconsistent for BH {}!".format(snap, ii)
+                    logging.error(err)
+                    raise ValueError(err)
+                if (xx > 0) and (ids[xx] == ids[xx-1]):
+                    err = "ERROR: snap {}, ids start before expected for BH {}!".format(snap, ii)
+                    logging.error(err)
+                    raise ValueError(err)
+                if (xx+nn < tot_num) and (ids[xx] == ids[xx+nn]):
+                    err = "ERROR: snap {}, ids continue beyond expected for BH {}!".format(snap, ii)
+                    logging.error(err)
+                    raise ValueError(err)
+                if np.any(np.diff(scales[xx:xx+nn]) < 0.0):
+                    err = "ERROR: snap {}, BH {} scales not monotonically increasing!".format(
+                        snap, ii)
+                    logging.error(err)
+                    raise ValueError(err)
+
+                if nn > DETS_RESOLUTION_MIN_NUM:
+                    span = scales[xx+nn-1] - scales[xx]
+                    res = span / nn
+                else:
+                    res = np.inf
+                    span = None
+
+                # if verb:
+                #     print("\tres = {} (target={}), span = {}".format(
+                #         res, DETS_RESOLUTION_TARGET, span))
+
+                if res < DETS_RESOLUTION_TARGET / (1.0 + DETS_RESOLUTION_TOLERANCE):
+                    new_num = int(np.ceil(span / DETS_RESOLUTION_TARGET))
+                    if verb and (new_num < DETS_RESOLUTION_MIN_NUM):
+                        msg = "WARNING: target resolution num = {} is too low".format(new_num)
+                        logging.warning(msg)
+                        # raise RuntimeError(msg)
+                        new_num = np.max([nn/10, DETS_RESOLUTION_MIN_NUM])
+                        new_num = int(np.ceil(new_num))
+
+                    new_scales = np.linspace(scales[xx], scales[xx+nn-1], new_num)[1:-1]
+                    # if verb:
+                    #     print("\tinterpolating {} ==> {}".format(nn, new_num))
+
+                    for kk in KEYS:
+                        if kk.startswith('unique'):
+                            continue
+
+                        if (kk in KEYS._INTERP_KEYS):
+                            xvals = scales[xx:xx+nn]
+                            yvals = dets_snap[kk][xx:xx+nn]
+                            ndim = np.ndim(yvals)
+                            if ndim == 1:
+                                temp = [
+                                    [yvals[0]],
+                                    np.interp(new_scales, xvals, yvals),
+                                    [yvals[-1]],
+                                ]
+                                temp = np.concatenate(temp)
+                            elif ndim == 2:
+                                nvars = yvals.shape[1]
+                                temp = np.zeros((new_num, nvars))
+                                for jj in range(nvars):
+                                    temp[0, jj] = yvals[0, jj]
+                                    temp[-1, jj] = yvals[-1, jj]
+                                    temp[1:-1, jj] = np.interp(new_scales, xvals, yvals[:, jj])
+                            else:
+                                err = "ERROR: unexpected shape for {} ({})!".format(kk, yvals.shape)
+                                logging.error(err)
+                                raise ValueError(err)
+
+                        elif kk == KEYS.SCALE:
+                            temp = np.concatenate([[scales[xx]], new_scales, [scales[xx+nn-1]]])
+                        else:
+                            temp = dets_snap[kk][xx:xx+new_num]
+
+                        if first:
+                            dets[kk] = temp
+                        else:
+                            prev = dets[kk]
+                            dets[kk] = np.concatenate([prev, temp])
+
+                    first = False
+                    tot_output += new_num
+                    ave_ratio += (new_num / nn)
+
+                else:
+                    for kk in KEYS:
+                        temp = dets_snap[kk][xx:xx+nn]
+                        if first:
+                            dets[kk] = temp
+                        else:
+                            prev = dets[kk]
+                            dets[kk] = np.concatenate([prev, temp])
+
+                    first = False
+                    tot_output += nn
+                    ave_ratio += 1.0
+
+                tot_input += nn
+                tot_count += 1
+
+            snap += 1
+
+        ave_ratio /= tot_count
+        tot_ratio = tot_output / tot_input
+        if verb:
+            print("Downsampled from {:.2e} ==> {:.2e}".format(tot_input, tot_output))
+            print("Total compression: {:.2e}, average: {:.2e}".format(tot_ratio, ave_ratio))
+
+        self._finalize_and_save(dets)
+
+        return
+
+    def _finalize_and_save(self, dets):
+        KEYS = self.KEYS
+        idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
+        for kk, vv in dets.items():
+            if kk.startswith('unique'):
+                continue
+            dets[kk] = vv[idx, ...]
+
+        u_ids, u_inds, u_counts = np.unique(dets[KEYS.ID], return_index=True, return_counts=True)
+        num_unique = u_ids.size
+        dets[KEYS.U_IDS] = u_ids
+        dets[KEYS.U_INDICES] = u_inds
+        dets[KEYS.U_COUNTS] = u_counts
+
+        # -- Save values to file
+        # Get output filename for this snapshot
+        #   path should have already been created in `_process` by rank=0
+        fname = self.filename
+        with h5py.File(fname, 'w') as save:
+            utils._save_meta_to_hdf5(save, self._sim_path, VERSION, __file__)
+            for key in KEYS:
+                save.create_dataset(str(key), data=dets[key])
+
+        if self._verbose:
+            msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
+                len(dets[KEYS.SCALE]), num_unique, fname, zio.get_file_size(fname))
+            print(msg)
+
+        return
+
+    def _load_from_save(self):
+        fname = self.filename
+        with h5py.File(fname, 'r') as load:
+            vers = load.attrs['version']
+            if vers != str(VERSION):
+                msg = "WARNING: loaded version '{}' does not match current '{}'!".format(
+                    vers, VERSION)
+                logging.warning(msg)
+            spath = load.attrs['sim_path']
+            if self._sim_path is not None:
+                if os.path.abspath(self._sim_path).lower() != os.path.abspath(spath).lower():
+                    msg = "WARNING: loaded sim_path '{}' does not match current '{}'!".format(
+                        spath, self._sim_path)
+                    logging.warning(msg)
+            else:
+                self._sim_path = spath
+
+            keys = self.keys()
+            size = load[self.KEYS.SCALE].size
+            for kk in keys:
+                try:
+                    vals = load[kk][:]
+                    setattr(self, kk, vals)
+                except Exception as err:
+                    msg = "ERROR: failed to load '{}' from '{}'!".format(kk, fname)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise
+
+            for kk in load.keys():
+                if kk not in keys:
+                    err = "WARNING: '{}' has unexpected data '{}'".format(fname, kk)
+                    logging.warning(err)
+
+            if self._verbose:
+                dt = load.attrs['created']
+                print("Loaded {:10d} details from '{}', created '{}'".format(size, fname, dt))
+
+        self._size = size
+        return
 
 
-def main(reorganize_flag=True, reformat_flag=True):
+class Details_Snap_New(Details_New):
 
-    core = Core(sets=dict(LOG_FILENAME='log_illbh-details.log'))
-    log = core.log
+    _PROCESSED_FILENAME = "bh-details_{snap:03d}.hdf5"
 
-    log.info("details.main()")
-    print(log.filename)
+    def __init__(self, snap, *args, **kwargs):
+        self._snap = snap
+        super().__init__(*args, **kwargs)
+        return
 
-    beg = datetime.now()
+    def _process(self):
+        snap = self._snap
+        types = [np.float, np.uint64, np.float64, np.float64, np.float64, np.float64,
+                 np.float64, np.float64, np.float64, np.float64, np.float64, np.float64]
 
-    # Organize Details by Snapshot Time; create new, temporary ASCII Files
-    log.debug("`reorganize_flag` = {}".format(reorganize_flag))
-    if reorganize_flag:
-        reorganize(core)
+        def parse_detail_line(line):
+            """
+            "%g %llu  %g  %g %g %g  %g %g %g  %g %g %g\n",
+            All.Time, (long long) P[n].ID, pot, BPP(n).BH_Mass, BPP(n).BH_MdotBondi, BPP(n).BH_Mdot,
+            P[n].Pos[0], P[n].Pos[1], P[n].Pos[2], P[n].Vel[0], P[n].Vel[1], P[n].Vel[2])
+            """
+            line = line.strip().split()
+            if len(line) != len(types):
+                raise ValueError(f"unexpected line length: '{line}'!")
 
-    # Create Dictionary Details Files
-    log.debug("`reformat_flag` = {}".format(reformat_flag))
-    if reformat_flag:
-        reformat(core)
+            temp = [tt(ll) for tt, ll in zip(types, line)]
+            return temp
+
+        ddir = 'details_{:03d}'.format(snap)
+        ddir = os.path.join(self._sim_path, 'output', 'blackholes', ddir)
+
+        if not os.path.isdir(ddir):
+            err = "ERROR: `ddir` '{}' does not exist!".format(ddir)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        dfils = os.path.join(ddir, "blackhole_details_*.txt")
+        dfils = sorted(glob.glob(dfils))
+
+        num_files = len(dfils)
+        if self._verbose:
+            print(f"snap {snap}, dir {ddir}, files: {num_files}")
+        if len(dfils) == 0:
+            err = "ERROR: snap={} : no files found in '{}'".format(snap, ddir)
+            raise FileNotFoundError(err)
+
+        details = []
+        tasks = []
+        num_lines = 0
+        for ii, dfil in enumerate(dfils):
+            _task = os.path.basename(dfil).split('_')[-1].split('.')[0]
+            _task = int(_task)
+
+            prev = None
+            for ll, line in enumerate(open(dfil, 'r').readlines()):
+                try:
+                    vals = parse_detail_line(line)
+                except Exception as err:
+                    msg = "ERROR: failed to parse line {} from {}: '{}'".format(ll, dfil, line)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise
+
+                sc = vals[0]
+                if prev is None:
+                    prev = sc
+                elif sc < prev:
+                    err = f"Snap: {snap}, file: {ii} - scale:{sc:.8f} is before prev:{prev:.8f}!"
+                    logging.error(err)
+                    raise ValueError(err)
+
+                details.append(vals)
+                tasks.append(ii)
+                num_lines += 1
+
+        KEYS = self.KEYS
+        dets = {
+            KEYS.SCALE  : np.zeros(num_lines, dtype=types[0]),
+            KEYS.ID     : np.zeros(num_lines, dtype=types[1]),
+            KEYS.POT    : np.zeros(num_lines, dtype=types[2]),
+            KEYS.MASS   : np.zeros(num_lines, dtype=types[3]),
+            KEYS.MDOT_B : np.zeros(num_lines, dtype=types[4]),
+            KEYS.MDOT   : np.zeros(num_lines, dtype=types[5]),
+            KEYS.POS    : np.zeros((num_lines, 3), dtype=types[6]),
+            KEYS.VEL    : np.zeros((num_lines, 3), dtype=types[9]),
+
+            KEYS.TASK   : np.zeros(num_lines, dtype=np.uint32),
+        }
+        for ii in range(num_lines):
+            dd = details[ii]
+
+            dets[KEYS.SCALE][ii] = dd[0]
+            dets[KEYS.ID][ii] = dd[1]
+            dets[KEYS.POT][ii] = dd[2]
+            dets[KEYS.MASS][ii] = dd[3]
+            dets[KEYS.MDOT_B][ii] = dd[4]
+            dets[KEYS.MDOT][ii] = dd[5]
+            dets[KEYS.POS][ii] = [dd[6+kk] for kk in range(3)]
+            dets[KEYS.VEL][ii] = [dd[9+kk] for kk in range(3)]
+            dets[KEYS.TASK][ii] = tasks[ii]
+
+        self._finalize_and_save(dets)
+        return
+
+    @property
+    def filename(self):
+        if self._filename is None:
+            # `sim_path` has already been checked to exist in initializer
+            sim_path = self._sim_path
+            temp = self._PROCESSED_FILENAME.format(snap=self._snap)
+            self._filename = os.path.join(sim_path, *PATH_PROCESSED, temp)
+
+        return self._filename
+
+
+def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
+
+    if comm.rank == 0:
+        temp = 'details_' + '[0-9]' * 3
+        path_bhs = os.path.join(sim_path, 'output', 'blackholes')
+        temp = os.path.join(path_bhs, temp)
+        det_dirs = sorted(glob.glob(temp))
+        if verbose:
+            print("Found {} details directories".format(len(det_dirs)))
+        if len(det_dirs) == 0:
+            err = "ERROR: no details directories found (pattern: '{}')".format(temp)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        snap_list = []
+        num_procs = None
+        prev = None
+        for dd in det_dirs:
+            sn = int(os.path.basename(dd).split('_')[-1])
+            snap_list.append(sn)
+            if prev is None:
+                if sn != 0:
+                    err = "WARNING: first snapshot ({}) is not zero!".format(sn)
+                    logging.warning(err)
+            elif prev + 1 != sn:
+                err = "WARNING: snapshot {} does not follow previous {}!".format(sn, prev)
+                logging.warning(err)
+
+            pattern = os.path.join(dd, "blackhole_details_*.txt")
+            num = len(glob.glob(pattern))
+            if num == 0:
+                err = "ERROR: found no files matching details pattern ({})!".format(pattern)
+                logging.error(err)
+                raise FileNotFoundError(err)
+            else:
+                if num_procs is None:
+                    num_procs = num
+                    if verbose:
+                        print("Files found for {} processors".format(num))
+                elif num_procs != num:
+                    err = "WARNING: num of files ({}) in snap {} does not match previous!".format(
+                        num, sn)
+                    logging.warning(err)
+
+            prev = sn
+
+        np.random.seed(1234)
+        np.random.shuffle(snap_list)
+        snap_list = np.array_split(snap_list, comm.size)
+
+    else:
+        snap_list = None
+
+    snap_list = comm.scatter(snap_list, root=0)
+
+    comm.barrier()
+    num_lines = 0
+    for snap in snap_list:
+        details = Details_Snap_New(snap, sim_path=sim_path, recreate=recreate, verbose=verbose)
+        num_lines += details[details.KEYS.SCALE].size
+
+    num_lines = comm.gather(num_lines, root=0)
 
     end = datetime.now()
-    log.info("Done after '{}'".format(end-beg))
-
-    return
-
-
-def reorganize(core=None):
-    core = Core.load(core)
-    log = core.log
-    log.debug("details.reorganize()")
-
-    RUN = core.sets.RUN_NUM
-    NUM_SNAPS = core.sets.NUM_SNAPS
-
-    # temp_fnames = [constants.GET_DETAILS_TEMP_FILENAME(run, snap) for snap in range(NUM_SNAPS)]
-    temp_fnames = [core.paths.fname_details_temp_snap(snap, RUN) for snap in range(NUM_SNAPS)]
-
-    loadsave = (not core.sets.RECREATE)
-
-    # Check if all temp files already exist
-    if loadsave:
-        temps_exist = [os.path.exists(tfil) for tfil in temp_fnames]
-        if all(temps_exist):
-            log.info("All temp files exist.")
-        else:
-            bad = np.argmin(temps_exist)
-            bad = temp_fnames[bad]
-            log.warning("Temp files do not exist e.g. '{}'".format(bad))
-            loadsave = False
-
-    # If temp files dont exist, or we WANT to redo them, then create temp files
-    if not loadsave:
-        log.debug("Finding Illustris BH Details files")
-        # Get Illustris BH Details Filenames
-        # raw_fnames = constants.GET_ILLUSTRIS_BH_DETAILS_FILENAMES(run, verbose)
-        raw_fnames = core.paths.fnames_details_input
-        if len(raw_fnames) < 1:
-            log.raise_error("Error no dets files found!!")
-
-        # Reorganize into temp files
-        log.warning("Reorganizing details into temporary files")
-        _reorganize_files(core, raw_fnames, temp_fnames)
-
-    # Confirm all temp files exist
-    temps_exist = all([os.path.exists(tfil) for tfil in temp_fnames])
-
-    # If files are missing, raise error
-    if not temps_exist:
-        print(("Temporary Files still missing!  '{:s}'".format(temp_fnames[0])))
-        raise RuntimeError("Temporary Files missing!")
-
-    return temp_fnames
-
-
-def _reorganize_files(core, raw_fnames, temp_fnames):
-
-    log = core.log
-    log.debug("details._reorganize_files()")
-
-    NUM_SNAPS = core.sets.NUM_SNAPS
-    snap_scales = core.cosmo.scales()
-
-    temps = [zio.modify_filename(tt, prepend='_') for tt in temp_fnames]
-
-    # Open new ASCII, Temp dets files
-    #    Make sure path is okay
-    zio.check_path(temps[0])
-    # Open each temp file
-    # temp_files = [open(tfil, 'w') for tfil in temp_fnames]
-    temp_files = [open(tfil, 'w') for tfil in temps]
-
-    num_temp = len(temp_files)
-    num_raw  = len(raw_fnames)
-    log.info("Organizing {:d} raw files into {:d} temp files".format(num_raw, num_temp))
-
-    prec = _DEF_PRECISION
-    all_num_lines_in = 0
-    all_num_lines_out = 0
-
-    # Iterate over all Illustris Details Files
-    # ----------------------------------------
-    for ii, raw in enumerate(core.tqdm(raw_fnames, desc='Raw files')):
-        log.debug("File {}: '{}'".format(ii, raw))
-        lines = []
-        scales = []
-        # Load all lines and entry scale-factors from raw dets file
-        for dline in open(raw):
-            lines.append(dline)
-            # Extract scale-factor from line
-            detScale = DTYPE.SCALAR(dline.split()[1])
-            scales.append(detScale)
-
-        # Convert to array
-        lines = np.array(lines)
-        scales = np.array(scales)
-        num_lines_in = scales.size
-
-        # If file is empty, continue
-        if num_lines_in == 0:
-            log.debug("\tFile empty")
-            continue
-
-        log.debug("\tLoaded {}".format(num_lines_in))
-
-        # Round snapshot scales to desired precision
-        scales_round = np.around(snap_scales, -prec)
-
-        # Find snapshots following each entry (right-edge) or equal (include right: 'right=True')
-        #    `-1` to put binaries into the snapshot UP-TO that scalefactor
-        # snap_nums = np.digitize(scales, scales_round, right=True) - 1
-        snap_nums = np.digitize(scales, scales_round, right=True)
-
-        # For each Snapshot, write appropriate lines
-        num_lines_out = 0
-        for snap in range(NUM_SNAPS):
-            inds = (snap_nums == snap)
-            num_lines_out_snap = np.count_nonzero(inds)
-            if num_lines_out_snap == 0:
-                continue
-
-            temp_files[snap].writelines(lines[inds])
-            # log.debug("\t\tWrote {} lines to snap {}".format(num_lines_out_snap, snap))
-            num_lines_out += num_lines_out_snap
-
-        if num_lines_out != num_lines_in:
-            log.error("File {}, '{}'".format(ii, raw))
-            log.raise_error("Wrote {} lines, loaded {} lines!".format(num_lines_out, num_lines_in))
-
-        all_num_lines_in += num_lines_in
-        all_num_lines_out += num_lines_out
-
-    # Close out dets files
-    tot_size = 0.0
-    log.info("Closing files, checking sizes")
-
-    for ii, newdf in enumerate(temp_files):
-        newdf.close()
-        tot_size += os.path.getsize(newdf.name)
-
-    ave_size = tot_size/(1.0*len(temp_files))
-    size_str = zio.bytes_string(tot_size)
-    ave_size_str = zio.bytes_string(ave_size)
-    log.info("Total temp size = '{}', average = '{}'".format(size_str, ave_size_str))
-
-    log.info("Input lines = {:d}, Output lines = {:d}".format(all_num_lines_in, all_num_lines_out))
-    if (all_num_lines_in != all_num_lines_out):
-        log.raise_error("input lines {}, does not match output lines {}!".format(
-            all_num_lines_in, all_num_lines_out))
-
-    log.info("Renaming temporary files...")
-    for ii, (aa, bb) in enumerate(zip(temps, temp_fnames)):
-        if ii == 0:
-            log.debug("'{}' ==> '{}'".format(aa, bb))
-        shutil.move(aa, bb)
-
-    return
-
-
-def reformat(core=None):
-    core = Core.load(core)
-    log = core.log
-    NUM_SNAPS = core.sets.NUM_SNAPS
-
-    log.debug("details.reformat()")
-
-    out_fnames = [core.paths.fname_details_snap(snap) for snap in range(NUM_SNAPS)]
-
-    loadsave = (not core.sets.RECREATE)
-
-    # Check if all save files already exist, and correct versions
-    if loadsave:
-        out_exist = [os.path.exists(sfil) for sfil in out_fnames]
-        if all(out_exist):
-            log.info("All output files exist")
-        else:
-            bad = np.argmin(out_exist)
-            bad = out_fnames[bad]
-            log.warning("Output files do not exist e.g. '{}'".format(bad))
-            loadsave = False
-
-    # Re-convert files
-    if (not loadsave):
-        log.warning("Processing temporary files")
-        temp_fnames = [core.paths.fname_details_temp_snap(snap) for snap in range(NUM_SNAPS)]
-        for snap in core.tqdm(range(NUM_SNAPS)):
-            temp = temp_fnames[snap]
-            out = out_fnames[snap]
-            _reformat_to_hdf5(core, snap, temp, out)
-
-    # Confirm save files exist
-    out_exist = [os.path.exists(sfil) for sfil in out_fnames]
-
-    # If files are missing, raise error
-    if (not all(out_exist)):
-        log.raise_error("Output files missing!")
-
-    return out_fnames
-
-
-def _reformat_to_hdf5(core, snap, temp_fname, out_fname):
-    """
-    """
-
-    log = core.log
-    cosmo = core.cosmo
-    log.debug("details._reformat_to_hdf5()")
-    log.info("Snap {}, {} ==> {}".format(snap, temp_fname, out_fname))
-    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
-
-    loadsave = (not core.sets.RECREATE)
-
-    # Make Sure Temporary Files exist, Otherwise re-create them
-    if (not os.path.exists(temp_fname)):
-        log.raise_error("Temp file '{}' does not exist!".format(temp_fname))
-
-    # Try to load from existing save
-    if loadsave:
-        if os.path.exists(out_fname):
-            log.info("\tOutput file '{}' already exists.".format(out_fname))
-            return
-
-    # Load dets from ASCII File
-    vals = _load_bhdetails_ascii(temp_fname)
-    ids, scales, masses, mdots, rhos, cs = vals
-    # Sort by ID number, then by scale-factor
-    sort = np.lexsort((scales, ids))
-    vals = [vv[sort] for vv in vals]
-    ids, scales, masses, mdots, rhos, cs = vals
-
-    # Find unique ID numbers, their first occurence indices, and the number of occurences
-    u_ids, u_inds, u_counts = np.unique(ids, return_index=True, return_counts=True)
-    num_unique = u_ids.size
-    log.info("\tunique IDs: {}".format(zmath.frac_str(num_unique, ids.size)))
-
-    # Calculate mass-differences
-    dmdts = np.zeros_like(mdots)
-    for ii, nn in zip(u_inds, u_counts):
-        j0 = slice(ii, ii+nn-1)
-        j1 = slice(ii+1, ii+nn)
-        # t0 = cosmo.scale_to_age(scales[j0])
-        # t1 = cosmo.scale_to_age(scales[j1])
-        z0 = cosmo._a_to_z(scales[j0])
-        z1 = cosmo._a_to_z(scales[j1])
-        t0 = cosmo.age(z0).cgs.value
-        t1 = cosmo.age(z1).cgs.value
-        m0 = masses[j0]
-        m1 = masses[j1]
-        dm = m1 - m0
-        dt = t1 - t0
-
-        # dmdts[j1] = (m1 - m0) / dt
-
-        ss = np.ones_like(dm)
-        neg = (dm < 0.0) | (dt < 0.0)
-        ss[neg] *= -1
-
-        inds = (dt != 0.0)
-        dmdts[j1][inds] = ss[inds] * np.fabs(dm[inds] / dt[inds])
-
-    # Convert dmdts to same units as mdots
-    dmdts = dmdts * CONV_ILL_TO_CGS.MASS / CONV_ILL_TO_CGS.MDOT
-
-    with h5py.File(out_fname, 'w') as out:
-        out.attrs[DETAILS.RUN] = core.sets.RUN_NUM
-        out.attrs[DETAILS.SNAP] = snap
-        out.attrs[DETAILS.NUM] = len(ids)
-        out.attrs[DETAILS.CREATED] = str(datetime.now().ctime())
-        out.attrs[DETAILS.VERSION] = VERSION
-
-        out.create_dataset(DETAILS.IDS, data=ids)
-        out.create_dataset(DETAILS.SCALES, data=scales)
-        out.create_dataset(DETAILS.MASSES, data=masses)
-        out.create_dataset(DETAILS.MDOTS, data=mdots)
-        out.create_dataset(DETAILS.DMDTS, data=dmdts)
-        out.create_dataset(DETAILS.RHOS, data=rhos)
-        out.create_dataset(DETAILS.CS, data=cs)
-
-        out.create_dataset(DETAILS.UNIQUE_IDS, data=u_ids)
-        out.create_dataset(DETAILS.UNIQUE_INDICES, data=u_inds)
-        out.create_dataset(DETAILS.UNIQUE_COUNTS, data=u_counts)
-
-    size_str = zio.get_file_size(out_fname)
-    log.info("\tSaved snap {} to '{}', size {}".format(snap, out_fname, size_str))
-
-    return
-
-
-def _load_bhdetails_ascii(temp_fname):
-    # Files have some blank lines in them... Clean
-    with open(temp_fname, 'r') as temp:
-        lines = temp.readlines()
-
-    nums = len(lines)
-
-    # Allocate storage
-    ids    = np.zeros(nums, dtype=DTYPE.ID)
-    scales = np.zeros(nums, dtype=DTYPE.SCALAR)
-    masses = np.zeros(nums, dtype=DTYPE.SCALAR)
-    mdots  = np.zeros(nums, dtype=DTYPE.SCALAR)
-    rhos   = np.zeros(nums, dtype=DTYPE.SCALAR)
-    cs     = np.zeros(nums, dtype=DTYPE.SCALAR)
-
-    count = 0
-    # Iterate over lines, storing only those with content (should be all)
-    for lin in lines:
-        lin = lin.strip()
-        if (len(lin) > 0):
-            tid, tim, mas, dot, rho, tcs = _parse_bhdetails_line(lin)
-            ids[count] = tid
-            scales[count] = tim
-            masses[count] = mas
-            mdots[count] = dot
-            rhos[count] = rho
-            cs[count] = tcs
-
-            count += 1
-
-    # Trim excess (shouldn't be needed)
-    if (count != nums):
-        trim = np.s_[count:]
-
-        ids    = np.delete(ids, trim)
-        scales = np.delete(scales, trim)
-        masses = np.delete(masses, trim)
-        mdots  = np.delete(mdots, trim)
-        rhos   = np.delete(rhos, trim)
-        cs     = np.delete(cs, trim)
-
-    return ids, scales, masses, mdots, rhos, cs
-
-
-def _parse_bhdetails_line(instr):
-    """Parse a line from an Illustris blachole_details_#.txt file
-
-    The line is formatted (in C) as:
-        "BH=%llu %g %g %g %g %g\n",
-        (long long) P[n].ID, All.Time, BPP(n).BH_Mass, mdot, rho, soundspeed
-
-    Arguments
-    ---------
-
-    Returns
-    -------
-        ID, time, mass, mdot, rho, cs
-
-    """
-    args = instr.split()
-    # First element is 'BH=#', trim to just the id number
-    args[0] = args[0].split("BH=")[-1]
-    idn  = DTYPE.ID(args[0])
-    time = DTYPE.SCALAR(args[1])
-    mass = DTYPE.SCALAR(args[2])
-    mdot = DTYPE.SCALAR(args[3])
-    rho  = DTYPE.SCALAR(args[4])
-    cs   = DTYPE.SCALAR(args[5])
-    return idn, time, mass, mdot, rho, cs
-
-
-def load_details(snap, core=None):
-    """
-    """
-    core = Core.load(core)
-    log = core.log
-
-    log.debug("details.load_details()")
-
-    fname = core.paths.fname_details_snap(snap)
-    log.debug("Filename for snap {}: '{}'".format(snap, fname))
-
-    dets = load_hdf5_to_mem(fname)
-    return dets
-
-
-def calc_dmdt_for_details(core=None):
-    """Calculate mass-differences as estimate for accretion rates, add/overwrite in HDF5 files.
-    """
-    core = Core.load(core)
-    log = core.log
-    cosmo = core.cosmo
-    NUM_SNAPS = core.sets.NUM_SNAPS
-    CONV_ILL_TO_CGS = core.cosmo.CONV_ILL_TO_CGS
-
-    # log.warning("WARNING: testing `calc_dmdt_for_details`!")
-    # for snap in [135]:
-    for snap in core.tqdm(range(NUM_SNAPS)):
-        fname = core.paths.fname_details_snap(snap)
-        log.debug("Snap {}: '{}'".format(snap, fname))
-        with h5py.File(fname, 'a') as data:
-            scales = data[DETAILS.SCALES]
-            if scales.size == 0:
-                continue
-
-            # These are already sorted by ID and scale-factor, so contiguous and chronological
-            # for each BH
-            masses = data[DETAILS.MASSES][:] * CONV_ILL_TO_CGS.MASS
-            mdots = data[DETAILS.MDOTS]
-
-            u_inds = data[DETAILS.UNIQUE_INDICES]
-            u_counts = data[DETAILS.UNIQUE_COUNTS]
-
-            # Calculate mass-differences
-            dmdts = np.zeros_like(masses)
-            count = 0
-            count_all = 0
-
-            for ii, nn in zip(u_inds, u_counts):
-                j0 = slice(ii, ii+nn-1)
-                j1 = slice(ii+1, ii+nn)
-                # t0 = cosmo.a_to_tage(scales[j0])
-                # t1 = cosmo.a_to_tage(scales[j1])
-                z0 = cosmo._a_to_z(scales[j0])
-                z1 = cosmo._a_to_z(scales[j1])
-                t0 = cosmo.age(z0).cgs.value
-                t1 = cosmo.age(z1).cgs.value
-                m0 = masses[j0]
-                m1 = masses[j1]
-                dm = m1 - m0
-                dt = t1 - t0
-
-                ss = np.ones_like(dm)
-                neg = (dm < 0.0) | (dt < 0.0)
-                ss[neg] *= -1
-
-                inds = (dt != 0.0)
-                dmdts[j1][inds] = ss[inds] * np.fabs(dm[inds] / dt[inds])
-
-                count += np.count_nonzero(inds)
-                count_all += inds.size
-
-            dmdts = dmdts / CONV_ILL_TO_CGS.MDOT
-            log.info("dM/dt nonzero : " + zmath.frac_str(np.count_nonzero(dmdts), masses.size))
-            log.info("mdots : " + zmath.stats_str(mdots, filter='>'))
-            log.info("dmdts : " + zmath.stats_str(dmdts, filter='>'))
-
+    if verbose:
+        print("Rank: {}, done at {}, after {}".format(comm.rank, end, (end-beg)))
+    if comm.rank == 0:
+        tot_num_lines = np.sum(num_lines)
+        ave = np.mean(num_lines)
+        med = np.median(num_lines)
+        std = np.std(num_lines)
+        if verbose:
+            print("Tot lines={:.2e}, med={:.2e}, ave={:.2e}±{:.2e}".format(
+                tot_num_lines, med, ave, std))
+
+        tail = f"Done at {str(end)} after {str(end-beg)} ({(end-beg).total_seconds()})"
+        print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+
+    comm.barrier()
     return
 
 
 if __name__ == "__main__":
-    main(reorganize_flag=False, reformat_flag=True)
+    beg = datetime.now()
+    recreate = ('-r' in sys.argv) or ('--recreate' in sys.argv)
+    verbose = ('-v' in sys.argv) or ('--verbose' in sys.argv) or VERBOSE
 
-    # calc_dmdt_for_details(core=None)
+    if comm.rank == 0:
+        this_fname = os.path.abspath(__file__)
+        head = f"{this_fname} : {str(beg)} - rank: {comm.rank}/{comm.size}"
+        print("\n" + head + "\n" + "=" * len(head) + "\n")
+
+        if (len(sys.argv) < 2) or ('-h' in sys.argv) or ('--help' in sys.argv):
+            logging.warning("USAGE: `python {} <PATH>`\n\n".format(__file__))
+            sys.exit(0)
+
+        sim_path = os.path.abspath(sys.argv[1]).rstrip('/')
+        if os.path.basename(sim_path) == 'output':
+            sim_path = os.path.split(sim_path)[0]
+
+    else:
+        sim_path = None
+
+    sim_path = comm.bcast(sim_path, root=0)
+
+    comm.barrier()
+
+    process_details_snaps(sim_path, recreate=recreate, verbose=verbose)
