@@ -1,6 +1,7 @@
 """
 """
 
+# from collections import OrderedDict
 import os
 import sys
 import glob
@@ -12,10 +13,10 @@ import h5py
 from mpi4py import MPI
 
 import zcode.inout as zio
-# import zcode.math as zmath
+import zcode.math as zmath
 
 import illpy_lib  # noqa
-from illpy_lib.illbh import Processed, utils, PATH_PROCESSED
+from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE
 
 VERBOSE = True
 VERSION = 0.4                                    # Version of details
@@ -99,10 +100,10 @@ class Details_New(Processed):
             u_indices = dets_snap[KEYS.U_INDICES]
             u_counts = dets_snap[KEYS.U_COUNTS]
             for ii, xx, nn in zip(u_ids, u_indices, u_counts):
-                if verb:
-                    print("\t{} - {} - {}:{} - {}:{}".format(
-                        ii, nn, xx, xx+nn-1, scales[xx], scales[xx+nn-1]))
-                    # print("\t{}".format(scales[xx:xx+nn]))
+                # if verb:
+                #     print("\t{} - {} - {}:{} - {}:{}".format(
+                #         ii, nn, xx, xx+nn-1, scales[xx], scales[xx+nn-1]))
+                #     # print("\t{}".format(scales[xx:xx+nn]))
 
                 if not np.all(ids[xx] == ids[xx:xx+nn]):
                     err = "ERROR: snap {}, ids inconsistent for BH {}!".format(snap, ii)
@@ -136,8 +137,8 @@ class Details_New(Processed):
                 if res < DETS_RESOLUTION_TARGET / (1.0 + DETS_RESOLUTION_TOLERANCE):
                     new_num = int(np.ceil(span / DETS_RESOLUTION_TARGET))
                     if verb and (new_num < DETS_RESOLUTION_MIN_NUM):
-                        msg = "WARNING: target resolution num = {} is too low".format(new_num)
-                        logging.warning(msg)
+                        # msg = "WARNING: target resolution num = {} is too low".format(new_num)
+                        # logging.warning(msg)
                         # raise RuntimeError(msg)
                         new_num = np.max([nn/10, DETS_RESOLUTION_MIN_NUM])
                         new_num = int(np.ceil(new_num))
@@ -401,6 +402,279 @@ class Details_Snap_New(Details_New):
 
         return self._filename
 
+
+class Merger_Details_New(Details_New):
+
+    _PROCESSED_FILENAME = "bh-merger-details.hdf5"
+
+    def _process(self):
+        if self._sim_path is None:
+            err = "ERROR: cannot process {} without `sim_path` set!".format(self.__class__)
+            logging.error(err)
+            raise ValueError(err)
+
+        mrgs = mergers.Mergers_New(sim_path=self._sim_path, verbose=self._verbose)
+        mkeys = mrgs.KEYS
+        num_mrgs = mrgs.size
+        max_snap = np.max(mrgs[mkeys.SNAP])
+
+        snap = 0
+        KEYS = self.KEYS
+        verb = self._verbose
+        mdets = [[None, None, None] for ii in range(num_mrgs)]
+        while True:
+            if verb:
+                print("snap = {}".format(snap))
+
+            try:
+                dets_snap = Details_Snap_New(snap, sim_path=self._sim_path)
+            except FileNotFoundError as err:
+                if snap < max_snap:
+                    msg = "ERROR: snap {} details missing! Has `details.py` been run?".format(snap)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise err
+                else:
+                    break
+
+            scales = dets_snap[KEYS.SCALE]
+            tot_num = scales.size
+            if verb:
+                print("\ttot_num = {}".format(tot_num))
+
+            if tot_num == 0:
+                snap += 1
+                continue
+
+            u_ids = dets_snap[KEYS.U_IDS]
+            u_indices = dets_snap[KEYS.U_INDICES]
+            u_counts = dets_snap[KEYS.U_COUNTS]
+            numu = u_ids.size
+            for mm in range(num_mrgs):
+                merger_ids = mrgs[mkeys.ID][mm]
+                merger_scale = mrgs[mkeys.SCALE][mm]
+                merger_mass = mrgs[mkeys.MASS][mm]
+                next_merger = mrgs[mkeys.NEXT][mm]
+                if next_merger > 0:
+                    next_merger = mrgs[mkeys.SCALE][next_merger]
+                else:
+                    next_merger = np.inf
+
+                for bh, bhid in enumerate(merger_ids):
+                    dd = np.searchsorted(u_ids, bhid)
+                    if (dd >= numu) or (u_ids[dd] != bhid):
+                        continue
+
+                    err = "ERROR: snap {}, merger {}, bh {} : ".format(snap, mm, bhid)
+                    beg = u_indices[dd]
+                    end = beg + u_counts[dd]
+                    det_scales = dets_snap[KEYS.SCALE][beg:end]
+                    det_masses = dets_snap[KEYS.MASS][beg:end]
+                    det_ids = dets_snap[KEYS.ID][beg:end]
+                    if not np.all(det_ids == bhid):
+                        raise RuntimeError()
+
+                    if bh == BH_TYPE.IN:
+                        if np.any(det_scales > merger_scale):
+                            err += "in-bh found after merger!"
+                            logging.error(err)
+                            raise RuntimeError(err)
+
+                        first = (mdets[mm][bh] is None)
+                        if first:
+                            mdets[mm][bh] = dict()
+
+                        for kk in KEYS:
+                            if kk.startswith('unique'):
+                                continue
+                            temp = dets_snap[kk][beg:end]
+                            if first:
+                                mdets[mm][bh][kk] = temp
+                            else:
+                                prev = mdets[mm][bh][kk]
+                                mdets[mm][bh][kk] = np.concatenate([prev, temp])
+
+                            if (kk == KEYS.MASS) and np.any(temp > merger_mass[BH_TYPE.IN]):
+                                err += "in bh larger than merger mass!"
+                                logging.error(err)
+                                raise RuntimeError(err)
+
+                    elif bh == BH_TYPE.OUT:
+
+                        idx_bef = (det_scales < merger_scale)
+                        idx_aft = (det_scales > merger_scale) & (det_scales < next_merger)
+                        for loc, idx in zip([BH_TYPE.OUT, 2], [idx_bef, idx_aft]):
+                            if not np.any(idx):
+                                continue
+
+                            print("merger scale = {:.8f}".format(merger_scale))
+                            print("merger mass  = {:.8e}, {:.8e}".format(*merger_mass))
+                            print("SCALES {} : {}".format(
+                                loc, zmath.stats_str(det_scales[idx], format=':.8f')))
+                            print("MASSES {} : {}".format(
+                                loc, zmath.stats_str(det_masses[idx], format=':.8e')))
+
+                            first = (mdets[mm][loc] is None)
+                            if first:
+                                mdets[mm][loc] = dict()
+
+                            for kk in KEYS:
+                                if kk.startswith('unique'):
+                                    continue
+                                temp = dets_snap[kk][beg:end][idx]
+                                if first:
+                                    mdets[mm][loc][kk] = temp
+                                else:
+                                    prev = mdets[mm][loc][kk]
+                                    mdets[mm][loc][kk] = np.concatenate([prev, temp])
+
+                                if kk == KEYS.MASS:
+                                    # After the merger, details should be MORE massive
+                                    if (loc == 2):
+                                        if np.any(temp < merger_mass.sum()):
+                                            msg = "merger_mass = {:.6e}, {:.6e}".format(
+                                                *merger_mass)
+                                            logging.error(msg)
+                                            msg = "details masses = {}".format(
+                                                zmath.stats_str(temp, format=':.8e'))
+                                            logging.error(msg)
+                                            msg = "merger scale = {:.8f}".format(merger_scale)
+                                            logging.error(msg)
+                                            msg = "details scales = {}".format(
+                                                zmath.stats_str(det_scales[idx], format=':.8f'))
+                                            logging.error(msg)
+                                            err += "remnant mass less than merger mass!"
+                                            logging.error(err)
+                                            # raise RuntimeError(err)
+                                    # Before the merger, details should be LESS massive
+                                    else:
+                                        if np.any(temp > merger_mass[BH_TYPE.OUT]):
+                                            err += "out bh larger than merger mass!"
+                                            logging.error(err)
+                                            raise RuntimeError(err)
+
+                                elif kk == KEYS.ID:
+                                    if not np.all(temp == bhid):
+                                        err += "out bh IDs dont match!"
+                                        logging.error(err)
+                                        raise RuntimeError(err)
+
+                            # for kk
+                        # for loc
+                    # elif bh
+                # for bh
+
+            snap += 1
+            # while true
+
+        if verb:
+
+            cosmo = illpy_lib.illcosmo.Simulation_Cosmology(self._sim_path, verbose=False)
+            seed_mass = float(cosmo._params['SeedBlackHoleMass'])
+
+            print("\n\n\n")
+            counts = np.zeros((num_mrgs, 3), dtype=int)
+            for mm in range(num_mrgs):
+                for jj in range(3):
+                    if mdets[mm][jj] is not None:
+                        counts[mm, jj] = mdets[mm][jj][KEYS.SCALE].size
+                        continue
+
+                    okay = False
+                    print("Merger {} type {} with zero matches".format(
+                        mm, BH_TYPE.from_value(jj)))
+                    print(mrgs.scale[mm], mrgs.id[mm], mrgs.mass[mm])
+                    if jj == BH_TYPE.REMNANT:
+                        nn = mrgs.next[mm]
+                        print("next = ", nn)
+                        if nn > 0:
+                            print("\t", mrgs.scale[nn], mrgs.id[nn], mrgs.mass[nn])
+
+                        tnext = mrgs.scale[nn] - mrgs.scale[mm]
+                        if (tnext < 1e-4):
+                            print("\t>>Remnant merged almost immediately")
+                            okay = True
+                        # else:
+                        #     print("\tWARNING: time till next merger = {:.8f}".format(tnext))
+
+                    else:
+                        pp = mrgs.prev[mm, jj]
+                        print("prev = ", pp)
+                        if pp >= 0:
+                            print("\t", mrgs.scale[pp], mrgs.id[pp])
+
+                            tprev = mrgs.scale[mm] - mrgs.scale[pp]
+                            if (tprev < 1e-4):
+                                print("\t>>Previous remnant merged almost immediately")
+                                okay = True
+                            # else:
+                            #     print("\tWARNING: time till next merger = {:.8f}".format(tnext))
+                        elif np.isclose(mrgs.mass[mm, jj], seed_mass, rtol=0.1):
+                            print("\t>>BH is near seed mass")
+                            okay = True
+
+                    if not okay:
+                        print("\tWARNING: no explanation for lack of details entries!")
+
+                print("")
+
+            num_zero = np.count_nonzero(counts == 0, axis=0)
+            med_nums = np.median(counts, axis=0)
+            ave_nums = np.average(counts, axis=0)
+
+            names = ['zero', 'med', 'ave']
+            types = ['', '', '']
+            types[BH_TYPE.IN] = 'in '
+            types[BH_TYPE.OUT] = 'out'
+            types[BH_TYPE.REMNANT] = 'rem'
+
+            table = []
+            for vals in [num_zero, med_nums, ave_nums]:
+                row = []
+                for jj in range(3):
+                    temp = "{:g}".format(vals[jj])
+                    row.append(temp)
+                table.append(row)
+
+            print(zio.ascii_table(table, rows=names, cols=types))
+
+        self._finalize_and_save(mdets)
+        return
+
+    def _finalize_and_save(self, mdets):
+        KEYS = self.KEYS
+        num = len(mdets)
+        # for mm in range(num):
+
+
+
+        idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
+        for kk, vv in dets.items():
+            if kk.startswith('unique'):
+                continue
+            dets[kk] = vv[idx, ...]
+
+        u_ids, u_inds, u_counts = np.unique(dets[KEYS.ID], return_index=True, return_counts=True)
+        num_unique = u_ids.size
+        dets[KEYS.U_IDS] = u_ids
+        dets[KEYS.U_INDICES] = u_inds
+        dets[KEYS.U_COUNTS] = u_counts
+
+        # -- Save values to file
+        # Get output filename for this snapshot
+        #   path should have already been created in `_process` by rank=0
+        fname = self.filename
+        with h5py.File(fname, 'w') as save:
+            utils._save_meta_to_hdf5(save, self._sim_path, VERSION, __file__)
+            for key in KEYS:
+                save.create_dataset(str(key), data=dets[key])
+
+        if self._verbose:
+            msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
+                len(dets[KEYS.SCALE]), num_unique, fname, zio.get_file_size(fname))
+            print(msg)
+
+        return
 
 def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
 

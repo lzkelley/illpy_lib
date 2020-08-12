@@ -67,7 +67,7 @@ class Simulation_Cosmology(cosmopy.Cosmology):
                 params = self._load_used_params(fn)
                 if verbose:
                     print("Loaded parameters from '{}'".format(fn))
-                    break
+                break
             except FileNotFoundError:
                 pass
 

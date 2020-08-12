@@ -5,7 +5,7 @@ import os
 import logging
 import enum
 
-import numpy as np
+# import numpy as np
 # import h5py
 # np.seterr(divide='ignore', invalid='ignore')
 
@@ -38,9 +38,12 @@ class _ENUM(type):
 
 
 class ENUM(metaclass=_ENUM):
-    pass
+
+    def __len__(self):
+        return len(iter(self))
 
 
+'''
 @enum.unique
 class _INT_ENUM(enum.IntEnum):
     def __str__(self):
@@ -50,6 +53,22 @@ class _INT_ENUM(enum.IntEnum):
 class BH_TYPE(_INT_ENUM):
     OUT = 0
     IN = 1
+    REMNANT = 2
+'''
+
+
+class BH_TYPE(ENUM):
+    OUT = 0
+    IN = 1
+    REMNANT = 2
+
+    @classmethod
+    def from_value(cls, value):
+        for nn in cls.names():
+            if getattr(cls, nn) == value:
+                return nn
+        else:
+            raise KeyError("Unrecognized value '{}'!  values: {}".format(value, cls.keys()))
 
 
 class Processed:

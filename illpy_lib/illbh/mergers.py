@@ -32,6 +32,9 @@ class Mergers_New(Processed):
         MASS = 'mass'
         POS = 'pos'
 
+        NEXT = 'next'
+        PREV = 'prev'
+
     def _load_raw_mergers(self):
 
         sim_path = self._sim_path
@@ -175,6 +178,9 @@ class Mergers_New(Processed):
             save.create_dataset(KEYS.MASS, data=mass)
             save.create_dataset(KEYS.POS, data=pos)
 
+            save.create_dataset(KEYS.NEXT, data=mrgs['next'])
+            save.create_dataset(KEYS.PREV, data=mrgs['prev'])
+
         if self._verbose:
             msg = "Saved data for {} mergers to '{}' size {}".format(
                 len(mrgs['scale']), fname, zio.get_file_size(fname))
@@ -186,6 +192,7 @@ class Mergers_New(Processed):
         """
         The first BH is the "out" (remaining) BH, second BH is "in" (removed) BH
         """
+        KEYS = self.KEYS
 
         def mstr(mm):
             msg = "{:6d} a={:.8f} s={:3d} ".format(mm, mrgs['scale'][mm], mrgs['snap'][mm])
