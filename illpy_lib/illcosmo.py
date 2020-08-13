@@ -57,7 +57,7 @@ class Simulation_Cosmology(cosmopy.Cosmology):
         self._verbose = verbose
         self._sim_path = sim_path
         if not os.path.isdir(sim_path):
-            raise ValueError("Simulation path '{}' does not exist!".format(sim_path))
+            raise FileNotFoundError("Simulation path '{}' does not exist!".format(sim_path))
 
         # -- Load 'usedvalues' parameters file from Arepo simulation directory
         _fnames = [fname_params, os.path.join(sim_path, fname_params)]
@@ -165,7 +165,8 @@ class Simulation_Cosmology(cosmopy.Cosmology):
 
             fname_snap = glob.glob(os.path.join(dir, '*.hdf5'))
             if len(fname_snap) == 0:
-                raise ValueError("No data files found in snapshot directory '{}'".format(dir))
+                err = "No data files found in snapshot directory '{}'".format(dir)
+                raise FileNotFoundError(err)
             fname_snap = fname_snap[0]
             if self._verbose and snap == 0:
                 print("Snap {}: loading header info from '{}'".format(snap, fname_snap))
