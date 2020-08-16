@@ -9,6 +9,8 @@ import logging
 import numpy as np
 import h5py
 
+import parse
+
 import zcode.inout as zio
 import zcode.math as zmath
 
@@ -28,15 +30,88 @@ class Mergers_New(Processed):
         SNAP = 'snap'
         TASK = 'task'
 
-        ID = 'id'
+        ID   = 'id'
         MASS = 'mass'
-        POS = 'pos'
+        BH_MASS = 'bh_mass'
+        POS  = 'pos'
+        VEL  = 'vel'
 
         NEXT = 'next'
         PREV = 'prev'
 
-    def _load_raw_mergers(self):
+    def _parse_raw_file_line(self, line):
+        KEYS = self.KEYS
 
+        format = (
+            "{time:g} {task:d}  " +
+            "{id_o:d} {mass_o:g} " +
+            "{px_o:g} {py_o:g} {pz_o:g}  " +
+            "{id_i:d} {mass_i:g} " +
+            "{px_i:g} {py_i:g} {pz_i:g}"
+        )
+
+        format_mass = (
+            "{time:g} {task:d}  " +
+            "{id_o:d} {mass_o:g} {bh_mass_o:g} " +
+            "{px_o:g} {py_o:g} {pz_o:g}  " +
+            "{id_i:d} {mass_i:g} {bh_mass_i:g} " +
+            "{px_i:g} {py_i:g} {pz_i:g}"
+        )
+
+        format_mass_vel = (
+            "{time:g} {task:d}  " +
+            "{id_o:d} {mass_o:g} {bh_mass_o:g} " +
+            "{px_o:g} {py_o:g} {pz_o:g} {vx_o:g} {vy_o:g} {vz_o:g}  " +
+            "{id_i:d} {mass_i:g} {bh_mass_i:g} " +
+            "{px_i:g} {py_i:g} {pz_i:g} {vx_i:g} {vy_i:g} {vz_i:g}"
+        )
+
+        for form in [format_mass_vel, format_mass, format]:
+            temp = parse.parse(form, line)
+            if temp is not None:
+                break
+        else:
+            err = "ERROR: failed to parse line '{}'".format(line)
+            logging.error(err)
+            raise ValueError(err)
+
+        ids = np.zeros(2, dtype=np.uint64)
+        ids[BH_TYPE.OUT] = temp['id_o']
+        ids[BH_TYPE.IN] = temp['id_i']
+
+        mass = np.zeros(2)
+        mass[BH_TYPE.OUT] = temp['mass_o']
+        mass[BH_TYPE.IN] = temp['mass_i']
+
+        pos = np.zeros((3, 2))
+        pos[:, BH_TYPE.OUT] = [temp['px_o'], temp['py_o'], temp['pz_o']]
+        pos[:, BH_TYPE.IN] = [temp['px_i'], temp['py_i'], temp['pz_i']]
+
+        bh_mass = np.zeros(2)
+        if 'bh_mass_o' in temp:
+            bh_mass[BH_TYPE.OUT] = temp['bh_mass_o']
+            bh_mass[BH_TYPE.IN] = temp['bh_mass_i']
+
+        vel = np.zeros((3, 2))
+        if 'vx_o' in temp:
+            vel[:, BH_TYPE.OUT] = [temp['vx_o'], temp['vy_o'], temp['vz_o']]
+            vel[:, BH_TYPE.IN] = [temp['vx_i'], temp['vy_i'], temp['vz_i']]
+
+        rv = {
+            KEYS.SCALE: temp['time'],
+            KEYS.TASK: temp['task'],
+
+            KEYS.ID: ids,
+            KEYS.MASS: mass,
+            KEYS.BH_MASS: bh_mass,
+            KEYS.POS: pos,
+            KEYS.VEL: vel
+        }
+
+        return rv
+
+    def _load_raw_mergers(self):
+        KEYS = self.KEYS
         sim_path = self._sim_path
 
         if sim_path is None:
@@ -49,48 +124,59 @@ class Mergers_New(Processed):
             logging.error(err)
             raise ValueError(err)
 
-        def parse_merger_line(line):
-            """
-            "%g %d  %llu %g %g %g %g  %llu %g %g %g %g\n",
-                All.Time, ThisTask,
-                /* remnant BH */
-                (long long) id, mass, pos[0], pos[1], pos[2],
-                /* consumed BH */
-                (long long) P[no].ID, BPP(no).BH_Mass, P[no].Pos[0], P[no].Pos[1], P[no].Pos[2]);
-            """
-            types = [np.float, np.uint,
-                     np.uint64, np.float64, np.float64, np.float64, np.float64,
-                     np.uint64, np.float64, np.float64, np.float64, np.float64]
-            line = line.strip().split()
-            if len(line) != len(types):
-                raise ValueError(f"unexpected line length: '{line}'!")
+        try:
+            cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=self._verbose)
+            scales = cosmo.scale
+            num_snaps = len(scales)
+        except FileNotFoundError as err:
+            scales = None
+            num_snaps = None
+            msg = "WARNING: could not load cosmology (snapshots missing?): '{}'".format(str(err))
+            logging.warning(msg)
+            logging.warning("WARNING: Cannot compare merger times to snapshot times!")
 
-            temp = [tt(ll) for tt, ll in zip(types, line)]
-            return temp, types
-
-        cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=self._verbose)
-        scale = cosmo.scale
         mergers = []
         msnaps = []
 
+        mdir_pattern = 'mergers_' + '[0-9]' * 3
+        mdir_pattern = os.path.join(self._sim_path, 'output', 'blackholes', mdir_pattern)
+        merger_dirs = sorted(glob.glob(mdir_pattern))
+        num_mdirs = len(merger_dirs)
+        if self._verbose:
+            print("Found {} merger directories".format(num_mdirs))
+        if (num_snaps is not None) and (num_snaps != num_mdirs):
+            err = "WARNING: found {} merger dirs but {} snapshots!".format(num_mdirs, num_snaps)
+            logging.warning(err)
+        if num_mdirs == 0:
+            err = "No merger directories found matching {}!".format(mdir_pattern)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
         num_mrgs = 0
-        for snap in range(len(scale)):
-            mdir = 'mergers_{:03d}'.format(snap)
-            mdir = os.path.join(self._sim_path, 'output', 'blackholes', mdir)
+        # for snap in range(len(scale)):
+        for kk, mdir in enumerate(merger_dirs):
+            snap = int(os.path.basename(mdir).split('_')[-1])
+            if snap != kk:
+                msg = "WARNING: {}th merger-directory is snapshot {}!".format(kk, snap)
+                logging.warning(msg)
+
             mfils = os.path.join(mdir, "blackhole_mergers_*.txt")
             mfils = sorted(glob.glob(mfils))
             if len(mfils) == 0:
                 err = "ERROR: snap={} : no files found in '{}'".format(snap, mdir)
                 raise FileNotFoundError(err)
 
-            lo = scale[snap-1] if snap > 0 else 0.0
-            hi = scale[snap]
+            if scales is not None:
+                lo = scales[snap-1] if snap > 0 else 0.0
+                hi = scales[snap]
 
             for ii, mf in enumerate(mfils):
                 prev = None
                 for line in open(mf, 'r').readlines():
-                    vals, types = parse_merger_line(line)
-                    sc = vals[0]
+                    vals = self._parse_raw_file_line(line)
+                    vals[KEYS.SNAP] = snap
+
+                    sc = vals[KEYS.SCALE]
                     if prev is None:
                         prev = sc
                     elif sc < prev:
@@ -98,37 +184,31 @@ class Mergers_New(Processed):
                         logging.error(err)
                         raise ValueError(err)
 
-                    if (sc < lo) or (sc > hi):
-                        # print(num_mrgs)
-                        err = f"Snap: {snap}, file: {ii} - scale:{sc:.8f} is not between [{lo:.8f}, {hi:.8f}]!"
+                    if (scales is not None) and ((sc < lo) or (sc > hi)):
+                        err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
+                            snap, ii, sc, lo, hi)
                         logging.error(err)
-                        # raise ValueError(err)
+                        raise ValueError(err)
+
                     mergers.append(vals)
                     msnaps.append(snap)
                     num_mrgs += 1
 
-        mrgs = {
-            'scale': np.zeros(num_mrgs, dtype=types[0]),
-            'snap': np.zeros(num_mrgs, dtype=np.uint32),
-            'task': np.zeros(num_mrgs, dtype=types[1]),
-            'id1': np.zeros(num_mrgs, dtype=types[2]),
-            'mass1': np.zeros(num_mrgs, dtype=types[3]),
-            'pos1': np.zeros((num_mrgs, 3), dtype=types[3]),
-            'id2': np.zeros(num_mrgs, dtype=types[2]),
-            'mass2': np.zeros(num_mrgs, dtype=types[3]),
-            'pos2': np.zeros((num_mrgs, 3), dtype=types[3]),
-        }
-        for ii in range(num_mrgs):
-            mm = mergers[ii]
-            mrgs['scale'][ii] = mm[0]
-            mrgs['task'][ii] = mm[1]
-            mrgs['snap'][ii] = msnaps[ii]
+        mrgs = {}
+        for mm, temp in enumerate(mergers):
+            if mm == 0:
+                for kk, vv in temp.items():
+                    if np.isscalar(vv):
+                        shp = num_mrgs
+                        tt = type(vv)
+                    else:
+                        shp = (num_mrgs,) + np.shape(vv)
+                        tt = vv.dtype
 
-            for kk in range(2):
-                jj = 2 + kk*5
-                mrgs[f'id{kk+1}'][ii] = mm[jj]
-                mrgs[f'mass{kk+1}'][ii] = mm[jj+1]
-                mrgs[f'pos{kk+1}'][ii, :] = [mm[jj+2+kk] for kk in range(3)]
+                    mrgs[kk] = np.zeros(shp, dtype=tt)
+
+            for kk, vv in temp.items():
+                mrgs[kk][mm, ...] = vv
 
         idx = np.argsort(mrgs['scale'])
         for kk, vv in mrgs.items():
@@ -162,28 +242,10 @@ class Mergers_New(Processed):
                 np.count_nonzero(mrgs['next'] >= 0), np.count_nonzero(mrgs['prev'] >= 0)))
 
         # Save values to file
-        KEYS = self.KEYS
-        with h5py.File(fname, 'w') as save:
-            utils._save_meta_to_hdf5(save, self._sim_path, VERSION, __file__)
-
-            ids = np.array([mrgs['id1'], mrgs['id2']]).T
-            mass = np.array([mrgs['mass1'], mrgs['mass2']]).T
-            pos = np.moveaxis(np.array([mrgs['pos1'], mrgs['pos2']]), 0, 1)
-
-            save.create_dataset(KEYS.SCALE, data=mrgs['scale'])
-            save.create_dataset(KEYS.SNAP, data=mrgs['snap'])
-            save.create_dataset(KEYS.TASK, data=mrgs['task'])
-
-            save.create_dataset(KEYS.ID, data=ids)
-            save.create_dataset(KEYS.MASS, data=mass)
-            save.create_dataset(KEYS.POS, data=pos)
-
-            save.create_dataset(KEYS.NEXT, data=mrgs['next'])
-            save.create_dataset(KEYS.PREV, data=mrgs['prev'])
-
+        self._save_to_hdf5(fname, self.KEYS, mrgs, __file__)
         if self._verbose:
             msg = "Saved data for {} mergers to '{}' size {}".format(
-                len(mrgs['scale']), fname, zio.get_file_size(fname))
+                len(mrgs[self.KEYS.SCALE]), fname, zio.get_file_size(fname))
             print(msg)
 
         return
@@ -195,21 +257,43 @@ class Mergers_New(Processed):
         KEYS = self.KEYS
 
         def mstr(mm):
-            msg = "{:6d} a={:.8f} s={:3d} ".format(mm, mrgs['scale'][mm], mrgs['snap'][mm])
-            msg += " in id={:20s} mass={:.8f} ".format(str(mrgs['id1'][mm]), mrgs['mass1'][mm])
-            msg += "out id={:20s} mass={:.8f} ".format(str(mrgs['id2'][mm]), mrgs['mass2'][mm])
+            msg = "{:6d} a={:.8f} s={:3d} ".format(mm, mrgs[KEYS.SCALE][mm], mrgs[KEYS.SNAP][mm])
+            ids = mrgs[KEYS.ID][mm]
+            mass = mrgs[KEYS.MASS][mm]
+            bh_mass = mrgs[KEYS.MASS][mm]
+            for name, tt in zip([' in', 'out'], [BH_TYPE.IN, BH_TYPE.OUT]):
+                try:
+                    msg += "{} id={:14d} bh_mass={:.8f} mass={:.8f} ".format(
+                        name, ids[tt], bh_mass[tt], mass[tt])
+                except:
+                    print("ids  = ", ids[tt], type(ids[tt]))
+                    print("mass = ", mass[tt], type(mass[tt]))
+                    raise
+
             return msg
 
         num = mrgs['scale'].size
         next = np.ones(num, np.int32) * -1
         prev = np.ones((num, 2), np.int32) * -1
-
+        use_bh_mass = True
         for mm in range(num):
-            mids = [mrgs['id1'][mm], mrgs['id2'][mm]]
-            ma = mrgs['scale'][mm]
+            # mids = [mrgs['id1'][mm], mrgs['id2'][mm]]
+            # ma = mrgs['scale'][mm]
+            mids = mrgs[KEYS.ID][mm]
+            ma = mrgs[KEYS.SCALE][mm]
+            if use_bh_mass:
+                mass = mrgs[KEYS.BH_MASS][mm]
+                if np.all(mass == 0.0):
+                    mass = None
+                    logging.warning("WARNING: ")
+            else:
+                mass = mrgs[KEYS.MASS][mm]
+
             for nn in range(mm+1, num):
-                nids = [mrgs['id1'][nn], mrgs['id2'][nn]]
-                na = mrgs['scale'][nn]
+                # nids = [mrgs['id1'][nn], mrgs['id2'][nn]]
+                # na = mrgs['scale'][nn]
+                nids = mrgs[KEYS.ID][nn]
+                na = mrgs[KEYS.SCALE][nn]
                 # Make sure scales are not decreasing (data is already sorted; should be impossible)
                 if na < ma:
                     err = f"ERROR: scale regression: {mm}={ma} ==> {nn}={na}!"
@@ -222,30 +306,32 @@ class Mergers_New(Processed):
                     logging.error(err)
                     logging.error(mstr(mm))
                     logging.error(mstr(nn))
-                    raise ValueError(err)
+                    # raise ValueError(err)
 
                 # Check if 'out' BH is in a subsequent merger
                 if mids[BH_TYPE.OUT] in nids:
                     next[mm] = nn
+                    mass_next = mrgs[KEYS.MASS][nn]
                     for jj in range(2):
                         if mids[BH_TYPE.OUT] == nids[jj]:
                             prev[nn, jj] = mm
                             # Make sure masses increased
-                            if mrgs['mass' + str(jj+1)][nn] < mrgs['mass2'][mm]:
+                            if mass_next[jj] < mass[BH_TYPE.OUT]:
                                 err = "ERROR: BH mass loss between merger {} and {}".format(mm, nn)
                                 logging.error(err)
                                 logging.error(mstr(mm))
                                 logging.error(mstr(nn))
-                                raise ValueError(err)
+                                if use_bh_mass:
+                                    raise ValueError(err)
+                                else:
+                                    logging.error("Using `Mass` not `BH_Mass`... continuing!")
 
                             break  # if
 
                     break  # for jj
 
-        mrgs['next'] = next
-        mrgs['prev'] = prev
-        # num_next = np.zeros_like(next)
-        # num_prev = np.zeros_like(prev)
+        mrgs[KEYS.NEXT] = next
+        mrgs[KEYS.PREV] = prev
 
         if self._verbose:
 
@@ -283,54 +369,3 @@ class Mergers_New(Processed):
             print("\t{}".format(zmath.stats_str(mult)))
 
         return mrgs
-
-    def _load_from_save(self):
-        fname = self.filename
-        with h5py.File(fname, 'r') as load:
-            vers = load.attrs['version']
-            if vers != str(VERSION):
-                msg = "WARNING: loaded version '{}' does not match current '{}'!".format(
-                    vers, VERSION)
-                logging.warning(msg)
-            spath = load.attrs['sim_path']
-            if self._sim_path is not None:
-                if os.path.abspath(self._sim_path).lower() != os.path.abspath(spath).lower():
-                    msg = "WARNING: loaded sim_path '{}' does not match current '{}'!".format(
-                        spath, self._sim_path)
-                    logging.warning(msg)
-            else:
-                self._sim_path = spath
-
-            size = None
-            keys = self.keys()
-            for kk in keys:
-                try:
-                    vals = load[str(kk)][:]
-                    ss = np.shape(vals)[0]
-                    if size is None:
-                        size = ss
-                    elif size != ss:
-                        msg = (
-                            "WARNING: loaded array for '{}' has size {} ".format(kk, ss) +
-                            "different from expected {}".format(size)
-                        )
-                        logging.warning(msg)
-
-                    setattr(self, kk, vals)
-                except Exception as err:
-                    msg = "ERROR: failed to load '{}' from '{}'!".format(kk, fname)
-                    logging.error(msg)
-                    logging.error(str(err))
-                    raise
-
-            for kk in load.keys():
-                if kk not in keys:
-                    err = "WARNING: '{}' has unexpected data '{}'".format(fname, kk)
-                    logging.warning(err)
-
-            if self._verbose:
-                dt = load.attrs['created']
-                print("Loaded {} mergers from '{}', created '{}'".format(size, fname, dt))
-
-        self._size = size
-        return

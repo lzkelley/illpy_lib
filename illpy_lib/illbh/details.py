@@ -12,6 +12,8 @@ import numpy as np
 import h5py
 from mpi4py import MPI
 
+import parse
+
 import zcode.inout as zio
 import zcode.math as zmath
 
@@ -19,7 +21,6 @@ import illpy_lib  # noqa
 from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE
 
 VERBOSE = True
-VERSION = 0.4                                    # Version of details
 DETS_RESOLUTION_TARGET = 1.0e-3                # in units of scale-factor
 DETS_RESOLUTION_TOLERANCE = 0.5              # allowed fraction below `DETS_RESOLUTION_TARGET`
 DETS_RESOLUTION_MIN_NUM = 10
@@ -38,13 +39,19 @@ class Details_New(Processed):
 
     class KEYS(Processed.KEYS):
         SCALE  = 'scale'
+
         ID     = 'id'
-        POT    = 'potential'
         MASS   = 'mass'
-        MDOT   = 'mdot'
+        BH_MASS = 'bh_mass'
         MDOT_B = 'mdot_bondi'
+        MDOT   = 'mdot'
+        POT    = 'potential'
+        DENS   = 'density'
+
         POS    = 'pos'
         VEL    = 'vel'
+
+        SNAP   = 'snap'
         TASK   = 'task'
         # RHO   = 'rho'
         # CS    = 'cs'
@@ -53,7 +60,8 @@ class Details_New(Processed):
         U_INDICES = 'unique_indices'
         U_COUNTS = 'unique_counts'
 
-        _INTERP_KEYS = [POT, MASS, MDOT, MDOT_B, POS, VEL]
+        _DERIVED = [TASK, SNAP, U_IDS, U_INDICES, U_COUNTS]
+        _INTERP_KEYS = [MASS, BH_MASS, MDOT, MDOT_B, POT, DENS, POS, VEL]
 
     def _process(self):
         if self._sim_path is None:
@@ -235,57 +243,12 @@ class Details_New(Processed):
         # Get output filename for this snapshot
         #   path should have already been created in `_process` by rank=0
         fname = self.filename
-        with h5py.File(fname, 'w') as save:
-            utils._save_meta_to_hdf5(save, self._sim_path, VERSION, __file__)
-            for key in KEYS:
-                save.create_dataset(str(key), data=dets[key])
-
+        self._save_to_hdf5(fname, KEYS, dets, __file__)
         if self._verbose:
             msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
                 len(dets[KEYS.SCALE]), num_unique, fname, zio.get_file_size(fname))
             print(msg)
 
-        return
-
-    def _load_from_save(self):
-        fname = self.filename
-        with h5py.File(fname, 'r') as load:
-            vers = load.attrs['version']
-            if vers != str(VERSION):
-                msg = "WARNING: loaded version '{}' does not match current '{}'!".format(
-                    vers, VERSION)
-                logging.warning(msg)
-            spath = load.attrs['sim_path']
-            if self._sim_path is not None:
-                if os.path.abspath(self._sim_path).lower() != os.path.abspath(spath).lower():
-                    msg = "WARNING: loaded sim_path '{}' does not match current '{}'!".format(
-                        spath, self._sim_path)
-                    logging.warning(msg)
-            else:
-                self._sim_path = spath
-
-            keys = self.keys()
-            size = load[self.KEYS.SCALE].size
-            for kk in keys:
-                try:
-                    vals = load[kk][:]
-                    setattr(self, kk, vals)
-                except Exception as err:
-                    msg = "ERROR: failed to load '{}' from '{}'!".format(kk, fname)
-                    logging.error(msg)
-                    logging.error(str(err))
-                    raise
-
-            for kk in load.keys():
-                if kk not in keys:
-                    err = "WARNING: '{}' has unexpected data '{}'".format(fname, kk)
-                    logging.warning(err)
-
-            if self._verbose:
-                dt = load.attrs['created']
-                print("Loaded {:10d} details from '{}', created '{}'".format(size, fname, dt))
-
-        self._size = size
         return
 
 
@@ -298,24 +261,57 @@ class Details_Snap_New(Details_New):
         super().__init__(*args, **kwargs)
         return
 
+    def _parse_raw_file_line(self, line):
+        """
+
+        "%.8f %llu  %.8e %.8e  %.8e %.8e %.8e %.8e  %.8e %.8e %.8e  %.8e %.8e %.8e"
+            All.Time, (long long) P[n].ID, P[n].Mass, BPP(n).BH_Mass,
+            BPP(n).BH_MdotBondi, BPP(n).BH_Mdot, pot, BPP(n).BH_Density,
+            P[n].Pos[0], P[n].Pos[1], P[n].Pos[2], P[n].Vel[0], P[n].Vel[1], P[n].Vel[2]
+
+        """
+        KEYS = self.KEYS
+
+        format = (
+            "{scale:.8f} {id:d}  " +
+            "{mass:.8e} {bh_mass:.8e}  " +
+            "{mdot_bondi:.8e} {mdot:.8e} {potential:.8e} {density:.8e}  " +
+            "{px:.8e} {py:.8e} {pz:.8e}  " +
+            "{vx:.8e} {vy:.8e} {vz:.8e}"
+        )
+
+        format_g = (
+            "{scale:g} {id:d}  " +
+            "{mass:g} {bh_mass:g}  " +
+            "{mdot_bondi:g} {mdot:g} {potential:g} {density:g}  " +
+            "{px:g} {py:g} {pz:g}  " +
+            "{vx:g} {vy:g} {vz:g}"
+        )
+
+        line = line.strip()
+        for form in [format, format_g]:
+            temp = parse.parse(form, line)
+            if temp is not None:
+                break
+        else:
+            err = "ERROR: failed to parse line '{}'".format(line)
+            logging.error(err)
+            raise ValueError(err)
+
+        rv = {}
+        for kk in KEYS:
+            if (kk in KEYS._DERIVED) or (kk in [KEYS.POS, KEYS.VEL]):
+                continue
+            rv[kk] = temp[kk]
+
+        rv[KEYS.POS] = np.array([temp['px'], temp['py'], temp['pz']])
+        rv[KEYS.VEL] = np.array([temp['vx'], temp['vy'], temp['vz']])
+
+        return rv
+
     def _process(self):
+        KEYS = self.KEYS
         snap = self._snap
-        types = [np.float, np.uint64, np.float64, np.float64, np.float64, np.float64,
-                 np.float64, np.float64, np.float64, np.float64, np.float64, np.float64]
-
-        def parse_detail_line(line):
-            """
-            "%g %llu  %g  %g %g %g  %g %g %g  %g %g %g\n",
-            All.Time, (long long) P[n].ID, pot, BPP(n).BH_Mass, BPP(n).BH_MdotBondi, BPP(n).BH_Mdot,
-            P[n].Pos[0], P[n].Pos[1], P[n].Pos[2], P[n].Vel[0], P[n].Vel[1], P[n].Vel[2])
-            """
-            line = line.strip().split()
-            if len(line) != len(types):
-                raise ValueError(f"unexpected line length: '{line}'!")
-
-            temp = [tt(ll) for tt, ll in zip(types, line)]
-            return temp
-
         ddir = 'details_{:03d}'.format(snap)
         ddir = os.path.join(self._sim_path, 'output', 'blackholes', ddir)
 
@@ -323,6 +319,18 @@ class Details_Snap_New(Details_New):
             err = "ERROR: `ddir` '{}' does not exist!".format(ddir)
             logging.error(err)
             raise FileNotFoundError(err)
+
+        try:
+            cosmo = illpy_lib.illcosmo.Simulation_Cosmology(self._sim_path, verbose=self._verbose)
+            scales = cosmo.scale
+            num_snaps = len(scales)
+            lo = scales[snap-1] if snap > 0 else 0.0
+            hi = scales[snap]
+        except FileNotFoundError as err:
+            num_snaps = None
+            msg = "WARNING: could not load cosmology (snapshots missing?): '{}'".format(str(err))
+            logging.warning(msg)
+            logging.warning("WARNING: Cannot compare merger times to snapshot times!")
 
         dfils = os.path.join(ddir, "blackhole_details_*.txt")
         dfils = sorted(glob.glob(dfils))
@@ -335,23 +343,18 @@ class Details_Snap_New(Details_New):
             raise FileNotFoundError(err)
 
         details = []
-        tasks = []
-        num_lines = 0
+        num_dets = 0
         for ii, dfil in enumerate(dfils):
-            _task = os.path.basename(dfil).split('_')[-1].split('.')[0]
-            _task = int(_task)
+            task = os.path.basename(dfil).split('_')[-1].split('.')[0]
+            task = int(task)
 
             prev = None
             for ll, line in enumerate(open(dfil, 'r').readlines()):
-                try:
-                    vals = parse_detail_line(line)
-                except Exception as err:
-                    msg = "ERROR: failed to parse line {} from {}: '{}'".format(ll, dfil, line)
-                    logging.error(msg)
-                    logging.error(str(err))
-                    raise
+                vals = self._parse_raw_file_line(line)
+                vals[KEYS.SNAP] = snap
+                vals[KEYS.TASK] = task
 
-                sc = vals[0]
+                sc = vals[KEYS.SCALE]
                 if prev is None:
                     prev = sc
                 elif sc < prev:
@@ -359,35 +362,33 @@ class Details_Snap_New(Details_New):
                     logging.error(err)
                     raise ValueError(err)
 
+                if (num_snaps is not None) and ((sc < lo) or (sc > hi)):
+                    err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
+                        snap, ii, sc, lo, hi)
+                    logging.error(err)
+                    # raise ValueError(err)
+
                 details.append(vals)
-                tasks.append(ii)
-                num_lines += 1
+                num_dets += 1
 
-        KEYS = self.KEYS
-        dets = {
-            KEYS.SCALE  : np.zeros(num_lines, dtype=types[0]),
-            KEYS.ID     : np.zeros(num_lines, dtype=types[1]),
-            KEYS.POT    : np.zeros(num_lines, dtype=types[2]),
-            KEYS.MASS   : np.zeros(num_lines, dtype=types[3]),
-            KEYS.MDOT_B : np.zeros(num_lines, dtype=types[4]),
-            KEYS.MDOT   : np.zeros(num_lines, dtype=types[5]),
-            KEYS.POS    : np.zeros((num_lines, 3), dtype=types[6]),
-            KEYS.VEL    : np.zeros((num_lines, 3), dtype=types[9]),
+        dets = {}
+        for dd, temp in enumerate(details):
+            if dd == 0:
+                for kk, vv in temp.items():
+                    if np.isscalar(vv):
+                        shp = num_dets
+                        tt = type(vv)
+                    else:
+                        shp = (num_dets,) + np.shape(vv)
+                        tt = vv.dtype
 
-            KEYS.TASK   : np.zeros(num_lines, dtype=np.uint32),
-        }
-        for ii in range(num_lines):
-            dd = details[ii]
+                    dets[kk] = np.zeros(shp, dtype=tt)
 
-            dets[KEYS.SCALE][ii] = dd[0]
-            dets[KEYS.ID][ii] = dd[1]
-            dets[KEYS.POT][ii] = dd[2]
-            dets[KEYS.MASS][ii] = dd[3]
-            dets[KEYS.MDOT_B][ii] = dd[4]
-            dets[KEYS.MDOT][ii] = dd[5]
-            dets[KEYS.POS][ii] = [dd[6+kk] for kk in range(3)]
-            dets[KEYS.VEL][ii] = [dd[9+kk] for kk in range(3)]
-            dets[KEYS.TASK][ii] = tasks[ii]
+            for kk, vv in temp.items():
+                dets[kk][dd, ...] = vv
+
+        if len(details) == 0:
+            dets = {kk: np.array([]) for kk in KEYS}
 
         self._finalize_and_save(dets)
         return
@@ -676,8 +677,10 @@ class Merger_Details_New(Details_New):
 
         return
 
+
 def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
 
+    beg = datetime.now()
     if comm.rank == 0:
         temp = 'details_' + '[0-9]' * 3
         path_bhs = os.path.join(sim_path, 'output', 'blackholes')

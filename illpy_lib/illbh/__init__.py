@@ -1,17 +1,20 @@
 """This module handles the processing of Illustris BH files.
 """
 
+__version__ = "0.5.1"
+
 import os
 import logging
-import enum
+# import enum
 
 # import numpy as np
-# import h5py
+import h5py
 # np.seterr(divide='ignore', invalid='ignore')
 
 # from illpy_lib.constants import NUM_SNAPS  # noqa
 
 # from . deep_core import Core  # noqa
+from . import utils
 
 PATH_PROCESSED = ["output", "processed"]
 
@@ -133,8 +136,67 @@ class Processed:
         self._load_from_save()
         return
 
+    def _save_to_hdf5(self, fname, keys, vals, script):
+        try:
+            with h5py.File(fname, 'w') as save:
+                utils._save_meta_to_hdf5(save, self._sim_path, __version__, script)
+                for kk in keys:
+                    save.create_dataset(kk, data=vals[kk])
+
+        except:
+            if os.path.exists(fname):
+                logging.error("ERROR: Failure while writing to '{}', deleting file!".format(fname))
+                os.remove(fname)
+            raise
+
+        return
+
     def _load_from_save(self):
-        raise NotImplementedError()
+        fname = self.filename
+        with h5py.File(fname, 'r') as load:
+            vers = load.attrs['version']
+            if vers != __version__:
+                msg = "WARNING: loaded version '{}' does not match current '{}'!".format(
+                    vers, __version__)
+                logging.warning(msg)
+            spath = load.attrs['sim_path']
+            if self._sim_path is not None:
+                if os.path.abspath(self._sim_path).lower() != os.path.abspath(spath).lower():
+                    msg = "WARNING: loaded sim_path '{}' does not match current '{}'!".format(
+                        spath, self._sim_path)
+                    logging.warning(msg)
+            else:
+                self._sim_path = spath
+
+            keys = self.keys()
+            try:
+                size = load[self.KEYS.SCALE].size
+            except:
+                wrn = "WARNING: Could not set `size` based on key: `{}`".format(self.KEYS.SCALE)
+                logging.warning(wrn)
+                size = None
+
+            for kk in keys:
+                try:
+                    vals = load[kk][:]
+                    setattr(self, kk, vals)
+                except Exception as err:
+                    msg = "ERROR: failed to load '{}' from '{}'!".format(kk, fname)
+                    logging.error(msg)
+                    logging.error(str(err))
+                    raise
+
+            for kk in load.keys():
+                if kk not in keys:
+                    err = "WARNING: '{}' has unexpected data '{}'".format(fname, kk)
+                    logging.warning(err)
+
+            if self._verbose:
+                dt = load.attrs['created']
+                print("Loaded {:10d} details from '{}', created '{}'".format(size, fname, dt))
+
+        self._size = size
+        return
 
     def _process(self):
         raise NotImplementedError()
