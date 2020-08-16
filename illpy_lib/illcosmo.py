@@ -53,7 +53,7 @@ class Simulation_Cosmology(cosmopy.Cosmology):
     _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self, sim_path, fname_params='param.txt-usedvalues', verbose=True, **kwargs):
+    def __init__(self, sim_path, fname_params='parameters-usedvalues', verbose=True, **kwargs):
         self._verbose = verbose
         self._sim_path = sim_path
         if not os.path.isdir(sim_path):
@@ -144,7 +144,8 @@ class Simulation_Cosmology(cosmopy.Cosmology):
 
     def _load_snapshot_info(self):
         path = self._sim_path
-        path_output = os.path.join(path, "output", "")
+        # path_output = os.path.join(path, "output", "")
+        path_output = path
 
         snap_dirs = sorted(glob.glob(os.path.join(path_output, "snapdir_*")))
         self.NUM_SNAPS = len(snap_dirs)
@@ -350,8 +351,12 @@ def cosmo_from_name(sim_name, **kwargs):
 
 
 def cosmo_from_path(sim_path):
-    fname_params = os.path.join(sim_path, 'param.txt-usedvalues')
-    params = _load_used_params(fname_params)
+    try:
+        fname_params = os.path.join(sim_path, 'param.txt-usedvalues')
+        params = _load_used_params(fname_params)
+    except FileNotFoundError:
+        fname_params = os.path.join(sim_path, 'parameters-usedvalues')
+        params = _load_used_params(fname_params)        
 
     kwargs = {}
     cosmo_pars = ['Omega0', 'OmegaLambda', 'OmegaBaryon', ]

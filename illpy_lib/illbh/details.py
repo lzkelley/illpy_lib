@@ -313,7 +313,8 @@ class Details_Snap_New(Details_New):
         KEYS = self.KEYS
         snap = self._snap
         ddir = 'details_{:03d}'.format(snap)
-        ddir = os.path.join(self._sim_path, 'output', 'blackholes', ddir)
+        # ddir = os.path.join(self._sim_path, 'output', 'blackholes', ddir)
+        ddir = os.path.join(self._sim_path, 'blackholes', ddir)
 
         if not os.path.isdir(ddir):
             err = "ERROR: `ddir` '{}' does not exist!".format(ddir)
@@ -683,7 +684,8 @@ def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
     beg = datetime.now()
     if comm.rank == 0:
         temp = 'details_' + '[0-9]' * 3
-        path_bhs = os.path.join(sim_path, 'output', 'blackholes')
+        # path_bhs = os.path.join(sim_path, 'output', 'blackholes')
+        path_bhs = os.path.join(sim_path, 'blackholes')
         temp = os.path.join(path_bhs, temp)
         det_dirs = sorted(glob.glob(temp))
         if verbose:
@@ -776,8 +778,8 @@ if __name__ == "__main__":
             sys.exit(0)
 
         sim_path = os.path.abspath(sys.argv[1]).rstrip('/')
-        if os.path.basename(sim_path) == 'output':
-            sim_path = os.path.split(sim_path)[0]
+        # if os.path.basename(sim_path) == 'output':
+        #    sim_path = os.path.split(sim_path)[0]
 
     else:
         sim_path = None

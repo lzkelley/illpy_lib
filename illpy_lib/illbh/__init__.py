@@ -16,7 +16,8 @@ import h5py
 # from . deep_core import Core  # noqa
 from . import utils
 
-PATH_PROCESSED = ["output", "processed"]
+# PATH_PROCESSED = ["output", "processed"]    # relative to simulation directory (i.e. where 'output' directory lives)
+PATH_PROCESSED = ["processed"]                # relative to simulation-output directory (i.e. where snapshots and groups live)
 
 
 '''

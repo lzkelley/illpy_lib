@@ -139,7 +139,8 @@ class Mergers_New(Processed):
         msnaps = []
 
         mdir_pattern = 'mergers_' + '[0-9]' * 3
-        mdir_pattern = os.path.join(self._sim_path, 'output', 'blackholes', mdir_pattern)
+        # mdir_pattern = os.path.join(self._sim_path, 'output', 'blackholes', mdir_pattern)
+        mdir_pattern = os.path.join(self._sim_path, 'blackholes', mdir_pattern)
         merger_dirs = sorted(glob.glob(mdir_pattern))
         num_mdirs = len(merger_dirs)
         if self._verbose:
