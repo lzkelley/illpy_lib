@@ -50,7 +50,7 @@ class Simulation_Cosmology(cosmopy.Cosmology):
         MDOT = None
         DENS = None
 
-    _Z_GRID = [10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
+    _Z_GRID = [20.0, 15.0, 10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
     def __init__(self, sim_path, fname_params='parameters-usedvalues', verbose=True, **kwargs):
@@ -178,8 +178,10 @@ class Simulation_Cosmology(cosmopy.Cosmology):
                 zz = head.attrs['Redshift']
                 if len(scale) > 0:
                     if (aa <= scale[-1]) or (zz >= redz[-1]):
+                        logging.error("this dir = '{}'".format(dir))
+                        logging.error("prev dir = '{}'".format(snap_dirs[snap-1]))
                         err = "ERROR: snap {} a={},z={}  prev a={},z={}".format(
-                            aa, zz, scale[-1], redz[-1])
+                            snap, aa, zz, scale[-1], redz[-1])
                         raise ValueError(err)
 
                 scale.append(aa)
