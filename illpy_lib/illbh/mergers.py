@@ -173,8 +173,13 @@ class Mergers_New(Processed):
 
             for ii, mf in enumerate(mfils):
                 prev = None
-                for line in open(mf, 'r').readlines():
-                    vals = self._parse_raw_file_line(line)
+                for ll, line in enumerate(open(mf, 'r').readlines()):
+                    try:
+                        vals = self._parse_raw_file_line(line)
+                    except:
+                        logging.error("FAILED on line {} of file '{}'".format(ll, mf))
+                        raise
+
                     vals[KEYS.SNAP] = snap
 
                     sc = vals[KEYS.SCALE]

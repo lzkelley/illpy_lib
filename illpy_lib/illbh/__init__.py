@@ -194,7 +194,7 @@ class Processed:
 
             if self._verbose:
                 dt = load.attrs['created']
-                print("Loaded {:10d} details from '{}', created '{}'".format(size, fname, dt))
+                print("Loaded {:10d} entries from '{}', created '{}'".format(size, fname, dt))
 
         self._size = size
         return
