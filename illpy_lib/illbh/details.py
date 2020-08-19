@@ -10,7 +10,6 @@ from datetime import datetime
 
 import numpy as np
 import h5py
-from mpi4py import MPI
 
 import parse
 
@@ -21,13 +20,11 @@ import illpy_lib  # noqa
 from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE
 
 VERBOSE = True
+DETS_RESOLUTION_LIMIT = False                  # Control flag for downsampling
 DETS_RESOLUTION_TARGET = 1.0e-3                # in units of scale-factor
 DETS_RESOLUTION_TOLERANCE = 0.5              # allowed fraction below `DETS_RESOLUTION_TARGET`
 DETS_RESOLUTION_MIN_NUM = 10
 
-comm = MPI.COMM_WORLD
-
-# Start
 
 if DETS_RESOLUTION_MIN_NUM < 10:
     raise ValueError("ERROR: `DETS_RESOLUTION_MIN_NUM` must be >= 10!")
@@ -68,6 +65,16 @@ class Details_New(Processed):
             err = "ERROR: cannot process {} without `sim_path` set!".format(self.__class__)
             logging.error(err)
             raise ValueError(err)
+
+        # Check output filename
+        fname = self.filename
+        path = os.path.dirname(fname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
 
         snap = 0
         KEYS = self.KEYS
@@ -141,8 +148,11 @@ class Details_New(Processed):
                 # if verb:
                 #     print("\tres = {} (target={}), span = {}".format(
                 #         res, DETS_RESOLUTION_TARGET, span))
+                downsample_flag = DETS_RESOLUTION_LIMIT
+                if downsample_flag:
+                    downsample_flag = (res < DETS_RESOLUTION_TARGET / (1.0 + DETS_RESOLUTION_TOLERANCE))
 
-                if res < DETS_RESOLUTION_TARGET / (1.0 + DETS_RESOLUTION_TOLERANCE):
+                if downsample_flag:
                     new_num = int(np.ceil(span / DETS_RESOLUTION_TARGET))
                     if verb and (new_num < DETS_RESOLUTION_MIN_NUM):
                         # msg = "WARNING: target resolution num = {} is too low".format(new_num)
@@ -199,6 +209,9 @@ class Details_New(Processed):
 
                 else:
                     for kk in KEYS:
+                        if kk.startswith('unique'):
+                            continue
+
                         temp = dets_snap[kk][xx:xx+nn]
                         if first:
                             dets[kk] = temp
@@ -321,6 +334,16 @@ class Details_Snap_New(Details_New):
             logging.error(err)
             raise FileNotFoundError(err)
 
+        # Check output filename
+        fname = self.filename
+        path = os.path.dirname(fname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
         try:
             cosmo = illpy_lib.illcosmo.Simulation_Cosmology(self._sim_path, verbose=self._verbose)
             scales = cosmo.scale
@@ -363,11 +386,13 @@ class Details_Snap_New(Details_New):
                     logging.error(err)
                     raise ValueError(err)
 
-                if (num_snaps is not None) and ((sc < lo) or (sc > hi)):
+                lo_flag = (sc < lo) & (not np.isclose(sc, lo, rtol=1e-6, atol=0.0))
+                hi_flag = (sc > hi) & (not np.isclose(sc, hi, rtol=1e-6, atol=0.0))
+                if (num_snaps is not None) and (lo_flag or hi_flag):
                     err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
                         snap, ii, sc, lo, hi)
                     logging.error(err)
-                    # raise ValueError(err)
+                    raise ValueError(err)
 
                 details.append(vals)
                 num_dets += 1
@@ -764,6 +789,10 @@ def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
 
 
 if __name__ == "__main__":
+    logging.warning("Loading MPI...")
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+
     beg = datetime.now()
     recreate = ('-r' in sys.argv) or ('--recreate' in sys.argv)
     verbose = ('-v' in sys.argv) or ('--verbose' in sys.argv) or VERBOSE
