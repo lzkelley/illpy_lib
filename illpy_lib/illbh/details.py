@@ -17,14 +17,14 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 import illpy_lib  # noqa
-from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE
+from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE, VERBOSE
 
-VERBOSE = True
 DETS_RESOLUTION_LIMIT = False                  # Control flag for downsampling
 DETS_RESOLUTION_TARGET = 1.0e-3                # in units of scale-factor
 DETS_RESOLUTION_TOLERANCE = 0.5              # allowed fraction below `DETS_RESOLUTION_TARGET`
 DETS_RESOLUTION_MIN_NUM = 10
 
+ALLOW_LINE_PARSE_ERROR = True
 
 if DETS_RESOLUTION_MIN_NUM < 10:
     raise ValueError("ERROR: `DETS_RESOLUTION_MIN_NUM` must be >= 10!")
@@ -241,8 +241,9 @@ class Details_New(Processed):
     def _finalize_and_save(self, dets):
         KEYS = self.KEYS
         idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
+        skip = [KEYS.U_IDS, KEYS.U_INDICES, KEYS.U_COUNTS]
         for kk, vv in dets.items():
-            if kk.startswith('unique'):
+            if kk in skip:
                 continue
             dets[kk] = vv[idx, ...]
 
@@ -308,7 +309,7 @@ class Details_Snap_New(Details_New):
                 break
         else:
             err = "ERROR: failed to parse line '{}'".format(line)
-            logging.error(err)
+            # logging.error(err)
             raise ValueError(err)
 
         rv = {}
@@ -349,7 +350,17 @@ class Details_Snap_New(Details_New):
             scales = cosmo.scale
             num_snaps = len(scales)
             lo = scales[snap-1] if snap > 0 else 0.0
-            hi = scales[snap]
+            try:
+                hi = scales[snap]
+            except IndexError:
+                # Last snapshot may not be present
+                if snap != len(scales):
+                    raise
+                else:
+                    hi = 1.0
+                    msg = "Did not find snapshot {}, setting `hi` = {}".format(snap, hi)
+                    logging.warning(msg)
+
         except FileNotFoundError as err:
             num_snaps = None
             msg = "WARNING: could not load cosmology (snapshots missing?): '{}'".format(str(err))
@@ -374,7 +385,15 @@ class Details_Snap_New(Details_New):
 
             prev = None
             for ll, line in enumerate(open(dfil, 'r').readlines()):
-                vals = self._parse_raw_file_line(line)
+                try:
+                    vals = self._parse_raw_file_line(line)
+                except ValueError as err:
+                    if ALLOW_LINE_PARSE_ERROR:
+                        continue
+                    else:
+                        logging.error(str(err))
+                        raise err
+
                 vals[KEYS.SNAP] = snap
                 vals[KEYS.TASK] = task
 
@@ -386,13 +405,14 @@ class Details_Snap_New(Details_New):
                     logging.error(err)
                     raise ValueError(err)
 
-                lo_flag = (sc < lo) & (not np.isclose(sc, lo, rtol=1e-6, atol=0.0))
-                hi_flag = (sc > hi) & (not np.isclose(sc, hi, rtol=1e-6, atol=0.0))
-                if (num_snaps is not None) and (lo_flag or hi_flag):
-                    err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
-                        snap, ii, sc, lo, hi)
-                    logging.error(err)
-                    raise ValueError(err)
+                if (num_snaps is not None):
+                    lo_flag = (sc < lo) & (not np.isclose(sc, lo, rtol=1e-6, atol=0.0))
+                    hi_flag = (sc > hi) & (not np.isclose(sc, hi, rtol=1e-6, atol=0.0))
+                    if (lo_flag or hi_flag):
+                        err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
+                            snap, ii, sc, lo, hi)
+                        logging.error(err)
+                        raise ValueError(err)
 
                 details.append(vals)
                 num_dets += 1
@@ -673,8 +693,6 @@ class Merger_Details_New(Details_New):
         num = len(mdets)
         # for mm in range(num):
 
-
-
         idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
         for kk, vv in dets.items():
             if kk.startswith('unique'):
@@ -705,6 +723,12 @@ class Merger_Details_New(Details_New):
 
 
 def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):
+    try:
+        comm = MPI.COMM_WORLD
+    except NameError:
+        logging.warning("Loading MPI...")
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
 
     beg = datetime.now()
     if comm.rank == 0:

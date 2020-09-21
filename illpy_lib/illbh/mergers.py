@@ -39,6 +39,14 @@ class Mergers_New(Processed):
         NEXT = 'next'
         PREV = 'prev'
 
+        NUM_NEXT = 'num_next'
+        NUM_PREV = 'num_prev'
+
+        U_IDS = 'unique_ids'
+        U_INDICES = 'unique_indices'
+
+        _DERIVED = [U_IDS, U_INDICES]
+
     def _parse_raw_file_line(self, line):
         KEYS = self.KEYS
 
@@ -169,7 +177,13 @@ class Mergers_New(Processed):
 
             if scales is not None:
                 lo = scales[snap-1] if snap > 0 else 0.0
-                hi = scales[snap]
+                try:
+                    hi = scales[snap]
+                except IndexError:
+                    # There may not be a final snapshot
+                    if snap != len(scales):
+                        raise
+                    hi = 1.0
 
             for ii, mf in enumerate(mfils):
                 prev = None
@@ -190,11 +204,14 @@ class Mergers_New(Processed):
                         logging.error(err)
                         raise ValueError(err)
 
-                    if (scales is not None) and ((sc < lo) or (sc > hi)):
-                        err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
-                            snap, ii, sc, lo, hi)
-                        logging.error(err)
-                        raise ValueError(err)
+                    if (scales is not None):
+                        lo_flag = (sc < lo) & (not np.isclose(sc, lo, rtol=1e-6, atol=0.0))
+                        hi_flag = (sc > hi) & (not np.isclose(sc, hi, rtol=1e-6, atol=0.0))
+                        if (lo_flag or hi_flag):
+                            err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
+                                snap, ii, sc, lo, hi)
+                            logging.error(err)
+                            raise ValueError(err)
 
                     mergers.append(vals)
                     msnaps.append(snap)
@@ -278,13 +295,13 @@ class Mergers_New(Processed):
 
             return msg
 
+        # -- Build Merger Tree
+
         num = mrgs['scale'].size
         next = np.ones(num, np.int32) * -1
         prev = np.ones((num, 2), np.int32) * -1
         use_bh_mass = True
         for mm in range(num):
-            # mids = [mrgs['id1'][mm], mrgs['id2'][mm]]
-            # ma = mrgs['scale'][mm]
             mids = mrgs[KEYS.ID][mm]
             ma = mrgs[KEYS.SCALE][mm]
             if use_bh_mass:
@@ -296,8 +313,6 @@ class Mergers_New(Processed):
                 mass = mrgs[KEYS.MASS][mm]
 
             for nn in range(mm+1, num):
-                # nids = [mrgs['id1'][nn], mrgs['id2'][nn]]
-                # na = mrgs['scale'][nn]
                 nids = mrgs[KEYS.ID][nn]
                 na = mrgs[KEYS.SCALE][nn]
                 # Make sure scales are not decreasing (data is already sorted; should be impossible)
@@ -339,39 +354,59 @@ class Mergers_New(Processed):
         mrgs[KEYS.NEXT] = next
         mrgs[KEYS.PREV] = prev
 
+        num_next = np.ones(num, np.int32) * -1
+        num_prev = np.ones((num, 2), np.int32) * -1
+
+        def _count_prev(mm):
+            for bh in range(2):
+                temp = prev[mm][bh]
+                if temp >= 0:
+                    num_prev[mm, bh] = _count_prev(temp)
+                else:
+                    num_prev[mm, bh] = 0
+
+            return num_prev[mm].sum() + 1
+
+        for mm in reversed(range(num)):
+            temp = next[mm]
+            if temp >= 0:
+                num_next[mm] = num_next[temp] + 1
+                continue
+
+            num_next[mm] = 0
+            _count_prev(mm)
+
+        mrgs[KEYS.NUM_NEXT] = num_next
+        mrgs[KEYS.NUM_PREV] = num_prev
+
+        # -- Report statistics
+
         if self._verbose:
-
-            def count_prev(idx, cnt):
-                if cnt >= next.size:
-                    raise RuntimeError()
-
-                temp = 0
-                for bh in range(2):
-                    if prev[idx, bh] >= 0:
-                        # msg = " " * (cnt + temp)
-                        temp += 1
-                        # msg += "{} : {} ==> {} ({})".format(idx, bh, prev[idx, bh], temp + cnt)
-                        # print(msg)
-                        temp += count_prev(prev[idx, bh], cnt)
-
-                # print(" " * (cnt + temp) + "{} = {}".format(idx, temp))
-                return temp + cnt
-
             num_next = (next >= 0)
             print("Mergers with subsequent mergers: {}".format(zmath.frac_str(num_next)))
             print("Mergers that are final remnants: {}".format(zmath.frac_str(~num_next)))
-            mult = -1 * np.ones_like(next)
-            for mm in range(num):
-                # Only consider final mergers
-                if next[mm] >= 0:
-                    continue
-                mult[mm] = count_prev(mm, 0)
 
-            mult = mult[mult >= 0]
+            mult = num_prev[num_prev >= 0]
             print("Remnant merger-multiplicity:")
             print("\tzero = {}".format(zmath.frac_str(mult == 0)))
             print("\tave  = {:.2f}".format(mult.mean()))
             print("\tmed  = {:.2f}".format(np.median(mult)))
             print("\t{}".format(zmath.stats_str(mult)))
+
+        # -- Identify Unique BHs based on ID numbers
+
+        mids = mrgs[KEYS.ID]
+        # Convert from (M, 2) ==> (2*M,), i.e. [ID0_pri, ID0_sec, ID1_pri, ID1_sec ...]
+        mids = mids.flatten()
+
+        # Find unique indices, and first occurence of each index
+        u_ids, u_inds = np.unique(mids, return_index=True)
+        # Convert from index number in array of length (2*M,) to index number in mergers (M,)
+        u_inds = u_inds // 2
+
+        mrgs[KEYS.U_IDS] = u_ids
+        mrgs[KEYS.U_INDICES] = u_inds
+        if self._verbose:
+            print("Identified {} unique BHs in {} mergers".format(u_ids.size, num))
 
         return mrgs

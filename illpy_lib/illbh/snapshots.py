@@ -1,152 +1,300 @@
 """
 """
 
+# from collections import OrderedDict
 import os
-import shutil
-import sys
+# import sys
+import glob
+import logging
 from datetime import datetime
 
 import numpy as np
-import h5py
+# import h5py
+
+# import parse
 
 import zcode.inout as zio
+# import zcode.math as zmath
+
+import illpy.snapshot
+import illpy_lib  # noqa
+from illpy_lib.illbh import Processed, PATH_PROCESSED, VERBOSE
 
 
-try:
-    import illpy
-except ImportError:
-    PATH_ILLPY = "/n/home00/lkelley/illustris/redesign/illpy/"
-    if PATH_ILLPY not in sys.path:
-        print("Added path to `illpy`: '{}'".format(PATH_ILLPY))
-        sys.path.append(PATH_ILLPY)
+class SNAP_KEYS(Processed.KEYS):
 
-    import illpy
+    BH_BPressure            = 'BH_BPressure'
+    BH_CumEgyInjection_QM   = 'BH_CumEgyInjection_QM'
+    BH_CumEgyInjection_RM   = 'BH_CumEgyInjection_RM'
+    BH_CumMassGrowth_QM     = 'BH_CumMassGrowth_QM'
+    BH_CumMassGrowth_RM     = 'BH_CumMassGrowth_RM'
+    BH_HostHaloMass         = 'BH_HostHaloMass'
+    BH_Hsml                 = 'BH_Hsml'
+    BH_MPB_CumEgyHigh       = 'BH_MPB_CumEgyHigh'
+    BH_MPB_CumEgyLow        = 'BH_MPB_CumEgyLow'
+    BH_Pressure             = 'BH_Pressure'
+    BH_Progs                = 'BH_Progs'
+    BH_U                    = 'BH_U'
+    SubfindDMDensity        = 'SubfindDMDensity'
+    SubfindDensity          = 'SubfindDensity'
+    SubfindHsml             = 'SubfindHsml'
+    SubfindVelDisp          = 'SubfindVelDisp'
+
+    BH_Density              = 'BH_Density'
+    BH_Mass                 = 'BH_Mass'
+    BH_Mdot                 = 'BH_Mdot'
+    BH_MdotBondi            = 'BH_MdotBondi'
+    BH_MdotEddington        = 'BH_MdotEddington'
+    Coordinates             = 'Coordinates'
+    Masses                  = 'Masses'
+    ParticleIDs             = 'ParticleIDs'
+    Potential               = 'Potential'
+    Velocities              = 'Velocities'
+
+    SCALE                   = 'scale'
+    SNAP                    = 'snap'
+
+    ID                      = ParticleIDs
+    MASS                    = Masses
+    BH_MASS                 = BH_Mass
+    MDOT_B                  = BH_MdotBondi
+    MDOT                    = BH_Mdot
+    POT                     = Potential
+    DENS                    = BH_Density
+    POS                     = Coordinates
+    VEL                     = Velocities
+
+    # NOTE: these are 'derived' in the sense for each snapshot: these parameters must be added
+    #       when combining all snapshots together, these are not derived, they come from the data
+    _DERIVED = [SCALE, SNAP]
+    _ALIASES = [ID, MASS, BH_MASS, MDOT_B, MDOT, POT, DENS, POS, VEL]
+
+    @classmethod
+    def names(cls):
+        nn = [kk for kk in dir(cls) if (not kk.startswith('_')) and (kk not in cls._ALIASES)]
+        nn = [kk for kk in nn if (not callable(getattr(cls, kk)))]
+        return sorted(nn)
 
 
-try:
-    import illpy_lib
-except ImportError:
-    PATH_ILLPY_LIB = "/n/home00/lkelley/illustris/redesign/illpy_lib/"
-    if PATH_ILLPY_LIB not in sys.path:
-        print("Added path to `illpy_lib`: '{}'".format(PATH_ILLPY_LIB))
-        sys.path.append(PATH_ILLPY_LIB)
+class Snapshots(Processed):
 
-    import illpy_lib  # noqa
+    _PROCESSED_FILENAME = "bh-snapshots.hdf5"
 
+    class KEYS(SNAP_KEYS):
 
-from illpy_lib.constants import NUM_SNAPS, PARTICLE
+        U_IDS                   = 'unique_ids'
+        U_INDICES               = 'unique_indices'
+        U_COUNTS                = 'unique_counts'
 
-from illpy_lib.illbh import Core
+        # These are the 'derived' keys for *all* snapshots together
+        #    the 'SCALE' and 'SNAP' are included in the individual snapshot files
+        _DERIVED = [U_IDS, U_INDICES, U_COUNTS]
 
-VERSION = 0.1
+    def _process(self):
+        sim_path = self._sim_path
+        if sim_path is None:
+            err = "ERROR: cannot process {} without `sim_path` set!".format(self.__class__)
+            logging.error(err)
+            raise ValueError(err)
 
+        # Check output filename
+        fname = self.filename
+        path = os.path.dirname(fname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
 
-def main():
-    core = Core(sets=dict(LOG_FILENAME="log_illbh-snapshots.log", RECREATE=True))
-    log = core.log
+        cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=False)
+        scales = cosmo.scale
+        num_snaps = scales.size
 
-    log.info("details.main()")
-    print(log.filename)
+        snap = 0
+        # KEYS = self.KEYS
+        verb = self._verbose
 
-    beg = datetime.now()
+        bhs = {}
+        for snap in range(num_snaps):
+            if verb:
+                print("snap = {}".format(snap))
 
-    fname = core.paths.fname_bh_particles
-    exists = os.path.exists(fname)
+            bh_snap = Snapshots_Snap(snap, sim_path=sim_path)
+            for kk in bh_snap.KEYS:
+                temp = bh_snap[kk]
+                prev = bhs.get(kk, None)
+                if (prev is None) or (len(prev) == 0):
+                    bhs[kk] = temp
+                else:
+                    bhs[kk] = np.concatenate([prev, temp])
 
-    recreate = core.sets.RECREATE
-    log.debug("File '{}' exists: {}".format(fname, exists))
+        self._finalize_and_save(bhs)
 
-    if not recreate and exists:
-        log.info("Particle file exists: '{}'".format(fname))
         return
 
-    log.warning("Loading BH particle data from snapshots")
-    fname_temp = zio.modify_filename(fname, prepend='_')
+    def _add_derived(self, data):
+        KEYS = self.KEYS
+        u_ids, u_inds, u_counts = np.unique(data[KEYS.ID], return_index=True, return_counts=True)
+        # num_unique = u_ids.size
+        data[KEYS.U_IDS] = u_ids
+        data[KEYS.U_INDICES] = u_inds
+        data[KEYS.U_COUNTS] = u_counts
+        return data
 
-    log.debug("Writing to temporary file '{}'".format(fname_temp))
-    # log.error("WARNING: running in TEMPORARY append mode!")
-    # with h5py.File(fname_temp, 'a') as out:
-    with h5py.File(fname_temp, 'r') as out:
-
-        all_ids = set()
-
-        for snap in core.tqdm(range(NUM_SNAPS), desc='Loading snapshots'):
-
-            log.debug("Loading snap {}".format(snap))
-            snap_str = '{:03d}'.format(snap)
-            group = out.create_group(snap_str)
-
-            try:
-                bhs = illpy.snapshot.loadSubset(core.paths.INPUT, snap, PARTICLE.BH)
-            except Exception as err:
-                log.error("FAILED on snap {}!!!".format(snap))
+    def _finalize_and_save(self, data, **header):
+        KEYS = self.KEYS
+        idx = np.lexsort((data[KEYS.SCALE], data[KEYS.ID]))
+        count = idx.size
+        for kk in KEYS:
+            if kk in KEYS._DERIVED:
                 continue
 
-            num_bhs = bhs['count']
-            log.info("Snap {} Loaded {} BHs".format(snap, num_bhs))
-            group.attrs['count'] = num_bhs
-            if num_bhs == 0:
-                continue
+            temp = data[kk]
+            temp = temp[idx, ...]
+            data[kk] = temp
 
-            ids = bhs['ParticleIDs']
-            all_ids = all_ids.union(ids)
-            sort = np.argsort(ids)
+        data = self._add_derived(data)
 
-            keys = list(bhs.keys())
-            keys.pop(keys.index('count'))
-            for kk in keys:
-                group.create_dataset(kk, data=bhs[kk][:][sort])
+        # -- Save values to file
+        # Get output filename for this snapshot
+        #   path should have already been created in `_process` by rank=0
+        fname = self.filename
+        self._save_to_hdf5(fname, KEYS, data, __file__, **header)
+        if self._verbose:
+            msg = "Saved data for {} BHs to '{}' size {}".format(
+                count, fname, zio.get_file_size(fname))
+            print(msg)
 
-        '''
-        for snap in core.tqdm(range(NUM_SNAPS), desc='Loading snapshots'):
+        return
 
-            log.debug("Loading snap {}".format(snap))
-            snap_str = '{:03d}'.format(snap)
-            group = out[snap_str]
 
-            if 'ParticleIDs' not in group.keys():
-                log.error("Skipping snap {}".format(snap))
-                continue
+class Snapshots_Snap(Snapshots):
 
-            ids = group['ParticleIDs']
-            num_bhs = ids.size
-            group.attrs['num'] = num_bhs
+    _PROCESSED_FILENAME = "bh-snapshots_{snap:03d}.hdf5"
 
-            all_ids = all_ids.union(ids)
-        '''
+    class KEYS(SNAP_KEYS):
+        pass
 
-        all_ids = np.array(sorted(list(all_ids)))
-        first = NUM_SNAPS * np.ones_like(all_ids, dtype=np.uint32)
-        last = np.zeros_like(all_ids, dtype=np.uint32)
+    def __init__(self, snap, *args, **kwargs):
+        self._snap = snap
+        super().__init__(*args, **kwargs)
+        return
 
-        # Find the first and last snapshot that each BH is found in
-        for snap in core.tqdm(range(NUM_SNAPS), desc='Finding first/last'):
-            snap_str = '{:03d}'.format(snap)
-            try:
-                ids = out[snap_str]['ParticleIDs'][:]
-            except KeyError as err:
-                lvl = log.INFO if (snap in [53, 55]) else log.ERROR
-                log.log(lvl, "Failed to access `ParticleIDs` from snap {}".format(snap))
-                log.log(lvl, str(err))
-                continue
+    def _add_derived(self, data):
+        return data
 
-            slots = np.searchsorted(all_ids, ids)
-            first[slots] = np.minimum(first[slots], snap)
-            last[slots] = np.maximum(last[slots], snap)
+    def _process(self):
+        KEYS = self.KEYS
+        snap = self._snap
 
-        out.create_dataset('unique_ids', data=all_ids)
-        out.create_dataset('unique_first_snap', data=first)
-        out.create_dataset('unique_last_snap', data=last)
+        # Check output filename
+        fname = self.filename
+        path = os.path.dirname(fname)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
 
-    log.debug("Moving temporary to final file '{}' ==> '{}'".format(fname_temp, fname))
-    shutil.move(fname_temp, fname)
+        pt_bh = illpy.PARTICLE.BH
+        fields = [kk for kk in KEYS.keys() if kk not in KEYS._DERIVED]
+        header = illpy.snapshot.get_header(self._sim_path, snap)
+        bh_snap = illpy.snapshot.loadSubset(self._sim_path, snap, pt_bh, fields=fields, sq=False)
+        num_bhs = bh_snap['count']
+        if self._verbose:
+            print("Loaded {} particles from snapshot {}".format(num_bhs, snap))
 
-    size_str = zio.get_file_size(fname)
+        if num_bhs == 0:
+            print("Snapshot {} contains no BHs".format(snap))
+            bh_snap = {}
+            for kk in KEYS:
+                bh_snap[kk] = np.array([])
+        else:
+            bh_snap[KEYS.SCALE] = header['Time'] * np.ones_like(bh_snap[KEYS.MASS])
+            bh_snap[KEYS.SNAP] = snap * np.ones_like(bh_snap[KEYS.MASS], dtype=int)
+
+        self._finalize_and_save(bh_snap, **header)
+        return
+
+    @property
+    def filename(self):
+        if self._filename is None:
+            # `sim_path` has already been checked to exist in initializer
+            sim_path = self._sim_path
+            temp = self._PROCESSED_FILENAME.format(snap=self._snap)
+            self._filename = os.path.join(sim_path, *PATH_PROCESSED, temp)
+
+        return self._filename
+
+
+def process_snapshot_snaps(sim_path, recreate=False, verbose=VERBOSE):
+    try:
+        comm = MPI.COMM_WORLD
+    except NameError:
+        logging.warning("Loading MPI...")
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+
+    beg = datetime.now()
+    if comm.rank == 0:
+        temp = 'snapdir_' + '[0-9]' * 3
+        temp = os.path.join(sim_path, temp)
+        snap_dirs = sorted(glob.glob(temp))
+        if verbose:
+            print("Found {} snapshot directories".format(len(snap_dirs)))
+        if len(snap_dirs) == 0:
+            err = "ERROR: no snapshot directories found (pattern: '{}')".format(temp)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        snap_list = []
+        prev = None
+        for dd in snap_dirs:
+            sn = int(os.path.basename(dd).split('_')[-1])
+            snap_list.append(sn)
+            if prev is None:
+                if sn != 0:
+                    err = "WARNING: first snapshot ({}) is not zero!".format(sn)
+                    logging.warning(err)
+            elif prev + 1 != sn:
+                err = "WARNING: snapshot {} does not follow previous {}!".format(sn, prev)
+                logging.warning(err)
+
+            prev = sn
+
+        np.random.seed(1234)
+        np.random.shuffle(snap_list)
+        snap_list = np.array_split(snap_list, comm.size)
+
+    else:
+        snap_list = None
+
+    snap_list = comm.scatter(snap_list, root=0)
+
+    comm.barrier()
+    num_lines = 0
+    for snap_num in snap_list:
+        snap = Snapshots_Snap(snap_num, sim_path=sim_path, recreate=recreate, verbose=verbose)
+        num_lines += snap[snap.KEYS.SCALE].size
+
+    num_lines = comm.gather(num_lines, root=0)
+
     end = datetime.now()
-    log.info("Saved to '{}', size {}, after {}".format(fname, size_str, end-beg))
+    if verbose:
+        print("Rank: {}, done at {}, after {}".format(comm.rank, end, (end-beg)))
+    if comm.rank == 0:
+        tot_num_lines = np.sum(num_lines)
+        ave = np.mean(num_lines)
+        med = np.median(num_lines)
+        std = np.std(num_lines)
+        if verbose:
+            print("Tot lines={:.2e}, med={:.2e}, ave={:.2e}±{:.2e}".format(
+                tot_num_lines, med, ave, std))
 
+        tail = f"Done at {str(end)} after {str(end-beg)} ({(end-beg).total_seconds()})"
+        print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+
+    comm.barrier()
     return
-
-
-if __name__ == "__main__":
-    main()

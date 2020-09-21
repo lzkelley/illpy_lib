@@ -1,7 +1,7 @@
 """This module handles the processing of Illustris BH files.
 """
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 import os
 import logging
@@ -19,6 +19,7 @@ from . import utils
 # PATH_PROCESSED = ["output", "processed"]    # relative to simulation directory (i.e. where 'output' directory lives)
 PATH_PROCESSED = ["processed"]                # relative to simulation-output directory (i.e. where snapshots and groups live)
 
+VERBOSE = True
 
 '''
 @enum.unique
@@ -137,12 +138,15 @@ class Processed:
         self._load_from_save()
         return
 
-    def _save_to_hdf5(self, fname, keys, vals, script):
+    def _save_to_hdf5(self, fname, keys, vals, script, **header):
         try:
             with h5py.File(fname, 'w') as save:
                 utils._save_meta_to_hdf5(save, self._sim_path, __version__, script)
                 for kk in keys:
                     save.create_dataset(kk, data=vals[kk])
+
+                for kk, vv in header.items():
+                    save.attrs[kk] = vv
 
         except:
             if os.path.exists(fname):
@@ -201,93 +205,3 @@ class Processed:
 
     def _process(self):
         raise NotImplementedError()
-
-
-'''
-class MERGERS:
-    # Meta Data
-    RUN       = 'run'
-    CREATED   = 'created'
-    NUM       = 'num'
-    VERSION   = 'version'
-    FILE      = 'filename'
-
-    # Physical Parameters
-    IDS       = 'ids'
-    SCALES    = 'scales'
-    MASSES    = 'masses'
-
-    # Maps
-    # MAP_STOM  = 's2m'
-    # MAP_MTOS  = 'm2s'
-    # MAP_ONTOP = 'ontop'
-    SNAP_NUMS = "snap_nums"
-    ONTOP_NEXT = "ontop_next"
-    ONTOP_PREV = "ontop_prev"
-
-
-MERGERS_PHYSICAL_KEYS = [MERGERS.IDS, MERGERS.SCALES, MERGERS.MASSES]
-
-
-class DETAILS:
-    RUN     = 'run'
-    CREATED = 'created'
-    VERSION = 'version'
-    NUM     = 'num'
-    SNAP    = 'snap'
-    FILE    = 'filename'
-
-    IDS     = 'id'
-    SCALES  = 'scales'
-    MASSES  = 'masses'
-    MDOTS   = 'mdots'
-    DMDTS   = 'dmdts'     # differences in masses
-    RHOS    = 'rhos'
-    CS      = 'cs'
-
-    UNIQUE_IDS = 'unique_ids'
-    UNIQUE_INDICES = 'unique_indices'
-    UNIQUE_COUNTS = 'unique_counts'
-
-
-DETAILS_PHYSICAL_KEYS = [DETAILS.IDS, DETAILS.SCALES, DETAILS.MASSES,
-                         DETAILS.MDOTS, DETAILS.DMDTS, DETAILS.RHOS, DETAILS.CS]
-
-
-class _LenMeta(type):
-
-    def __len__(self):
-        return self.__len__()
-
-
-class BH_TYPE(metaclass=_LenMeta):
-    IN  = 0
-    OUT = 1
-
-    @classmethod
-    def __len__(cls):
-        return 2
-
-
-class BH_TREE:
-    PREV         = 'prev'
-    NEXT         = 'next'
-    SCALE_PREV   = 'scale_prev'
-    SCALE_NEXT   = 'scale_next'
-    TIME_PREV    = 'time_prev'
-    TIME_NEXT    = 'time_next'
-
-    NUM_BEF      = 'num_bef'
-    NUM_AFT      = 'num_aft'
-    TIME_BETWEEN = 'time_between'
-
-    CREATED      = 'created'
-    RUN          = 'run'
-    VERSION      = 'version'
-    NUM          = 'num'
-
-
-from . utils import load_hdf5_to_mem, _distribute_snapshots  # noqa
-
-# from . import bh_constants  # noqa
-'''
