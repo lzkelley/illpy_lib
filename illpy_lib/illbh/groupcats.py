@@ -129,7 +129,7 @@ class Groupcats(Processed):
         bhs = {}
         for snap in range(num_snaps):
             if verb:
-                print("snap = {}".format(snap))
+                print("\nsnap = {}".format(snap))
 
             gcat_snap = Groupcats_Snap(snap, sim_path=sim_path)
             for kk in gcat_snap.KEYS:
@@ -160,6 +160,8 @@ class Groupcats(Processed):
         for kk in KEYS:
             # if kk in KEYS._DERIVED:
             #     continue
+            if kk.startswith('unique'):
+                continue
 
             temp = data[kk]
             temp = temp[idx, ...]
@@ -308,6 +310,16 @@ class Groupcats_Snap(Groupcats):
 
         # bh_halos = halo_num[bin_inds]
         bh_subhalos = subh_num[bin_inds]
+        if np.any(bh_subhalos < 0):
+            print("\nFound unmatched BHs")
+            print("BHs = ", num_bh, "LenType = ", np.sum(groups['SubhaloLenType'], axis=0))
+            """
+            print("bh_indices = ", bh_indices)
+            print("offsets = ", offsets[:, PARTICLE.BH])
+            print("bin_inds = ", bin_inds)
+            print("bh_subhalos = ", bh_subhalos)
+            print()
+            """
 
         for bh, sh in enumerate(bh_subhalos):
             if sh < 0:
