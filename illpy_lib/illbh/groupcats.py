@@ -364,7 +364,8 @@ class Groupcats_Snap(Groupcats):
                 err = "Match between BH {} (ID: {}) and subhalo {} looks bad!".format(
                     bh, bh_id[bh], sh
                 )
-                raise ValueError(err)
+                logging.warning(err)
+                # raise ValueError(err)
 
         return bh_subhalos
 

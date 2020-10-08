@@ -118,6 +118,18 @@ class Processed:
     def keys(self):
         return [str(kk) for kk in self.KEYS]
 
+    def unique(self):
+        keys = self.KEYS
+        try:
+            vals = zip(self[keys.U_IDS], self[keys.U_INDICES], self[keys.U_COUNTS])
+        except KeyError as err:
+            raise AttributeError("Missing `unique` keys! Error: '{}'".format(str(err)))
+
+        for idn, idx, num in vals:
+            yield idn, idx, num
+
+        return
+
     @property
     def size(self):
         return self._size
