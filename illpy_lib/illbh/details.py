@@ -17,7 +17,7 @@ import zcode.inout as zio
 import zcode.math as zmath
 
 import illpy_lib  # noqa
-from illpy_lib.illbh import Processed, utils, PATH_PROCESSED, mergers, BH_TYPE, VERBOSE
+from illpy_lib.illbh import Processed, utils, mergers, BH_TYPE, VERBOSE
 
 DETS_RESOLUTION_LIMIT = False                  # Control flag for downsampling
 DETS_RESOLUTION_TARGET = 1.0e-3                # in units of scale-factor
@@ -30,35 +30,213 @@ if DETS_RESOLUTION_MIN_NUM < 10:
     raise ValueError("ERROR: `DETS_RESOLUTION_MIN_NUM` must be >= 10!")
 
 
-class Details_New(Processed):
+class Details(Processed):
 
     _PROCESSED_FILENAME = "bh-details.hdf5"
 
     class KEYS(Processed.KEYS):
         SCALE  = 'scale'
-
         ID     = 'id'
-        MASS   = 'mass'
         BH_MASS = 'bh_mass'
-        MDOT_B = 'mdot_bondi'
         MDOT   = 'mdot'
-        POT    = 'potential'
+
+        U_IDS = 'unique_ids'
+        U_INDICES = 'unique_indices'
+        U_COUNTS = 'unique_counts'
+
+        # _DERIVED = [TASK, SNAP, U_IDS, U_INDICES, U_COUNTS]
+        # _INTERP_KEYS = [MASS, BH_MASS, MDOT, MDOT_B, POT, DENS, POS, VEL]
+        _DERIVED = [U_IDS, U_INDICES, U_COUNTS]
+        _INTERP_KEYS = [BH_MASS, MDOT]
+
+    def _process(self):
+        raise NotImplementedError()
+
+    def _finalize_and_save(self, dets):
+        KEYS = self.KEYS
+        idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
+        skip = [KEYS.U_IDS, KEYS.U_INDICES, KEYS.U_COUNTS]
+        for kk, vv in dets.items():
+            if kk in skip:
+                continue
+            dets[kk] = vv[idx, ...]
+
+        u_ids, u_inds, u_counts = np.unique(dets[KEYS.ID], return_index=True, return_counts=True)
+        num_unique = u_ids.size
+        dets[KEYS.U_IDS] = u_ids
+        dets[KEYS.U_INDICES] = u_inds
+        dets[KEYS.U_COUNTS] = u_counts
+
+        # -- Save values to file
+        # Get output filename for this snapshot
+        #   path should have already been created in `_process` by rank=0
+        fname = self.filename
+        self._save_to_hdf5(fname, KEYS, dets, __file__)
+        if self._verbose:
+            msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
+                len(dets[KEYS.SCALE]), num_unique, fname, zio.get_file_size(fname))
+            print(msg)
+
+        return
+
+
+class Details_TNG(Details):
+
+    class KEYS(Details.KEYS):
         DENS   = 'density'
+        SNDS   = 'soundspeed'
+
+        U_IDS = 'unique_ids'
+        U_INDICES = 'unique_indices'
+        U_COUNTS = 'unique_counts'
+
+        _INTERP_KEYS = Details.KEYS._INTERP_KEYS + [DENS, SNDS]
+
+
+class Details_TNG_Task(Details):
+
+    _PROCESSED_FILENAME = "bh-details_{task:04d}.hdf5"
+
+    class KEYS(Details_TNG.KEYS):
+        pass
+
+    def __init__(self, task, *args, **kwargs):
+        self._task = task
+        super().__init__(*args, **kwargs)
+        return
+
+    def _parse_raw_file_line(self, line):
+        """
+        TNG:
+        fprintf(FdBlackHolesDetails, "BH=%llu %g %g %g %g %g\n",
+            (long long) P[n].ID, All.Time, BPP(n).BH_Mass, mdot, rho, soundspeed);
+        """
+        KEYS = self.KEYS
+
+        format = (
+            "BH={id:d} {scale:g} " +
+            "{bh_mass:g} {mdot:g} {density:g} {soundspeed:g}"
+        )
+
+        # in TNG some soundspeed values are nan (from zero densities at seeding??)
+        #    NOTE: big-s 'S' means any non-whitespace characters
+        backup = (
+            "BH={id:d} {scale:g} " +
+            "{bh_mass:g} {mdot:g} {density:g} {soundspeed:4S}"
+        )
+
+        line = line.strip()
+        temp = parse.parse(format, line)
+        # Try the backup parser and manually convert from str to float
+        convert = False
+        if temp is None:
+            temp = parse.parse(backup, line)
+            if temp is None:
+                err = "ERROR: failed to parse line '{}'".format(line)
+                logging.error(err)
+                raise ValueError(err)
+            # NOTE: this doesnt work -- can't assign values
+            # temp['soundspeed'] = np.float(temp['soundspeed'])
+            convert = True
+
+        det = {}
+        for kk in KEYS:
+            if (kk in KEYS._DERIVED):
+                continue
+            det[kk] = temp[kk]
+            if convert and kk == KEYS.SNDS:
+                det[kk] = np.float(det[kk])
+
+        return det
+
+    def _process(self):
+        KEYS = self.KEYS
+        task = self._task
+        fname_in = 'blackhole_details_{:d}.txt'.format(task)
+        fname_in = os.path.join(self._sim_path, 'output', 'blackhole_details', fname_in)
+
+        if not os.path.isfile(fname_in):
+            err = "ERROR: `fname` '{}' does not exist!".format(fname_in)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        # Check output filename
+        fname_out = self.filename
+        path = os.path.dirname(fname_out)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        if not os.path.isdir(path):
+            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname_out, path)
+            logging.error(err)
+            raise FileNotFoundError(err)
+
+        details = []
+        prev = None
+        for ll, line in enumerate(open(fname_in, 'r').readlines()):
+            try:
+                vals = self._parse_raw_file_line(line)
+            except ValueError as err:
+                logging.error("File '{}', line {}: {}".format(fname_in, ll, str(err)))
+                raise err
+
+            sc = vals[KEYS.SCALE]
+            if prev is None:
+                prev = sc
+            elif sc < prev:
+                err = "Task: {}, {} - scale:{:.8f} is before prev:{:.8f}!".format(
+                    task, fname, sc, prev)
+                logging.error(err)
+                raise ValueError(err)
+
+            details.append(vals)
+
+        num_dets = len(details)
+        dets = {}
+        for dd, temp in enumerate(details):
+            if dd == 0:
+                for kk, vv in temp.items():
+                    if np.isscalar(vv):
+                        shp = num_dets
+                        tt = type(vv)
+                    else:
+                        shp = (num_dets,) + np.shape(vv)
+                        tt = vv.dtype
+
+                    dets[kk] = np.zeros(shp, dtype=tt)
+
+            for kk, vv in temp.items():
+                dets[kk][dd, ...] = vv
+
+        if len(details) == 0:
+            dets = {kk: np.array([]) for kk in KEYS}
+
+        self._finalize_and_save(dets)
+        return
+
+    @property
+    def filename(self):
+        if self._filename is None:
+            temp = self._PROCESSED_FILENAME.format(task=self._task)
+            self._filename = os.path.join(self._processed_path, temp)
+
+        return self._filename
+
+
+class Details_New(Details):
+
+    class KEYS(Details.KEYS):
+        MASS   = 'mass'
+        MDOT_B = 'mdot_bondi'
+        POT    = 'potential'
 
         POS    = 'pos'
         VEL    = 'vel'
 
         SNAP   = 'snap'
         TASK   = 'task'
-        # RHO   = 'rho'
-        # CS    = 'cs'
 
-        U_IDS = 'unique_ids'
-        U_INDICES = 'unique_indices'
-        U_COUNTS = 'unique_counts'
-
-        _DERIVED = [TASK, SNAP, U_IDS, U_INDICES, U_COUNTS]
-        _INTERP_KEYS = [MASS, BH_MASS, MDOT, MDOT_B, POT, DENS, POS, VEL]
+        _DERIVED = Details.KEYS._DERIVED + [TASK, SNAP]
+        _INTERP_KEYS = Details.KEYS._INTERP_KEYS + [MASS, MDOT_B, POT, POS, VEL]
 
     def _process(self):
         if self._sim_path is None:
@@ -235,33 +413,6 @@ class Details_New(Processed):
             print("Total compression: {:.2e}, average: {:.2e}".format(tot_ratio, ave_ratio))
 
         self._finalize_and_save(dets)
-
-        return
-
-    def _finalize_and_save(self, dets):
-        KEYS = self.KEYS
-        idx = np.lexsort((dets[KEYS.SCALE], dets[KEYS.ID]))
-        skip = [KEYS.U_IDS, KEYS.U_INDICES, KEYS.U_COUNTS]
-        for kk, vv in dets.items():
-            if kk in skip:
-                continue
-            dets[kk] = vv[idx, ...]
-
-        u_ids, u_inds, u_counts = np.unique(dets[KEYS.ID], return_index=True, return_counts=True)
-        num_unique = u_ids.size
-        dets[KEYS.U_IDS] = u_ids
-        dets[KEYS.U_INDICES] = u_inds
-        dets[KEYS.U_COUNTS] = u_counts
-
-        # -- Save values to file
-        # Get output filename for this snapshot
-        #   path should have already been created in `_process` by rank=0
-        fname = self.filename
-        self._save_to_hdf5(fname, KEYS, dets, __file__)
-        if self._verbose:
-            msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
-                len(dets[KEYS.SCALE]), num_unique, fname, zio.get_file_size(fname))
-            print(msg)
 
         return
 
@@ -442,14 +593,13 @@ class Details_Snap_New(Details_New):
     @property
     def filename(self):
         if self._filename is None:
-            # `sim_path` has already been checked to exist in initializer
-            sim_path = self._sim_path
             temp = self._PROCESSED_FILENAME.format(snap=self._snap)
-            self._filename = os.path.join(sim_path, *PATH_PROCESSED, temp)
+            self._filename = os.path.join(self._processed_path, temp)
 
         return self._filename
 
 
+'''
 class Merger_Details_New(Details_New):
 
     _PROCESSED_FILENAME = "bh-merger-details.hdf5"
@@ -720,6 +870,7 @@ class Merger_Details_New(Details_New):
             print(msg)
 
         return
+'''
 
 
 def process_details_snaps(sim_path, recreate=False, verbose=VERBOSE):

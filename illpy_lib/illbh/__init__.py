@@ -17,16 +17,10 @@ import h5py
 from . import utils
 
 # PATH_PROCESSED = ["output", "processed"]    # relative to simulation directory (i.e. where 'output' directory lives)
-PATH_PROCESSED = ["processed"]                # relative to simulation-output directory (i.e. where snapshots and groups live)
+# relative to simulation-output directory (i.e. where snapshots and groups live)
+_PROCESSED_DIR = ["postprocessing", "blackholes"]
 
 VERBOSE = True
-
-'''
-@enum.unique
-class _ENUM(enum.Enum):
-    def __str__(self):
-        return str(self.value)
-'''
 
 
 class _ENUM(type):
@@ -46,20 +40,6 @@ class ENUM(metaclass=_ENUM):
 
     def __len__(self):
         return len(iter(self))
-
-
-'''
-@enum.unique
-class _INT_ENUM(enum.IntEnum):
-    def __str__(self):
-        return str(self.value)
-
-
-class BH_TYPE(_INT_ENUM):
-    OUT = 0
-    IN = 1
-    REMNANT = 2
-'''
 
 
 class BH_TYPE(ENUM):
@@ -83,28 +63,42 @@ class Processed:
     class KEYS(ENUM):
         pass
 
-    def __init__(self, sim_path=None, filename=None, verbose=True, recreate=False):
+    def __init__(self, sim_path=None, processed_path=None, verbose=True, recreate=False):
         # -- Initialize
-        if (sim_path is None) and (filename is None):
-            err = "ERROR: Either `sim_path` or `filename` must be provided!"
+        if self._PROCESSED_FILENAME is None:
+            err = "`_PROCESSED_FILENAME` must be specified in subclass!"
+            logging.error(err)
+            raise RuntimeError(err)
+
+        if (sim_path is None) and (processed_path is None):
+            err = "ERROR: Either `sim_path` or `processed_path` must be provided!"
             logging.error(err)
             raise ValueError(err)
         elif (sim_path is not None) and (not os.path.isdir(sim_path)):
             err = "ERROR: `sim_path` '{}' does not exist!".format(sim_path)
             logging.error(err)
             raise ValueError(err)
-        elif (sim_path is None) and (not os.path.isfile(filename)):
-            err = "ERROR: `filename` '{}' does not exist!".format(filename)
-            logging.error(err)
-            raise ValueError(err)
 
-        if filename is not None:
-            filename = os.path.abspath(filename)
+        if processed_path is None:
+            sim_path = os.path.abspath(sim_path)
+            sim_path = sim_path.rstrip('/')
+            if os.path.dirname(sim_path) == 'output':
+                sim_path = sim_path.rstrip('output')
+
+            temp = os.path.join(sim_path, 'output')
+            if not os.path.isdir(temp):
+                raise ValueError("Could not find output path '{}'!".format(temp))
+
+            processed_path = os.path.join(sim_path, *_PROCESSED_DIR)
+
+        else:
+            processed_path = os.path.abspath(processed_path)
 
         self._verbose = verbose
         self._recreate = recreate
         self._sim_path = sim_path
-        self._filename = filename
+        self._processed_path = processed_path
+        self._filename = None
         self._size = None
 
         # -- Load data
@@ -137,9 +131,7 @@ class Processed:
     @property
     def filename(self):
         if self._filename is None:
-            # `sim_path` has already been checked to exist in initializer
-            sim_path = self._sim_path
-            self._filename = os.path.join(sim_path, *PATH_PROCESSED, self._PROCESSED_FILENAME)
+            self._filename = os.path.join(self._processed_path, self._PROCESSED_FILENAME)
 
         return self._filename
 
@@ -152,6 +144,7 @@ class Processed:
 
     def _save_to_hdf5(self, fname, keys, vals, script, **header):
         try:
+            os.makedirs(os.path.dirname(fname), exist_ok=True)
             with h5py.File(fname, 'w') as save:
                 utils._save_meta_to_hdf5(save, self._sim_path, __version__, script)
                 for kk in keys:

@@ -4,3 +4,4 @@ mpi4py
 cython
 zcode
 cosmopy
+parse

@@ -358,7 +358,7 @@ def cosmo_from_path(sim_path):
         params = _load_used_params(fname_params)
     except FileNotFoundError:
         fname_params = os.path.join(sim_path, 'parameters-usedvalues')
-        params = _load_used_params(fname_params)        
+        params = _load_used_params(fname_params)
 
     kwargs = {}
     cosmo_pars = ['Omega0', 'OmegaLambda', 'OmegaBaryon', ]
@@ -386,3 +386,30 @@ def cosmo_from_path(sim_path):
     cosmo._usedparams = params
 
     return cosmo
+
+
+def load_sim_cosmo(sim_path, params_fname=None, verbose=True, **kwargs):
+    path_mods = [
+        "",
+        "output",
+        "arepo"
+    ]
+
+    if params_fname is None:
+        params_fname = [
+            'parameters-usedvalues',
+            'param.txt-usedvalues'
+        ]
+    elif np.isscalar(params_fname):
+        params_fname = [params_fname]
+
+    for pm in path_mods:
+        for fn in params_fname:
+            try:
+                path = os.path.join(sim_path, pm, '')
+                cosmo = Simulation_Cosmology(path, fname_params=fn, verbose=verbose, **kwargs)
+                return cosmo
+            except FileNotFoundError:
+                pass
+
+    return None
