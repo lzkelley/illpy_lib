@@ -1,0 +1,82 @@
+%reload_ext autoreload
+%autoreload 2
+
+from importlib import reload
+
+import os
+import sys
+import logging
+import warnings
+import glob
+# from collections import OrderedDict
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import scipy as sp
+# import scipy.interpolate
+# import astropy as ap
+import h5py
+
+
+# --- LZK Libs ---
+
+import zcode.math as zmath
+import zcode.plot as zplot
+import zcode.astro as zastro
+from zcode.constants import *
+import zcode.inout as zio
+
+import kalepy as kale
+
+
+# --- Arepo / Illustris ---
+
+import illpy
+import illpy_lib
+import illpy_lib.illcosmo
+import illpy_lib.illbh
+import illpy_lib.illbh.mergers
+import illpy_lib.illbh.details
+import illpy_lib.illbh.snapshots
+import illpy_lib.illbh.groupcats
+
+from illpy_lib.illbh import BH_TYPE
+
+
+# --- Generic Setup ---
+
+# Silence annoying numpy errors
+np.seterr(divide='ignore', invalid='ignore', over='ignore');
+%precision %.2g
+
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# Plotting settings
+mpl.rc('font', **{'family': 'serif', 'sans-serif': ['Times'], 'size': 12})
+mpl.rc('lines', solid_capstyle='round')
+mpl.rc('mathtext', fontset='cm')
+plt.rcParams.update({'grid.alpha': 0.5})
+
+
+# --- Project Setup ---
+
+# PATH_BASE = "/blue/lblecha/lkelley/arepo_sims/cosmo_zooms/dynamics-comparison"
+# PATH_BASE = "/Volumes/Smally/arepo_sims/"
+
+# SIM_NAME = "bh_new_centering"
+
+# sim_path = os.path.join(PATH_BASE, SIM_NAME, 'output', '')
+
+# PATH = (
+# #     "/Volumes/Smally/arepo_sims/"
+# #     "bh_new_centering/output"
+#     "new-log_pos-test/output"
+# #     "/Volumes/Smally/log_test_data/"
+# )
+
+# SIM_PATHS = [
+#     "bh_new_centering",
+#     "repos-potmin",
+#     "unalt-dyn"
+# ]
