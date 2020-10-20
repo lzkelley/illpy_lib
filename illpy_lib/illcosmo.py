@@ -53,27 +53,40 @@ class Simulation_Cosmology(cosmopy.Cosmology):
     _Z_GRID = [20.0, 15.0, 10.0, 4.0, 2.0, 1.0, 0.5, 0.1, 0.02]
     _INTERP_POINTS = 40
 
-    def __init__(self, sim_path, fname_params='parameters-usedvalues', verbose=True, **kwargs):
+    def __init__(self, sim_path, fname_params=None, verbose=True, **kwargs):
         self._verbose = verbose
         self._sim_path = sim_path
         if not os.path.isdir(sim_path):
             raise FileNotFoundError("Simulation path '{}' does not exist!".format(sim_path))
 
-        # -- Load 'usedvalues' parameters file from Arepo simulation directory
-        _fnames = [fname_params, os.path.join(sim_path, fname_params)]
-        params = None
-        for fn in _fnames:
-            try:
-                params = self._load_used_params(fn)
-                if verbose:
-                    print("Loaded parameters from '{}'".format(fn))
-                break
-            except FileNotFoundError:
-                pass
+        path_mods = [
+            "",
+            "output",
+            "arepo"
+        ]
 
-        else:
-            raise FileNotFoundError("File '{}' does not exist!".format(fname_params))
+        if fname_params is None:
+            fname_params = [
+                'parameters-usedvalues',
+                'param.txt-usedvalues'
+            ]
+        elif np.isscalar(fname_params):
+            fname_params = [fname_params]
 
+        fname = None
+        for pm in path_mods:
+            for fn in fname_params:
+                path = os.path.join(sim_path, pm, fn)
+                if os.path.isfile(path):
+                    if verbose:
+                        print("Found parameters file: '{}'".format(path))
+                    fname = path
+                    break
+
+        if fname is None:
+            raise FileNotFoundError("Could not find params file in '{}'".format(sim_path))
+
+        params = self._load_used_params(fname)
         self._params = params
 
         # -- Extract the target values from the parameters
@@ -144,8 +157,8 @@ class Simulation_Cosmology(cosmopy.Cosmology):
 
     def _load_snapshot_info(self):
         path = self._sim_path
-        # path_output = os.path.join(path, "output", "")
-        path_output = path
+        path_output = os.path.join(path, "output", "")
+        # path_output = path
 
         snap_dirs = sorted(glob.glob(os.path.join(path_output, "snapdir_*")))
         self.NUM_SNAPS = len(snap_dirs)

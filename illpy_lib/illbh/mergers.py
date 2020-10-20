@@ -12,175 +12,67 @@ import numpy as np
 
 import parse
 
-import zcode.inout as zio
-import zcode.math as zmath
+# import zcode.inout as zio
+# import zcode.math as zmath
 
-import illpy_lib  # noqa
-from illpy_lib.illbh import BH_TYPE, Processed  # , utils
-
-
-VERSION = 0.5
+# import illpy_lib  # noqa
+from illpy_lib.illbh import BH_TYPE, Processed, utils, KEYS
 
 
 class Mergers(Processed):
 
     _PROCESSED_FILENAME = "bh-mergers.hdf5"
 
-    class KEYS(Processed.KEYS):
-        SCALE = 'scale'
-        ID   = 'id'
-        MASS = 'mass'
-
-        # NEXT = 'next'
-        # PREV = 'prev'
-        #
-        # NUM_NEXT = 'num_next'
-        # NUM_PREV = 'num_prev'
-
-        U_IDS = 'unique_ids'
-        U_INDICES = 'unique_indices'
-
-        _DERIVED = [U_IDS, U_INDICES]
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        fname = self.filename()
+        self._load(fname, self._recreate)
+        return
 
     def _parse_raw_file_line(self, line):
-        KEYS = self.KEYS
-
-        format = (
-            "{time:g} {task:d}  " +
-            "{id_o:d} {mass_o:g} " +
-            "{px_o:g} {py_o:g} {pz_o:g}  " +
-            "{id_i:d} {mass_i:g} " +
-            "{px_i:g} {py_i:g} {pz_i:g}"
-        )
-
-        format_mass = (
-            "{time:g} {task:d}  " +
-            "{id_o:d} {mass_o:g} {bh_mass_o:g} " +
-            "{px_o:g} {py_o:g} {pz_o:g}  " +
-            "{id_i:d} {mass_i:g} {bh_mass_i:g} " +
-            "{px_i:g} {py_i:g} {pz_i:g}"
-        )
-
-        format_mass_vel = (
-            "{time:g} {task:d}  " +
-            "{id_o:d} {mass_o:g} {bh_mass_o:g} " +
-            "{px_o:g} {py_o:g} {pz_o:g} {vx_o:g} {vy_o:g} {vz_o:g}  " +
-            "{id_i:d} {mass_i:g} {bh_mass_i:g} " +
-            "{px_i:g} {py_i:g} {pz_i:g} {vx_i:g} {vy_i:g} {vz_i:g}"
-        )
-
-        for form in [format_mass_vel, format_mass, format]:
-            temp = parse.parse(form, line)
-            if temp is not None:
-                break
-        else:
-            err = "ERROR: failed to parse line '{}'".format(line)
-            logging.error(err)
-            raise ValueError(err)
-
-        ids = np.zeros(2, dtype=np.uint64)
-        ids[BH_TYPE.OUT] = temp['id_o']
-        ids[BH_TYPE.IN] = temp['id_i']
-
-        mass = np.zeros(2)
-        mass[BH_TYPE.OUT] = temp['mass_o']
-        mass[BH_TYPE.IN] = temp['mass_i']
-
-        pos = np.zeros((3, 2))
-        pos[:, BH_TYPE.OUT] = [temp['px_o'], temp['py_o'], temp['pz_o']]
-        pos[:, BH_TYPE.IN] = [temp['px_i'], temp['py_i'], temp['pz_i']]
-
-        bh_mass = np.zeros(2)
-        if 'bh_mass_o' in temp:
-            bh_mass[BH_TYPE.OUT] = temp['bh_mass_o']
-            bh_mass[BH_TYPE.IN] = temp['bh_mass_i']
-
-        vel = np.zeros((3, 2))
-        if 'vx_o' in temp:
-            vel[:, BH_TYPE.OUT] = [temp['vx_o'], temp['vy_o'], temp['vz_o']]
-            vel[:, BH_TYPE.IN] = [temp['vx_i'], temp['vy_i'], temp['vz_i']]
-
-        rv = {
-            KEYS.SCALE: temp['time'],
-            KEYS.TASK: temp['task'],
-
-            KEYS.ID: ids,
-            KEYS.MASS: mass,
-            KEYS.BH_MASS: bh_mass,
-            KEYS.POS: pos,
-            KEYS.VEL: vel
-        }
-
+        raise NotImplementedError("This must be subclassed!")
+        rv = None
         return rv
 
-    def _get_merger_file_list(self, sim_path, cosmo=None):
+    def _get_merger_file_list(self, sim_path):
         raise NotImplementedError()
 
     def _clean_raw_mergers(self, mrgs):
         return mrgs
 
     def _load_raw_mergers(self):
-        KEYS = self.KEYS
         sim_path = self._sim_path
+        verbose = self._verbose
 
-        if sim_path is None:
-            err = "ERROR: `sim_path` is not set, cannot load raw mergers!"
-            logging.error(err)
-            raise ValueError(err)
-
-        if not os.path.isdir(sim_path):
-            err = "ERROR: `sim_path` '{}' does not exist!".format(sim_path)
-            logging.error(err)
-            raise ValueError(err)
-
-        '''
-        cosmo = illpy_lib.illcosmo.load_sim_cosmo(sim_path, verbose=self._verbose)
-        if cosmo is None:
-            msg = "WARNING: could not load cosmology"
-            logging.warning(msg)
-        '''
-        cosmo = None
-
-        merger_files = self._get_merger_file_list(sim_path, cosmo=cosmo)
-        if self._verbose:
+        # Get list of illustris blackhole-merger text files
+        #    This should be subclasses to find the files for particular output structures
+        merger_files = self._get_merger_file_list(sim_path)
+        if verbose:
             print("Found {} merger files".format(len(merger_files)))
 
-        # --- Go through all files compiling a list of dict for each merger ---
+        # --- Go through all files compiling a list of dict for each merger
         mergers = []
-        first = True
+        print_first = verbose   # print the first merger line if verbose
         for ii, mf in enumerate(tqdm.tqdm(merger_files, desc='files')):
-            prev = None
-            for ll, line in enumerate(open(mf, 'r').readlines()):
-                if first:
-                    print("Example merger line: '{}'".format(line.strip()))
-                    first = False
+            file_mergers = _load_raw_mergers_from_file(mf, len(mergers) == 0)
+            mergers = mergers + file_mergers
 
-                try:
-                    vals = self._parse_raw_file_line(line)
-                except:
-                    logging.error("FAILED on line {} of file '{}'".format(ll, mf))
-                    raise
-
-                sc = vals[KEYS.SCALE]
-                if prev is None:
-                    prev = sc
-                elif sc < prev:
-                    err = "file: {}, {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
-                    err = err.format(ii, mf, ll, sc, prev)
-                    logging.error(err)
-                    raise ValueError(err)
-
-                mergers.append(vals)
+        num_mrgs = len(mergers)
+        if verbose:
+            print("Loaded {} raw mergers".format(num_mrgs))
 
         # --- Convert to dict of arrays for all mergers ---
-        num_mrgs = len(mergers)
         mrgs = {}
         for mm, temp in enumerate(mergers):
+            # Initialize arrays on first value
             if mm == 0:
+                # Go through each item to determine necessary shape and data-type
                 for kk, vv in temp.items():
+                    # Scalars --> (N,)
                     if np.isscalar(vv):
                         shp = num_mrgs
                         tt = type(vv)
+                    # Arrays --> (N,) + (shape,)
                     else:
                         shp = (num_mrgs,) + np.shape(vv)
                         tt = vv.dtype
@@ -190,68 +82,77 @@ class Mergers(Processed):
             for kk, vv in temp.items():
                 mrgs[kk][mm, ...] = vv
 
-        idx = np.argsort(mrgs['scale'])
+        # --- Sort by scale-factor ---
+        #    Sort here so that ordering can be used for cleaning later
+        #    NOTE: these should already be all sorted... but lets be safe
+        idx = np.argsort(mrgs[KEYS.SCALE])
         for kk, vv in mrgs.items():
             mrgs[kk] = vv[idx, ...]
 
-        if self._verbose:
-            print("Loaded {} raw mergers".format(idx.size))
-
         return mrgs
+
+    def _load_raw_mergers_from_file(self, fname, print_first):
+        prev = None
+        mergers = []
+        for ll, line in enumerate(open(fname, 'r').readlines()):
+            if print_first:
+                print("first merger line: '{}'".format(line.strip()))
+                print_first = False
+
+            try:
+                vals = self._parse_raw_file_line(line)
+            except:
+                logging.error("FAILED on line {} of file '{}'".format(ll, mf))
+                raise
+
+            sc = vals[KEYS.SCALE]
+            if prev is None:
+                prev = sc
+            elif sc < prev:
+                err = "file: {}, {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
+                err = err.format(ii, mf, ll, sc, prev)
+                logging.error(err)
+                raise ValueError(err)
+
+            mergers.append(vals)
+
+        return mergers
 
     def _process(self):
         # Check output filename
-        fname = self.filename
-        path = os.path.dirname(fname)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        if not os.path.isdir(path):
-            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
-            logging.error(err)
-            raise FileNotFoundError(err)
+        fname = self.filename()
+        fname = utils._check_output_path(fname)
 
         # Load merger events directly from Illustris blackhole_mergers txt files, unmodified
         mrgs = self._load_raw_mergers()
         if self._verbose:
-            print("Loaded ", mrgs['scale'].size, "mergers!")
+            print("Loaded ", mrgs[KEYS.SCALE].size, "mergers")
 
         # Process mergers
+        #    This should be subclasses for simulation-specific operations
         mrgs = self._clean_raw_mergers(mrgs)
+        self._finalize_and_save(fname, mrgs)
+        return
 
-        # Construct merger tree ('next' and 'prev' arrays) and do some consistency checks
-        logging.warning("WARNING: skipping merger tree")
-        '''
-        mrgs = self._build_tree(mrgs)
-        if self._verbose:
-            print("Merger tree constructed with {} next and {} prev links".format(
-                np.count_nonzero(mrgs['next'] >= 0), np.count_nonzero(mrgs['prev'] >= 0)))
-        '''
-
+    def _finalize(self, mrgs):
         # -- Identify Unique BHs based on ID numbers
-        KEYS = self.KEYS
         mids = mrgs[KEYS.ID]
         # Convert from (M, 2) ==> (2*M,), i.e. [ID0_pri, ID0_sec, ID1_pri, ID1_sec ...]
         mids = mids.flatten()
 
         # Find unique indices, and first occurence of each index
-        u_ids, u_inds = np.unique(mids, return_index=True)
+        u_ids, u_inds, u_counts = np.unique(mids, return_index=True, return_counts=True)
         # Convert from index number in array of length (2*M,) to index number in mergers (M,)
         u_inds = u_inds // 2
-
         mrgs[KEYS.U_IDS] = u_ids
         mrgs[KEYS.U_INDICES] = u_inds
+        mrgs[KEYS.U_COUNTS] = u_counts
         if self._verbose:
             print("Identified {} unique BHs in {} mergers".format(u_ids.size, mids.size))
 
-        # Save values to file
-        self._save_to_hdf5(fname, self.KEYS, mrgs, __file__)
-        if self._verbose:
-            msg = "Saved data for {} mergers to '{}' size {}".format(
-                len(mrgs[self.KEYS.SCALE]), fname, zio.get_file_size(fname))
-            print(msg)
+        return mrgs
 
-        return
-
+    '''
     def _build_tree(self, mrgs):
         """
         The first BH is the "out" (remaining) BH, second BH is "in" (removed) BH
@@ -373,15 +274,12 @@ class Mergers(Processed):
             print("\t{}".format(zmath.stats_str(mult)))
 
         return mrgs
+    '''
 
 
 class Mergers_TNG(Mergers):
 
-    class KEYS(Mergers.KEYS):
-        TASK = 'task'
-        BH_MASS = 'bh_mass'    # NOTE: the 'in' BH has 'BH_Mass' but the 'out' uses reg. 'mass'
-
-    def _get_merger_file_list(self, sim_path, cosmo=None):
+    def _get_merger_file_list(self, sim_path):
         mfil_pattern = 'blackhole_mergers_*.txt'
         mfil_pattern = os.path.join(sim_path, 'output', 'blackhole_mergers', mfil_pattern)
         merger_files = sorted(glob.glob(mfil_pattern))
@@ -389,12 +287,11 @@ class Mergers_TNG(Mergers):
 
     def _parse_raw_file_line(self, line):
         """
-        TNG:
+        TOS & TNG:
 
         fprintf(FdBlackHolesMergers, "%d %g %llu %g %llu %g\n",
                 ThisTask, All.Time, (long long) id, mass, (long long) P[no].ID, BPP(no).BH_Mass);
         """
-        KEYS = self.KEYS
 
         format = (
             "{task:d} {scale:g} " +
@@ -432,21 +329,25 @@ class Mergers_TNG(Mergers):
         return mrg
 
 
+class Mergers_TOS(Mergers_TNG):
+
+    def _get_merger_file_list(self, sim_path):
+        files = []
+        path = os.path.join(sim_path, 'txt-files', 'txtfiles_new', '')
+        for dirpath, dirnames, filenames in os.walk(path):
+            filenames = [os.path.join(dirpath, fn) for fn in filenames if fn.startswith('blackhole_mergers')]
+            if (len(filenames) > 0) and self._verbose:
+                print("Found {} files in {}".format(len(filenames), dirpath))
+            files = files + filenames
+
+        return files
+
+
 class Mergers_New(Mergers):
     """New-Seed Simulations (Blecha, Kelley, Torrey collaboration project).
     """
 
-    class KEYS(Mergers.KEYS):
-        SNAP = 'snap'
-        TASK = 'task'
-
-        BH_MASS = 'bh_mass'
-        POS  = 'pos'
-        VEL  = 'vel'
-
     def _parse_raw_file_line(self, line):
-        KEYS = self.KEYS
-
         format = (
             "{time:g} {task:d}  " +
             "{id_o:d} {mass_o:g} " +
@@ -552,129 +453,3 @@ class Mergers_New(Mergers):
             print("Found {} merger files".format(len(file_list)))
 
         return file_list
-
-    '''
-    def _load_raw_mergers(self):
-        KEYS = self.KEYS
-        sim_path = self._sim_path
-
-        if sim_path is None:
-            err = "ERROR: `sim_path` is not set, cannot load raw mergers!"
-            logging.error(err)
-            raise ValueError(err)
-
-        if not os.path.isdir(sim_path):
-            err = "ERROR: `sim_path` '{}' does not exist!".format(sim_path)
-            logging.error(err)
-            raise ValueError(err)
-
-        try:
-            cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=self._verbose)
-            scales = cosmo.scale
-            num_snaps = len(scales)
-        except FileNotFoundError as err:
-            scales = None
-            num_snaps = None
-            msg = "WARNING: could not load cosmology (snapshots missing?): '{}'".format(str(err))
-            logging.warning(msg)
-            logging.warning("WARNING: Cannot compare merger times to snapshot times!")
-
-        mergers = []
-        msnaps = []
-
-        mdir_pattern = 'mergers_' + '[0-9]' * 3
-        # mdir_pattern = os.path.join(self._sim_path, 'output', 'blackholes', mdir_pattern)
-        mdir_pattern = os.path.join(self._sim_path, 'blackholes', mdir_pattern)
-        merger_dirs = sorted(glob.glob(mdir_pattern))
-        num_mdirs = len(merger_dirs)
-        if self._verbose:
-            print("Found {} merger directories".format(num_mdirs))
-        if (num_snaps is not None) and (num_snaps != num_mdirs):
-            err = "WARNING: found {} merger dirs but {} snapshots!".format(num_mdirs, num_snaps)
-            logging.warning(err)
-        if num_mdirs == 0:
-            err = "No merger directories found matching {}!".format(mdir_pattern)
-            logging.error(err)
-            raise FileNotFoundError(err)
-
-        num_mrgs = 0
-        # for snap in range(len(scale)):
-        for kk, mdir in enumerate(merger_dirs):
-            snap = int(os.path.basename(mdir).split('_')[-1])
-            if snap != kk:
-                msg = "WARNING: {}th merger-directory is snapshot {}!".format(kk, snap)
-                logging.warning(msg)
-
-            mfils = os.path.join(mdir, "blackhole_mergers_*.txt")
-            mfils = sorted(glob.glob(mfils))
-            if len(mfils) == 0:
-                err = "ERROR: snap={} : no files found in '{}'".format(snap, mdir)
-                raise FileNotFoundError(err)
-
-            if scales is not None:
-                lo = scales[snap-1] if snap > 0 else 0.0
-                try:
-                    hi = scales[snap]
-                except IndexError:
-                    # There may not be a final snapshot
-                    if snap != len(scales):
-                        raise
-                    hi = 1.0
-
-            for ii, mf in enumerate(mfils):
-                prev = None
-                for ll, line in enumerate(open(mf, 'r').readlines()):
-                    try:
-                        vals = self._parse_raw_file_line(line)
-                    except:
-                        logging.error("FAILED on line {} of file '{}'".format(ll, mf))
-                        raise
-
-                    vals[KEYS.SNAP] = snap
-
-                    sc = vals[KEYS.SCALE]
-                    if prev is None:
-                        prev = sc
-                    elif sc < prev:
-                        err = f"Snap: {snap}, file: {ii} - scale:{sc:.8f} is before previous:{prev:.8f}!"
-                        logging.error(err)
-                        raise ValueError(err)
-
-                    if (scales is not None):
-                        lo_flag = (sc < lo) & (not np.isclose(sc, lo, rtol=1e-6, atol=0.0))
-                        hi_flag = (sc > hi) & (not np.isclose(sc, hi, rtol=1e-6, atol=0.0))
-                        if (lo_flag or hi_flag):
-                            err = "Snap: {}, file: {}, scale:{:.8f} not in [{:.8f}, {:.8f}]!".format(
-                                snap, ii, sc, lo, hi)
-                            logging.error(err)
-                            raise ValueError(err)
-
-                    mergers.append(vals)
-                    msnaps.append(snap)
-                    num_mrgs += 1
-
-        mrgs = {}
-        for mm, temp in enumerate(mergers):
-            if mm == 0:
-                for kk, vv in temp.items():
-                    if np.isscalar(vv):
-                        shp = num_mrgs
-                        tt = type(vv)
-                    else:
-                        shp = (num_mrgs,) + np.shape(vv)
-                        tt = vv.dtype
-
-                    mrgs[kk] = np.zeros(shp, dtype=tt)
-
-            for kk, vv in temp.items():
-                mrgs[kk][mm, ...] = vv
-
-        idx = np.argsort(mrgs['scale'])
-        for kk, vv in mrgs.items():
-            mrgs[kk] = vv[idx, ...]
-
-        if self._verbose:
-            print("Loaded {} raw mergers".format(idx.size))
-
-        return mrgs
-    '''

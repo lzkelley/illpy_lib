@@ -1,6 +1,7 @@
 """
 """
 import os
+import logging
 from datetime import datetime
 
 import numpy as np
@@ -38,6 +39,19 @@ def _save_meta_to_hdf5(save_hdf5, sim_path, version, script_file):
     save_hdf5.attrs['script'] = str(os.path.abspath(script_file))
     save_hdf5.attrs['sim_path'] = str(sim_path)
     return
+
+
+def _check_output_path(fname):
+    fname = os.path.abspath(fname)
+    path = os.path.dirname(fname)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    if not os.path.isdir(path):
+        err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
+        logging.error(err)
+        raise FileNotFoundError(err)
+
+    return fname
 
 
 # def git_hash():
