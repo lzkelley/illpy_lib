@@ -52,9 +52,8 @@ class Mergers(Processed):
 
         # --- Go through all files compiling a list of dict for each merger
         mergers = []
-        print_first = verbose   # print the first merger line if verbose
         for ii, mf in enumerate(tqdm.tqdm(merger_files, desc='files')):
-            file_mergers = _load_raw_mergers_from_file(mf, len(mergers) == 0)
+            file_mergers = self._load_raw_mergers_from_file(mf, len(mergers) == 0)
             mergers = mergers + file_mergers
 
         num_mrgs = len(mergers)
@@ -94,6 +93,7 @@ class Mergers(Processed):
     def _load_raw_mergers_from_file(self, fname, print_first):
         prev = None
         mergers = []
+        bhs_in = []
         for ll, line in enumerate(open(fname, 'r').readlines()):
             if print_first:
                 print("first merger line: '{}'".format(line.strip()))
@@ -102,15 +102,27 @@ class Mergers(Processed):
             try:
                 vals = self._parse_raw_file_line(line)
             except:
-                logging.error("FAILED on line {} of file '{}'".format(ll, mf))
+                logging.error("FAILED on line {} of file '{}'".format(ll, fname))
                 raise
 
+            # --- Check that "in" BH has not already appeared in a merger ---
+            _bh_in = vals[KEYS.ID][BH_TYPE.IN]
+            if _bh_in in bhs_in:
+                bad = np.where(_bh_in == bhs_in)[0][0]
+                err = "file: {} - line: {} - in BH:{:d} already in merger {}!"
+                err = err.format(fname, ll, _bh_in, bad)
+                logging.error(err)
+                raise ValueError(err)
+
+            bhs_in.append(_bh_in)
+
+            # --- Check that this merger time is after the previous one ---
             sc = vals[KEYS.SCALE]
             if prev is None:
                 prev = sc
             elif sc < prev:
-                err = "file: {}, {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
-                err = err.format(ii, mf, ll, sc, prev)
+                err = "file: {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
+                err = err.format(fname, ll, sc, prev)
                 logging.error(err)
                 raise ValueError(err)
 
@@ -148,7 +160,7 @@ class Mergers(Processed):
         mrgs[KEYS.U_INDICES] = u_inds
         mrgs[KEYS.U_COUNTS] = u_counts
         if self._verbose:
-            print("Identified {} unique BHs in {} mergers".format(u_ids.size, mids.size))
+            print("Identified {} unique BHs in {} mergers".format(u_ids.size, mids.size//2))
 
         return mrgs
 
@@ -341,6 +353,58 @@ class Mergers_TOS(Mergers_TNG):
             files = files + filenames
 
         return files
+
+    def _load_raw_mergers_from_file(self, fname, print_first):
+        prev = None
+        mergers = []
+        bhs_in = []
+        scales = []
+        for ll, line in enumerate(open(fname, 'r').readlines()):
+            if print_first:
+                print("first merger line: '{}'".format(line.strip()))
+                print_first = False
+
+            try:
+                vals = self._parse_raw_file_line(line)
+            except:
+                logging.error("FAILED on line {} of file '{}'".format(ll, fname))
+                raise
+
+            # --- Check that "in" BH has not already appeared in a merger ---
+            _bh_in = vals[KEYS.ID][BH_TYPE.IN]
+            if _bh_in in bhs_in:
+                bad = np.where(_bh_in == bhs_in)[0][0]
+                err = "file: {} - line: {} - in BH:{:d} already in merger {}!"
+                err = err.format(fname, ll, _bh_in, bad)
+                logging.warning(err)
+                # Remove previous merger
+                logging.warning("!!Removing previous merger {}!!".format(bad))
+                mergers.pop(bad)
+                bhs_in.pop(bad)
+                scales.pop(bad)
+
+            # --- Check that this merger time is after the previous one ---
+            sc = vals[KEYS.SCALE]
+            if prev is None:
+                prev = sc
+            elif sc < prev:
+                err = "file: {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
+                err = err.format(fname, ll, sc, prev)
+                logging.error(err)
+                logging.warning("!!Removing preceding mergers!!")
+                idx = len(scales) - 1
+                while (idx >= 0) and (scales[idx] > sc):
+                    logging.warning("!!Removing merger {}!!".format(idx))
+                    bhs_in.pop(idx)
+                    scales.pop(idx)
+                    mergers.pop(idx)
+                    idx -= 1
+
+            bhs_in.append(_bh_in)
+            scales.append(sc)
+            mergers.append(vals)
+
+        return mergers
 
 
 class Mergers_New(Mergers):
