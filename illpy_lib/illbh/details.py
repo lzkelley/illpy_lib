@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 
 import numpy as np
-# import h5py
+import h5py
 
 import parse
 
@@ -56,15 +56,15 @@ class Details(Processed):
         dets[KEYS.U_COUNTS] = u_counts
         return dets
 
-    def _finalize_and_save(self, dets):
-        # KEYS = self.KEYS
+    def _finalize_and_save(self, dets, fname=None, **header):
         dets = self._sort_add_unique(dets)
 
         # -- Save values to file
         # Get output filename for this snapshot
         #   path should have already been created in `_process` by rank=0
-        fname = self.filename()
-        self._save_to_hdf5(fname, KEYS, dets, __file__)
+        if fname is None:
+            fname = self.filename()
+        self._save_to_hdf5(fname, __file__, dets, **header)
         if self._verbose:
             num_unique = dets[KEYS.U_IDS].size
             msg = "Saved data for {} details ({} unique) to '{}' size {}".format(
@@ -383,135 +383,25 @@ class Details_TNG_Task(Details):
 
 class Details_TNG_Snap(Details):
 
-    _PROCESSED_FILENAME = "bh-details_{snap:04d}.hdf5"
+    _PROCESSED_FILENAME = "bh-details_snap-{snap:04d}.hdf5"
     _SNAP_DIR_NAME = "details_{snap:04d}"
+    _SKIP_DERIVED_KEYS = KEYS._DERIVED
 
     def __init__(self, snap, sim_path, *args, cosmo=None, **kwargs):
         self._snap = snap
-        if cosmo is None:
-            cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path)
         self._cosmo = cosmo
-
-        if (self._cosmo is None) or (len(getattr(self._cosmo, 'scale', [])) == 0):
-            err = "Failed to load cosmo, required for {}".format(self.__class__.__name__)
-            logging.error(err)
-            raise RuntimeError(err)
-
         super().__init__(sim_path, *args, **kwargs)
-
-        self._size = None
-        num_snaps = len(self._cosmo.scale)
-        recreate = self._recreate
-        verbose = self._verbose
-        exists = True
-        fname = self.filename(snap)
-        if not os.path.isfile(fname):
-            if self._verbose:
-                print("Snap file {} does not exist '{}'".format(snap, fname))
-            exists = False
-
-        if recreate or (not exists):
-            if verbose:
-                print("Running `_process()`; recreate: {}, exists: {} ({})".format(
-                    recreate, exists, fname))
-            self._process()
-        elif verbose:
-            print("File exists")
-
-        return
-
-    def _finalize_and_save(self, dets):
-        # KEYS = self.KEYS
-        # dets = self._sort_add_unique(dets)
-        verbose = self._verbose
-        cosmo = self._cosmo
-        snap_scales = cosmo.scale
-        num_snaps = len(snap_scales)
-
-        # KEYS = self.KEYS
-        idx = np.argsort(dets[KEYS.SCALE])
-        # skip = [KEYS.U_IDS, KEYS.U_INDICES, KEYS.U_COUNTS]
-        for kk, vv in dets.items():
-            dets[kk] = vv[idx, ...]
-
-        det_scales = dets[KEYS.SCALE]
-        SFIGS = 6
-        # logging.warning("Rounding snapshot scalefactors up at {} decimal places".format(SFIGS))
-        # Determine the number of decimal places for this number of sig-figs
-        temp = SFIGS - 1 + np.fabs(np.floor(np.log10(snap_scales))).astype(int)
-        # Round up at this number of sig-figs
-        temp = 10**temp
-        snap_scales = np.ceil(temp * snap_scales) / temp
-
-        last_scale = 0.0
-        check = np.zeros(det_scales.size, dtype=int)
-        if verbose:
-            tot_num = det_scales.size
-            print("Organizing into {:3d} snapshots [{:.10e}...{:.10e}]".format(
-                snap_scales.size, snap_scales[0], snap_scales[-1]))
-
-        final_snap = num_snaps - 1
-        # print_first_snap = verbose
-        for snap, sca in enumerate(snap_scales):
-            # idx_hi = (det_scales > last_scale)
-            # idx_lo_1 = (det_scales <= sca)
-            # idx_lo_2 = (np.isclose(det_scales, sca, rtol=1e-8) & (snap == final_snap))
-            # idx = idx_hi & (idx_lo_1 | idx_lo_2)
-            idx = (det_scales > last_scale) & (det_scales <= sca)
-            check[idx] += 1
-            snap_dets = {}
-            for kk, vv in dets.items():
-                snap_dets[kk] = vv[idx, ...]
-
-            snap_dets = self._sort_add_unique(snap_dets)
-            fname = self.filename(snap)
-            self._save_to_hdf5(fname, __file__, snap_dets)
-            if (snap == final_snap) and verbose:
-                _num = len(snap_dets[KEYS.SCALE])
-                _num_uniq = snap_dets[KEYS.U_IDS].size
-                _frac = _num / tot_num
-                msg = "task {:4d} :: saved {:.2e}/{:.2e} = {:.2e} details ({:.2e} unique) to '{}' size {}".format(
-                    self._task, _num, tot_num, _frac, _num_uniq, fname, zio.get_file_size(fname))
-                print(msg)
-
-            last_scale = sca
-
-        # --- Make sure each entry was written once and only once ---
-        err = ""
-        if np.any(check > 1):
-            err += "ERROR: `check` values greater than one!  "
-        if np.any(check < 1):
-            err += "ERROR: `check` values less    than one!  "
-
-        if len(err) > 0:
-            bads = np.where(check != 1)[0]
-            logging.error(err)
-
-            logging.error("{} bad values: {}".format(len(bads), bads))
-            logging.error("bad scales = {:.10e}   = {}".format(
-                det_scales[bads][0], det_scales[bads]))
-
-            # Delete files on failure
-            for snap in range(num_snaps):
-                fname = self.filename(snap)
-                os.remove(fname)
-
-            raise RuntimeError(err)
-
+        self._load(self.filename(snap), self._recreate)
         return
 
     def _process(self):
         verbose = self._verbose
-        cosmo = self._cosmo
-        # scales = cosmo.scale
-        # num_snaps = len(scales)
-        # if verbose:
-        #     print("{} snapshots from cosmo".format(num_snaps))
 
         # Get list of files
         snap = self._snap
         snap_path = self._snap_path(snap, self._processed_path)
         pattern = Details_TNG_Task._PROCESSED_FILENAME.replace('{task:04d}', '*')
+        pattern = os.path.join(snap_path, pattern)
         files = sorted(glob.glob(pattern))
         if verbose:
             print(f"found {len(files)} files matching '{pattern}'")
@@ -520,42 +410,60 @@ class Details_TNG_Snap(Details):
             raise FileNotFoundError(f"No files found for snap {snap} matching '{pattern}'!")
 
         details = {}
-        for fname in files:
+        first = True
+        size = 0
+        for ii, fname in enumerate(files):
+            new_size = None
+            new_size_key = None
+            with h5py.File(fname, 'r') as h5:
+                for kk, vv in h5.items():
+                    if kk in self._SKIP_DERIVED_KEYS:
+                        continue
+
+                    temp = vv[()]
+                    # if np.ndim(temp) > 0:
+                    temp_size = np.shape(temp)[0]
+                    if new_size is None:
+                        new_size = temp_size
+                        new_size_key = kk
+                    elif (kk not in KEYS._U_KEYS) and (new_size != temp_size):
+                        msg = (
+                            f"Size of '{kk}'={temp_size} does not match "
+                            f"previous size {new_size} from '{new_size_key}!"
+                        )
+                        logging.warning(msg)
+
+                    if kk not in details:
+                        if not first:
+                            err = f"WARNING: key '{kk}' found first in file {ii}, {fname}!"
+                            logging.error(err)
+                            raise RuntimeError(err)
+
+                        details[kk] = temp
+                    else:
+                        prev = details[kk]
+                        details[kk] = np.concatenate([prev, temp], axis=0)
+
+                if first and len(h5.keys()) > 0:
+                    first = False
+
+            if new_size is not None:
+                size += new_size
+                if verbose:
+                    print(f"Loaded {new_size} entires from '{fname}'")
+
+        self._size = size
+        if verbose:
+            print(f"Loaded {size} details")
+
+        self._details = details
+        try:
+            self._finalize_and_save(details)
+        except Exception as err:
+            logging.exception(err)
+            print(err)
             raise
 
-        num_dets = len(details)
-        self._size = num_dets
-        if verbose:
-            print("Loaded {} details from '{}'".format(num_dets, fname_in))
-
-        dets = {}
-        for dd, temp in enumerate(details):
-            if dd == 0:
-                for kk, vv in temp.items():
-                    if np.isscalar(vv):
-                        shp = num_dets
-                        tt = type(vv)
-                    else:
-                        shp = (num_dets,) + np.shape(vv)
-                        tt = vv.dtype
-
-                    if kk == KEYS.ID:
-                        tt = np.uint64
-
-                    # print(f"initializing {kk} to shape {shp} type {tt}  - shape(vv) = {np.shape(vv)}")
-                    dets[kk] = np.zeros(shp, dtype=tt)
-
-            for kk, vv in temp.items():
-                try:
-                    dets[kk][dd, ...] = vv
-                except OverflowError as err:
-                    print(kk)
-                    print(err)
-                    print(f"FAILED on kk={kk}, type={vv.dtype}")
-                    print(f"dets[{kk}].dtype = {dets[kk].dtype}")
-                    raise
-
-        self._finalize_and_save(dets)
         return
 
     @classmethod
@@ -564,7 +472,9 @@ class Details_TNG_Snap(Details):
         path = os.path.join(processed_path, temp, '')
         return path
 
-    def filename(self, snap):
+    def filename(self, snap=None):
+        if snap is None:
+            snap = self._snap
         path = self._snap_path(snap, self._processed_path)
         fname = self._PROCESSED_FILENAME.format(snap=snap)
         fname = os.path.join(path, fname)
@@ -597,6 +507,10 @@ class Details_TOS_Task(Details_TNG_Task):
         return files
 
 
+class Details_TOS_Snap(Details_TNG_Snap):
+    pass
+
+
 def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VERBOSE):
     try:
         comm = MPI.COMM_WORLD
@@ -609,8 +523,16 @@ def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VER
     beg = datetime.now()
     if comm.rank == 0:
 
+        pattern = os.path.join(sim_path, 'output', 'snapdir_*')
+        num_snaps = len(glob.glob(pattern))
+        if num_snaps == 0:
+            err = f"Failed to find snapshots matching pattern '{pattern}'!"
+            logging.exception(err)
+            raise RuntimeError(err)
+
         if mode == 'tng':
-            Det_Class = Details_TNG_Task
+            Det_Class_Task = Details_TNG_Task
+            Det_Class_Snap = Details_TNG_Snap
             fname_params = None
 
             pattern = os.path.join(
@@ -626,7 +548,8 @@ def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VER
                 raise FileNotFoundError(err)
 
         elif mode == 'tos':
-            Det_Class = Details_TOS_Task
+            Det_Class_Task = Details_TOS_Task
+            Det_Class_Snap = Details_TOS_Snap
             fname_params = TOS_PARAMS_FNAME
             num_tasks = 8192
 
@@ -634,32 +557,40 @@ def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VER
             raise ValueError(f"Unrecognized `mode` '{mode}'!")
 
         task_list = np.arange(num_tasks).tolist()
+        snap_list = np.arange(num_snaps).tolist()
         np.random.seed(1234)
         np.random.shuffle(task_list)
+        np.random.shuffle(snap_list)
         task_list = np.array_split(task_list, comm.size)
+        snap_list = np.array_split(snap_list, comm.size)
 
         cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, fname_params=fname_params)
         # Make sure all paths exist
         for snap in range(len(cosmo.scale)):
-            snap_path = Det_Class._snap_path(snap, proc_path)
+            snap_path = Det_Class_Task._snap_path(snap, proc_path)
             if not os.path.isdir(snap_path):
                 os.makedirs(snap_path)
 
     else:
         task_list = None
+        snap_list = None
         cosmo = None
-        Det_Class = None
+        Det_Class_Task = None
+        Det_Class_Snap = None
 
     task_list = comm.scatter(task_list, root=0)
+    snap_list = comm.scatter(snap_list, root=0)
     cosmo = comm.bcast(cosmo, root=0)
-    Det_Class = comm.bcast(Det_Class, root=0)
+    Det_Class_Task = comm.bcast(Det_Class_Task, root=0)
+    Det_Class_Snap = comm.bcast(Det_Class_Snap, root=0)
 
+    # ---- Process All Processor/Task Output Files ----
     comm.barrier()
     print(f"rank: {comm.rank}, {len(task_list)} tasks: {task_list}".format())
     num_lines = 0
     for task in task_list:
-        details = Det_Class(task, sim_path, proc_path,
-                            cosmo=cosmo, recreate=recreate, verbose=verbose)
+        details = Det_Class_Task(task, sim_path, proc_path,
+                                 cosmo=cosmo, recreate=recreate, verbose=verbose)
         temp = details.size
         if (temp is None) and verbose:
             print("No details loaded for task {}".format(task))
@@ -667,11 +598,12 @@ def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VER
 
         num_lines += temp
 
-    num_lines = comm.gather(num_lines, root=0)
-
     end = datetime.now()
     if verbose:
         print(f"Rank: {comm.rank}, {num_lines:.2e} lines done at {end}, after {(end-beg)}")
+
+    num_lines = comm.gather(num_lines, root=0)
+
     if comm.rank == 0:
         tot_num_lines = np.sum(num_lines)
         ave = np.mean(num_lines)
@@ -681,6 +613,35 @@ def process_details_snaps(mode, sim_path, proc_path, recreate=False, verbose=VER
             print("Tot lines={:.2e}, med={:.2e}, ave={:.2e}±{:.2e}".format(
                 tot_num_lines, med, ave, std))
 
+    # ---- Process All Snapshots Output Files ----
+    comm.barrier()
+    print(f"rank: {comm.rank}, {len(snap_list)} snaps: {snap_list}".format())
+    num_lines = 0
+    for snap in snap_list:
+        details = Det_Class_Snap(snap, sim_path, proc_path,
+                                 cosmo=cosmo, recreate=recreate, verbose=verbose)
+        temp = details.size
+        if (temp is None) and verbose:
+            print("No details loaded for task {}".format(task))
+            continue
+
+        num_lines += temp
+
+    end = datetime.now()
+    if verbose:
+        print(f"Rank: {comm.rank}, {num_lines:.2e} lines done at {end}, after {(end-beg)}")
+
+    num_lines = comm.gather(num_lines, root=0)
+    if comm.rank == 0:
+        tot_num_lines = np.sum(num_lines)
+        ave = np.mean(num_lines)
+        med = np.median(num_lines)
+        std = np.std(num_lines)
+        if verbose:
+            print("Tot lines={:.2e}, med={:.2e}, ave={:.2e}±{:.2e}".format(
+                tot_num_lines, med, ave, std))
+
+    if comm.rank == 0:
         tail = f"Done at {str(end)} after {str(end-beg)} ({(end-beg).total_seconds()})"
         print("\n" + "=" * len(tail) + "\n" + tail + "\n")
 
