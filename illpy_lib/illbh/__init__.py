@@ -102,7 +102,7 @@ class Processed:
 
     _PROCESSED_FILENAME = "bh-snapshots.hdf5"
 
-    def __init__(self, sim_path, processed_path, verbose=VERBOSE, recreate=False, load=True):
+    def __init__(self, sim_path, processed_path, verbose=VERBOSE, recreate=False, load=False):
         sim_path = os.path.abspath(sim_path)
         sim_path = sim_path.rstrip('/')
         if os.path.dirname(sim_path) == 'output':
@@ -121,8 +121,8 @@ class Processed:
         self._size = None
 
         # -- Load data
-        # if load:
-        #     self._load(recreate)
+        if load:
+            self._load(recreate)
 
         return
 
@@ -188,10 +188,9 @@ class Processed:
     def _load(self, fname, recreate):
         # fname = self.filename
         exists = os.path.exists(fname)
+        if self._verbose:
+            print(f"`_load()`: recreate: {recreate}, exists: {exists} ({fname})")
         if not exists or recreate:
-            if self._verbose:
-                print("Running `_process()`; recreate: {}, exists: {} ({})".format(
-                    recreate, exists, fname))
             self._process()
 
         self._load_from_save(fname)
@@ -235,7 +234,7 @@ class Processed:
                 dt = load.attrs['created']
                 print("Loaded {:10d} entries from '{}', created '{}'".format(size, fname, dt))
             if size == 0:
-                logging.warning("No values loaded; keys = '{}' from '{}'!".format(keys, fname))
+                logging.info("No values loaded; keys = '{}' from '{}'!".format(keys, fname))
 
         return
 
