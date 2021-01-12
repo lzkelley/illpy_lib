@@ -52,13 +52,20 @@ class Mergers(Processed):
 
         # --- Go through all files compiling a list of dict for each merger
         mergers = []
+        bad_scales = []
         for ii, mf in enumerate(tqdm.tqdm(merger_files, desc='files')):
-            file_mergers = self._load_raw_mergers_from_file(mf, len(mergers) == 0)
+            file_mergers, file_bad_scales = self._load_raw_mergers_from_file(mf, len(mergers) == 0)
             mergers = mergers + file_mergers
-
+            bad_scales = bad_scales + file_bad_scales
+            
         num_mrgs = len(mergers)
         if verbose:
             print("Loaded {} raw mergers".format(num_mrgs))
+
+        if len(bad_scales) > 0:
+            bads_str = ", ".join([f"{bs:.8f}" for bs in bad_scales])
+            logging.error("Found bad scales!")
+            logging.error(f"{len(bad_scales)} bad scales: {bads_str}")            
 
         # --- Convert to dict of arrays for all mergers ---
         mrgs = {}
@@ -94,6 +101,8 @@ class Mergers(Processed):
         prev = None
         mergers = []
         bhs_in = []
+        bad_scales = []
+        num_removed = 0
         for ll, line in enumerate(open(fname, 'r').readlines()):
             if print_first:
                 print("first merger line: '{}'".format(line.strip()))
@@ -105,6 +114,26 @@ class Mergers(Processed):
                 logging.error("FAILED on line {} of file '{}'".format(ll, fname))
                 raise
 
+            # --- Check that this merger time is after the previous one ---
+            sc = vals[KEYS.SCALE]
+            if prev is None:
+                prev = sc
+            # If time is *before* previous merger, indicates restart, delete previous mergers
+            elif sc <= prev:
+                err = "file: {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
+                err = err.format(fname, ll, sc, prev)
+                logging.info(err)
+
+                num_mergers = len(mergers)
+                for bb in reversed(range(num_mergers)):
+                    if mergers[bb][KEYS.SCALE] >= sc:
+                        del mergers[bb]
+                        del bhs_in[bb]
+                        num_removed += 1
+                
+                logging.info(f"Removed {num_removed}/{num_mergers} = {num_removed/num_mergers:.4e} entries from restart")
+                # raise ValueError(err)
+
             # --- Check that "in" BH has not already appeared in a merger ---
             _bh_in = vals[KEYS.ID][BH_TYPE.IN]
             if _bh_in in bhs_in:
@@ -112,23 +141,29 @@ class Mergers(Processed):
                 err = "file: {} - line: {} - in BH:{:d} already in merger {}!"
                 err = err.format(fname, ll, _bh_in, bad)
                 logging.error(err)
+                logging.error(mergers[bad])
+                logging.error(vals)
+                bad_scales.append(vals[KEYS.SCALE])
+                
                 raise ValueError(err)
+                
+                if np.all(vals[KEYS.ID] == mergers[bad][KEYS.ID]):
+                    logging.error("IDs match, overriding previous with new!")
+                    del bhs_in[bad]
+                    del mergers[bad]
+                else:
+                    raise ValueError(err)
 
             bhs_in.append(_bh_in)
 
-            # --- Check that this merger time is after the previous one ---
-            sc = vals[KEYS.SCALE]
-            if prev is None:
-                prev = sc
-            elif sc < prev:
-                err = "file: {} - line: {} - scale:{:.8f} is before previous:{:.8f}!"
-                err = err.format(fname, ll, sc, prev)
-                logging.error(err)
-                raise ValueError(err)
-
             mergers.append(vals)
-
-        return mergers
+            prev = sc
+            
+        if self._verbose:
+            print(f"Loaded {len(mergers)} mergers")
+            print(f"Removed {num_removed} entries from restarts")
+            
+        return mergers, bad_scales
 
     def _process(self):
         # Check output filename
@@ -156,20 +191,21 @@ class Mergers(Processed):
         u_ids, u_inds, u_counts = np.unique(mids, return_index=True, return_counts=True)
         # Convert from index number in array of length (2*M,) to index number in mergers (M,)
         u_inds = u_inds // 2
+        num_mrgs = mids.size//2
         mrgs[KEYS.U_IDS] = u_ids
         mrgs[KEYS.U_INDICES] = u_inds
         mrgs[KEYS.U_COUNTS] = u_counts
+        self._size = num_mrgs
         if self._verbose:
-            print("Identified {} unique BHs in {} mergers".format(u_ids.size, mids.size//2))
+            print("Identified {} unique BHs in {} mergers".format(u_ids.size, num_mrgs))
 
         return mrgs
 
-    '''
     def _build_tree(self, mrgs):
         """
         The first BH is the "out" (remaining) BH, second BH is "in" (removed) BH
         """
-        KEYS = self.KEYS
+        # KEYS = self.KEYS
 
         def mstr(mm):
             msg = "{:6d} a={:.8f} task={:3d} ".format(mm, mrgs[KEYS.SCALE][mm], mrgs[KEYS.TASK][mm])
@@ -243,8 +279,8 @@ class Mergers(Processed):
 
                     break  # for jj
 
-        mrgs[KEYS.NEXT] = next
-        mrgs[KEYS.PREV] = prev
+        mrgs[KEYS.T_NEXT] = next
+        mrgs[KEYS.T_PREV] = prev
 
         num_next = np.ones(num, np.int32) * -1
         num_prev = np.ones((num, 2), np.int32) * -1
@@ -268,8 +304,8 @@ class Mergers(Processed):
             num_next[mm] = 0
             _count_prev(mm)
 
-        mrgs[KEYS.NUM_NEXT] = num_next
-        mrgs[KEYS.NUM_PREV] = num_prev
+        mrgs[KEYS.T_NUM_NEXT] = num_next
+        mrgs[KEYS.T_NUM_PREV] = num_prev
 
         # -- Report statistics
 
@@ -286,7 +322,6 @@ class Mergers(Processed):
             print("\t{}".format(zmath.stats_str(mult)))
 
         return mrgs
-    '''
 
 
 class Mergers_TNG(Mergers):

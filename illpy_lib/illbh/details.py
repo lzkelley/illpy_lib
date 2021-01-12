@@ -47,10 +47,13 @@ class Details(Processed):
         for kk, vv in dets.items():
             # if kk in skip:
             #     continue
-            dets[kk] = vv[idx, ...]
+            try:
+                dets[kk] = vv[idx, ...]
+            except Exception as err:
+                logging.exception(err)
+                raise err        
 
         u_ids, u_inds, u_counts = np.unique(dets[KEYS.ID], return_index=True, return_counts=True)
-        # num_unique = u_ids.size
         dets[KEYS.U_IDS] = u_ids
         dets[KEYS.U_INDICES] = u_inds
         dets[KEYS.U_COUNTS] = u_counts
@@ -290,10 +293,18 @@ class Details_TNG_Task(Details):
         #     raise FileNotFoundError(err)
         fname_in_list = self._get_details_file_list(self._sim_path)
 
+        # ARR_SIZE = int(1e3)
+        
         details = []
+        num_removed = 0
+        num_loaded = 0
         for fname_in in fname_in_list:
             prev = None
             print_first_line = verbose
+            
+            bh_ids = []
+            bh_mass = []
+            bh_locs = []
             for ll, line in enumerate(open(fname_in, 'r').readlines()):
                 if print_first_line:
                     print("First line: '{}'".format(line.strip()))
@@ -305,22 +316,65 @@ class Details_TNG_Task(Details):
                     logging.error("File '{}', line {}: {}".format(fname_in, ll, str(err)))
                     raise err
 
+                # ---- Make sure this entry comes after the previous
                 sc = vals[KEYS.SCALE]
                 if prev is None:
                     prev = sc
+                # If not, indicates restart, erase backwards until the times are ordered
                 elif sc < prev:
                     err = "Task: {}, {} - scale:{:.8f} is before prev:{:.8f}!".format(
                         self._task, fname_in, sc, prev)
-                    logging.error(err)
-                    raise ValueError(err)
+                    logging.info(err)
+                    
+                    scales = [dd[KEYS.SCALE] for dd in details]
+                    scales = np.array(scales)
+                    bads = np.where(scales >= sc)[0]
+                    num_removed += bads.size
+                    logging.info(f"Removing {bads.size}/{scales.size} = {bads.size/scales.size:.4e} elements")
+                    for bb in sorted(bads, reverse=True):
+                        del details[bb]
+                        bh_ids = []
+                        bh_mass = []
+                        bh_locs = []
+                        
+                    # raise ValueError(err)
 
+                # ---- Make sure BH masses grow monotonically
+                # Store a list of the highest-mass each unique BH reaches
+                bhid = vals[KEYS.ID]
+                mass = vals[KEYS.BH_MASS]
+                # If the BH ID has already been stored, make sure mass increases, update max mass
+                try:
+                    ii = bh_ids.index(bhid)
+                    if mass < bh_mass[ii]:
+                        pp = bh_locs[ii]
+                        err = f"File '{fname_in}', line={ll}, decrease in BH mass vs. line={pp}!"
+                        print(err)
+                        print(f"previous line: {ll-1}: {details[-1]}")
+                        print(f"Current  line: {ll}: {vals}")
+                        print(f"Conflict line: {pp}: {details[pp]}")
+                        logging.exception(err)
+                        raise RuntimeError(err)
+
+                    bh_mass[ii] = mass
+                    bh_locs[ii] = ll
+                # Store new BH IDs
+                except ValueError:
+                    bh_ids.append(bhid)
+                    bh_mass.append(mass)
+                    bh_locs.append(ll)
+                    
                 details.append(vals)
-
+                prev = sc
+                num_loaded += 1
+                
         num_dets = len(details)
         self._size = num_dets
         if verbose:
-            print("Loaded {} details from '{}'".format(num_dets, fname_in))
-
+            print(f"Loaded {num_dets:.4e} ({num_loaded:.4e}) details from '{fname_in}'")
+            print(f"Removed {num_removed:.4e} entries from restarts")
+            
+        # ---- Store all entries to dictionary
         dets = {}
         for dd, temp in enumerate(details):
             if dd == 0:
@@ -348,6 +402,8 @@ class Details_TNG_Task(Details):
                     print(f"dets[{kk}].dtype = {dets[kk].dtype}")
                     raise
 
+        dets[KEYS.TASK] = self._task * np.ones(num_dets, dtype=int)
+            
         self._finalize_and_save(dets)
         return
 
@@ -400,7 +456,7 @@ class Details_TNG_Snap(Details):
         # Get list of files
         snap = self._snap
         snap_path = self._snap_path(snap, self._processed_path)
-        pattern = Details_TNG_Task._PROCESSED_FILENAME.replace('{task:04d}', '*')
+        pattern = Details_TNG_Task._PROCESSED_FILENAME.replace('{task:04d}', '[0-9]*')
         pattern = os.path.join(snap_path, pattern)
         files = sorted(glob.glob(pattern))
         if verbose:
@@ -421,7 +477,7 @@ class Details_TNG_Snap(Details):
                         continue
 
                     temp = vv[()]
-                    # if np.ndim(temp) > 0:
+
                     temp_size = np.shape(temp)[0]
                     if new_size is None:
                         new_size = temp_size
@@ -451,11 +507,11 @@ class Details_TNG_Snap(Details):
                 size += new_size
                 if verbose:
                     print(f"Loaded {new_size} entires from '{fname}'")
-
+                
         self._size = size
         if verbose:
             print(f"Loaded {size} details")
-
+            
         self._details = details
         try:
             self._finalize_and_save(details)

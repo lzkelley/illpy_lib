@@ -186,6 +186,33 @@ class Snapshots_TNG(Snapshots):
     # These values are only in the 'full' snapshots (not in 'mini' ones), skip them for now
     _SKIP_KEYS = ['SubfindDMDensity', 'SubfindDensity', 'SubfindHsml', 'SubfindVelDisp']
 
+    '''
+    _NUM_SNAPS = 100
+    
+    _PROCESSED_FILENAME = "bh-snapshots.hdf5"
+    # _SKIP_KEYS = []   # NOTE: this is not used in `Snapshots_Snap`
+    # _PROCESSED_DIR_NAME = "bh-snapshots"
+
+    def __init__(self, *args, load=True, **kwargs):
+        super().__init__(*args, load=load, **kwargs)
+        return
+
+    def _process(self):
+        snap = self._snap
+
+        # Check output filename
+        fname_out = self.filename()
+        fname_out = utils._check_output_path(fname)
+        
+        for snap in range(self._NUM_SNAPS):
+            
+
+        return
+
+    def filename(self):
+        fname = os.path.join(self._processed_path, self._PROCESSED_FILENAME)
+        return fname
+    '''
 
 class Snapshots_TOS(Snapshots):
     pass
