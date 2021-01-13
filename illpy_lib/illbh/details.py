@@ -443,11 +443,10 @@ class Details_TNG_Snap(Details):
     _SNAP_DIR_NAME = "details_{snap:04d}"
     _SKIP_DERIVED_KEYS = KEYS._DERIVED
 
-    def __init__(self, snap, sim_path, *args, cosmo=None, **kwargs):
+    def __init__(self, snap, sim_path, *args, cosmo=None, load=True, **kwargs):
         self._snap = snap
         self._cosmo = cosmo
-        super().__init__(sim_path, *args, **kwargs)
-        self._load(self.filename(snap), self._recreate)
+        super().__init__(sim_path, *args, load=load, **kwargs)
         return
 
     def _process(self):

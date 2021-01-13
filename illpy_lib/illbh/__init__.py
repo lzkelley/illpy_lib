@@ -63,6 +63,7 @@ class KEYS(ENUM):
     # keys from Illustris
     ParticleIDs             = 'ParticleIDs'
     Masses                  = 'Masses'
+    Coordinates             = 'Coordinates'
 
     BH_Mass                 = 'BH_Mass'
     BH_Mdot                 = 'BH_Mdot'
@@ -78,8 +79,9 @@ class KEYS(ENUM):
     MASS = Masses
     BH_MASS = BH_Mass
     ID = ParticleIDs
+    POS = Coordinates
 
-    _ALIASES = [MASS, BH_MASS, ID]
+    _ALIASES = [MASS, BH_MASS, ID, POS]
 
     # Added keys for derived parameters
     U_IDS = 'unique_ids'
@@ -102,7 +104,7 @@ class Processed:
 
     _PROCESSED_FILENAME = "bh-snapshots.hdf5"
 
-    def __init__(self, sim_path, processed_path, verbose=VERBOSE, recreate=False, load=False):
+    def __init__(self, sim_path, processed_path, verbose=VERBOSE, recreate=False, load=False, must_exist=False):
         sim_path = os.path.abspath(sim_path)
         sim_path = sim_path.rstrip('/')
         if os.path.dirname(sim_path) == 'output':
@@ -122,7 +124,8 @@ class Processed:
 
         # -- Load data
         if load:
-            self._load(recreate)
+            fname = self.filename()
+            self._load(fname, recreate, must_exist)
 
         return
 
@@ -170,7 +173,12 @@ class Processed:
 
             os.makedirs(os.path.dirname(fname), exist_ok=True)
             with h5py.File(fname, 'w') as save:
-                utils._save_meta_to_hdf5(save, self._sim_path, __version__, script_name)
+                # Try to save metadata, but dont fail because of it
+                try:
+                    utils._save_meta_to_hdf5(save, self._sim_path, __version__, script_name)
+                except Exception as err:
+                    logging.error(f"SUPRESSING ERROR in `_save_meta_to_hdf5`: '{err}'!")
+
                 for kk in keys:
                     save.create_dataset(kk, data=data[kk])
 
@@ -185,11 +193,13 @@ class Processed:
 
         return
 
-    def _load(self, fname, recreate):
+    def _load(self, fname, recreate, must_exist):
         # fname = self.filename
         exists = os.path.exists(fname)
         if self._verbose:
             print(f"`_load()`: recreate: {recreate}, exists: {exists} ({fname})")
+        if (not exists) and must_exist:
+            raise FileNotFoundError("Filename '{fname}' does not exist!")
         if not exists or recreate:
             self._process()
 

@@ -1,7 +1,6 @@
 """
 """
 
-# from collections import OrderedDict
 import os
 import sys
 import glob
@@ -9,16 +8,11 @@ import logging
 from datetime import datetime
 
 import numpy as np
-# import h5py
-
-# import parse
-
-# import zcode.inout as zio
-# import zcode.math as zmath
 
 import illpy.snapshot
 import illpy_lib  # noqa
 from illpy_lib.illbh import Processed, VERBOSE, KEYS, utils
+from illpy_lib.illbh.groupcats import GCAT_KEYS
 
 _BAD_SNAPS_TOS = [53, 55]   # Missing snapshots in original Illustris
 
@@ -31,10 +25,8 @@ class Snapshots(Processed):
     #    Note: these are still stored in individual files, but not in the combined version here
     _SKIP_KEYS = []
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        fname = self.filename()
-        self._load(fname, self._recreate)
+    def __init__(self, *args, load=True, **kwargs):
+        super().__init__(*args, load=load, **kwargs)
         return
 
     def _process(self):
@@ -58,8 +50,10 @@ class Snapshots(Processed):
 
             # WARNING: `bh_snap` may be an empty dictionary, when there are no BHs in snapshot!
             try:
-                bh_snap = SNAP_CLASS(snap, self._sim_path, self._processed_path,
-                                     verbose=self._verbose)
+                bh_snap = SNAP_CLASS(
+                    snap, self._sim_path, self._processed_path,
+                    must_exist=True, verbose=verbose
+                )
             except OSError as err:
                 if verbose:
                     print("Failed to load snap {} : {}".format(snap, str(err)))
@@ -104,6 +98,49 @@ class Snapshots(Processed):
         data[KEYS.U_COUNTS] = u_counts
         return data
 
+    def _add_gcat_vals(self, snaps, gcats=None):
+        verbose = self._verbose
+        if gcats is None:
+            try:
+                gcats = illpy_lib.illbh.groupcats.Groupcats(
+                    self._sim_path, self._processed_path,
+                    must_exist=True, verbose=self._verbose, load=True
+                )
+            except:
+                logging.error("FAILED to load `Groupcats`!")
+                raise
+
+        sn_u_ids = snaps[KEYS.U_IDS]
+        sn_u_inds = snaps[KEYS.U_INDICES]
+        sn_u_counts = snaps[KEYS.U_COUNTS]
+
+        gc_u_ids = gcats[GCAT_KEYS.U_IDS]
+        gc_u_inds = gcats[GCAT_KEYS.U_INDICES]
+        gc_u_counts = gcats[GCAT_KEYS.U_COUNTS]
+
+        if verbose:
+            print(f"Unique IDs: snapshots {sn_u_ids.size}, groupcats {gc_u_ids.size}")
+        if np.any(sn_u_ids != gc_u_ids) or np.any(sn_u_inds != gc_u_inds) or np.any(sn_u_counts != gc_u_counts):
+            err = f"Mismatch in unique IDs or indices!"
+            raise ValueError(err)
+
+        if np.any(snaps[KEYS.ID] != gcats[GCAT_KEYS.ID]) or np.any(snaps[KEYS.SNAP] != gcats[GCAT_KEYS.SNAP]):
+            raise ValueError(f"Mismatch between ID numbers!")
+
+        keys = [
+            GCAT_KEYS.SUBHALO, GCAT_KEYS.HALO,
+            GCAT_KEYS.SubhaloMassType, GCAT_KEYS.SubhaloMassInHalfRadType, GCAT_KEYS.SubhaloHalfmassRadType,
+            GCAT_KEYS.SubhaloSFRinHalfRad, GCAT_KEYS.SubhaloVelDisp, GCAT_KEYS.SubhaloVmax,
+        ]
+
+        if verbose:
+            print("Copying keys: {keys}")
+
+        for kk in keys:
+            snaps[kk] = np.copy(gcats[kk])
+
+        return snaps
+
     def _finalize(self, data, **header):
         # ---- Sort by ID number and then scale-factor
         idx = np.lexsort((data[KEYS.SCALE], data[KEYS.ID]))
@@ -113,6 +150,7 @@ class Snapshots(Processed):
             data[kk] = temp
 
         data = self._add_derived(data)
+        data = self._add_gcat_vals(data)
         return data
 
 
@@ -124,9 +162,8 @@ class Snapshots_Snap(Snapshots):
 
     def __init__(self, snap, *args, **kwargs):
         self._snap = snap
+        # This should have `load=True` default from `Snapshots` class
         super().__init__(*args, **kwargs)
-        fname = self.filename()
-        self._load(fname, self._recreate)
         return
 
     def _process(self):

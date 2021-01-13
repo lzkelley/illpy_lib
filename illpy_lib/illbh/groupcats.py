@@ -1,8 +1,9 @@
 """
 """
-
+import sys
+import glob
 import os
-# from datetime import datetime
+from datetime import datetime
 import logging
 
 import numpy as np
@@ -13,11 +14,10 @@ import illpy.snapshot
 from illpy import PARTICLE
 import illpy_lib  # noqa
 from illpy_lib import DTYPE
-from illpy_lib.illbh import Processed, PATH_PROCESSED  # , VERBOSE
-from illpy_lib.illbh.snapshots import SNAP_KEYS
+from illpy_lib.illbh import Processed, ENUM, utils, KEYS, VERBOSE
 
 
-class GCAT_KEYS(Processed.KEYS):
+class GCAT_KEYS(ENUM):
 
     SubhaloBHMass                       = 'SubhaloBHMass'
     SubhaloBHMdot                       = 'SubhaloBHMdot'
@@ -72,94 +72,112 @@ class GCAT_KEYS(Processed.KEYS):
 
     SCALE                               = 'scale'
     SNAP                                = 'snap'
-    ID                                  = 'id'     # blackhole ID numbers
+    # ID                                  = 'id'        # blackhole ID numbers
+    ID                                  = 'ParticleIDs'        # blackhole ID numbers
     SUBHALO                             = 'subhalo'   # subhalo index number for this snapshot
+    HALO                                = 'halo'      # halo index number for this snapshot
+
+    # Added keys for derived parameters
+    U_IDS = 'unique_ids'
+    U_INDICES = 'unique_indices'
+    U_COUNTS = 'unique_counts'
+
+    # _INTERP_KEYS = [MASS, BH_MASS, MDOT, MDOT_B, POT, DENS, POS, VEL]
+    _U_KEYS = [U_IDS, U_INDICES, U_COUNTS]
 
     # NOTE: these are 'derived' in the sense for each snapshot: these parameters must be added
     #       when combining all snapshots together, these are not derived, they come from the data
-    _DERIVED = [SCALE, SNAP, ID, SUBHALO]
+    _DERIVED = [SCALE, SNAP, ID, SUBHALO, HALO] + _U_KEYS
     _ALIASES = []   # ID, MASS, BH_MASS, MDOT_B, MDOT, POT, DENS, POS, VEL]
 
-    @classmethod
-    def names(cls):
-        nn = [kk for kk in dir(cls) if (not kk.startswith('_')) and (kk not in cls._ALIASES)]
-        nn = [kk for kk in nn if (not callable(getattr(cls, kk)))]
-        return sorted(nn)
+    # @classmethod
+    # def names(cls):
+    #     nn = [kk for kk in dir(cls) if (not kk.startswith('_')) and (kk not in cls._ALIASES)]
+    #     nn = [kk for kk in nn if (not callable(getattr(cls, kk)))]
+    #     return sorted(nn)
 
 
 class Groupcats(Processed):
 
     _PROCESSED_FILENAME = "bh-groupcats.hdf5"
-
-    class KEYS(GCAT_KEYS):
-
-        U_IDS                   = 'unique_ids'
-        U_INDICES               = 'unique_indices'
-        U_COUNTS                = 'unique_counts'
-
-        # These are the 'derived' keys for *all* snapshots together
-        #    the 'SCALE' and 'SNAP' are included in the individual snapshot files
-        _DERIVED = [U_IDS, U_INDICES, U_COUNTS]
+    _SKIP_KEYS = []
 
     def _process(self):
-        sim_path = self._sim_path
-        if sim_path is None:
-            err = "ERROR: cannot process {} without `sim_path` set!".format(self.__class__)
-            logging.error(err)
-            raise ValueError(err)
-
         # Check output filename
-        fname = self.filename
-        path = os.path.dirname(fname)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        if not os.path.isdir(path):
-            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
-            logging.error(err)
-            raise FileNotFoundError(err)
+        fname = self.filename()
+        utils._check_output_path(fname)
+        verbose = self._verbose
 
-        cosmo = illpy_lib.illcosmo.Simulation_Cosmology(sim_path, verbose=False)
-        scales = cosmo.scale
-        num_snaps = scales.size
-
+        gcat = {}
         snap = 0
-        # KEYS = self.KEYS
-        verb = self._verbose
+        count = 0
+        warn_first_skip_key = verbose
+        while (snap < 10000):
+            if verbose:
+                print("snap = {}".format(snap))
+            # Keep loading snapshots until we fail, assume that's the last snapshot
+            try:
+                gcat_snap = Groupcats_Snap(
+                    snap, self._sim_path, self._processed_path,
+                    verbose=verbose, load=True, must_exist=True
+                )
+            except OSError as err:
+                if verbose:
+                    print("Failed to load snap {} : {}".format(snap, str(err)))
+                print(f"finished after snap {snap-1}")
+                break
+                
+            if len(gcat_snap.keys()) == 0:
+                logging.info(f"groupcat from {snap=} is empty")
+            else:
+                count = gcat_snap[GCAT_KEYS.SCALE].size
 
-        bhs = {}
-        for snap in range(num_snaps):
-            if verb:
-                print("\nsnap = {}".format(snap))
+            for kk in gcat_snap.keys():
+                if kk in self._SKIP_KEYS:
+                    if warn_first_skip_key:
+                        msg = "Skipping key '{}' and all of '{}'".format(kk, self._SKIP_KEYS)
+                        logging.warning(msg)
+                    warn_first_skip_key = False
+                    continue
 
-            gcat_snap = Groupcats_Snap(snap, sim_path=sim_path)
-            for kk in gcat_snap.KEYS:
                 temp = gcat_snap[kk]
-                prev = bhs.get(kk, None)
+                prev = gcat.get(kk, None)
                 if (prev is None) or (len(prev) == 0):
-                    bhs[kk] = temp
+                    gcat[kk] = temp
                 else:
-                    bhs[kk] = np.concatenate([prev, temp])
+                    gcat[kk] = np.concatenate([prev, temp])
 
-        self._finalize_and_save(bhs)
+            snap += 1
 
+        if verbose:
+            print("Loaded {} entries from {} snaps".format(count, snap))
+
+        if len(gcat) == 0:
+            err = f"After {snap} snaps, `gcat` is empty!"
+            logging.error(err)
+            raise RuntimeError(err)
+
+        if 'id' in gcat.keys():
+            gcat[GCAT_KEYS.ID] = gcat.pop('id')
+
+        self._finalize_and_save(gcat)
         return
 
     def _add_derived(self, data):
-        KEYS = self.KEYS
-        u_ids, u_inds, u_counts = np.unique(data[KEYS.ID], return_index=True, return_counts=True)
+        u_ids, u_inds, u_counts = np.unique(data[GCAT_KEYS.ID], return_index=True, return_counts=True)
         # num_unique = u_ids.size
-        data[KEYS.U_IDS] = u_ids
-        data[KEYS.U_INDICES] = u_inds
-        data[KEYS.U_COUNTS] = u_counts
+        data[GCAT_KEYS.U_IDS] = u_ids
+        data[GCAT_KEYS.U_INDICES] = u_inds
+        data[GCAT_KEYS.U_COUNTS] = u_counts
         return data
 
     def _finalize_and_save(self, data, **header):
-        KEYS = self.KEYS
-        idx = np.lexsort((data[KEYS.SCALE], data[KEYS.ID]))
+        idx = np.lexsort((data[GCAT_KEYS.SCALE], data[GCAT_KEYS.ID]))
         count = idx.size
-        for kk in KEYS:
+        for kk in GCAT_KEYS:
             # if kk in KEYS._DERIVED:
             #     continue
+            # Don't want 'unique' keys from each snap; recalculate them for ALL snapshots below
             if kk.startswith('unique'):
                 continue
 
@@ -167,16 +185,15 @@ class Groupcats(Processed):
             temp = temp[idx, ...]
             data[kk] = temp
 
+        # Add unique entries here
         data = self._add_derived(data)
 
         # -- Save values to file
-        # Get output filename for this snapshot
-        #   path should have already been created in `_process` by rank=0
-        fname = self.filename
-        self._save_to_hdf5(fname, KEYS, data, __file__, **header)
+        fname = self.filename()
+        fname = utils._check_output_path(fname)
+        self._save_to_hdf5(fname, __file__, data, keys=GCAT_KEYS, **header)
         if self._verbose:
-            msg = "Saved data for {} BHs to '{}' size {}".format(
-                count, fname, zio.get_file_size(fname))
+            msg = f"Saved data for {count} BHs to '{fname}' size {zio.get_file_size(fname)}"
             print(msg)
 
         return
@@ -185,58 +202,54 @@ class Groupcats(Processed):
 class Groupcats_Snap(Groupcats):
 
     _PROCESSED_FILENAME = "bh-groupcats_{snap:03d}.hdf5"
+    _PROCESSED_DIR_NAME = "bh-groupcats"
 
-    class KEYS(GCAT_KEYS):
-        pass
-
-    def __init__(self, snap, *args, **kwargs):
+    def __init__(self, snap, *args, load=True, **kwargs):
         self._snap = snap
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, load=load, **kwargs)
         return
 
     def _add_derived(self, data):
         return data
 
     def _process(self):
-        KEYS = self.KEYS
         snap = self._snap
 
         # Check output filename
-        fname = self.filename
-        path = os.path.dirname(fname)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        if not os.path.isdir(path):
-            err = "ERROR: filename '{}' path '{}' is not a directory!".format(fname, path)
-            logging.error(err)
-            raise FileNotFoundError(err)
+        fname = self.filename()
+        fname = utils._check_output_path(fname)
 
         pt_bh = illpy.PARTICLE.BH
-        gcat_fields = [kk for kk in KEYS.keys() if kk not in KEYS._DERIVED]
-        snap_fields = [SNAP_KEYS.ID, SNAP_KEYS.POS, SNAP_KEYS.MASS]
-        header = illpy.snapshot.get_header(self._sim_path, snap)
-        bh_snap = illpy.snapshot.loadSubset(self._sim_path, snap, pt_bh,
-                                            fields=snap_fields, sq=False)
+        gcat_fields = [kk for kk in GCAT_KEYS.keys() if kk not in GCAT_KEYS._DERIVED]
+        snap_fields = [KEYS.ID, KEYS.POS, KEYS.MASS]
+        path = os.path.join(self._sim_path, 'output', '')
+        header = illpy.snapshot.get_header(path, snap)
+        if self._verbose:
+            print(f"Loading {snap=:03d} (a={header['Time']:.8f})")
+        bh_snap = illpy.snapshot.loadSubset(path, snap, pt_bh, fields=snap_fields, sq=False)
         num_bhs = bh_snap['count']
+        if self._verbose:
+            print(f"\tloaded {num_bhs=} from snapshot")
 
         bh_gcat = {}
         if num_bhs == 0:
             print("Snapshot {} contains no BHs".format(snap))
-            for kk in KEYS:
+            for kk in GCAT_KEYS:
                 bh_gcat[kk] = np.array([])
         else:
-            groups = illpy.groupcat.loadSubhalos(self._sim_path, snap, fields=gcat_fields)
+            groups = illpy.groupcat.loadSubhalos(path, snap, fields=gcat_fields)
             num_grs = groups['count']
+            if self._verbose:
+                print(f"\tloaded {num_grs} subhalos")
 
             halo_fields = ['GroupLenType', 'GroupNsubs', 'GroupFirstSub']
-            halos = illpy.groupcat.loadHalos(self._sim_path, snap, fields=halo_fields)
+            halos = illpy.groupcat.loadHalos(path, snap, fields=halo_fields)
             num_halos = halos['count']
-
             if self._verbose:
-                print("Loaded {} BHs, {} halos, {} groups from snap {}".format(
-                    num_bhs, num_halos, num_grs, snap))
+                print(f"\tloaded {num_halos} halos")
 
-            bh_subhalos = self._match(bh_snap, halos, groups)
+            # Match BHs to parent (sub)halos
+            bh_subhalos, bh_halos = self._match(bh_snap, halos, groups)
 
             # Store catalog parameters
             idx = (bh_subhalos >= 0)
@@ -244,8 +257,8 @@ class Groupcats_Snap(Groupcats):
             nbad = np.count_nonzero(bh_subhalos < 0)
             if nbad > 0:
                 print("{} bhs are unmatched to subhalos".format(nbad))
-            for kk in KEYS:
-                if (kk in KEYS._DERIVED) or (kk in KEYS._ALIASES):
+            for kk in GCAT_KEYS:
+                if (kk in GCAT_KEYS._DERIVED) or (kk in GCAT_KEYS._ALIASES):
                     continue
                 gc_vals = groups[kk]
                 shape = list(np.shape(gc_vals))
@@ -255,23 +268,19 @@ class Groupcats_Snap(Groupcats):
                 bh_gcat[kk] = temp
 
             # Store derived parameters
-            bh_gcat[KEYS.SCALE] = header['Time'] * np.ones(num_bhs)
-            bh_gcat[KEYS.SNAP] = snap * np.ones(num_bhs, dtype=int)
-            bh_gcat[KEYS.ID] = bh_snap[SNAP_KEYS.ID]
-            bh_gcat[KEYS.SUBHALO] = bh_subhalos
+            bh_gcat[GCAT_KEYS.SCALE] = header['Time'] * np.ones(num_bhs)
+            bh_gcat[GCAT_KEYS.SNAP] = snap * np.ones(num_bhs, dtype=int)
+            bh_gcat[GCAT_KEYS.ID] = bh_snap[KEYS.ID]
+            bh_gcat[GCAT_KEYS.SUBHALO] = bh_subhalos
+            bh_gcat[GCAT_KEYS.HALO] = bh_halos
 
         self._finalize_and_save(bh_gcat, **header)
         return
 
-    @property
     def filename(self):
-        if self._filename is None:
-            # `sim_path` has already been checked to exist in initializer
-            sim_path = self._sim_path
-            temp = self._PROCESSED_FILENAME.format(snap=self._snap)
-            self._filename = os.path.join(sim_path, *PATH_PROCESSED, temp)
-
-        return self._filename
+        temp = self._PROCESSED_FILENAME.format(snap=self._snap)
+        fname = os.path.join(self._processed_path, self._PROCESSED_DIR_NAME, temp)
+        return fname
 
     def _match(self, bh_snap, halos, groups):
         """Use BH ID numbers to find parent subhalos.
@@ -285,15 +294,13 @@ class Groupcats_Snap(Groupcats):
 
         Returns
         -------
-        cat_inds_matched : (M,) int
-            Indices for the BH snapshot particles which are valid and matched.
-        snap_inds_matched : (M,) int
-            Indices for the Subhalo catalog entries which are valid and matched.
+        bh_subhalos: (M,) int
+        bh_halos: (M,) int
 
         """
-        bh_id = bh_snap[SNAP_KEYS.ID][:]
-        bh_mass = bh_snap[SNAP_KEYS.MASS][:]
-        bh_pos = bh_snap[SNAP_KEYS.POS][:]
+        bh_id = bh_snap[KEYS.ID][:]
+        bh_mass = bh_snap[KEYS.MASS][:]
+        bh_pos = bh_snap[KEYS.POS][:]
 
         num_bh = len(bh_id)
         # Create 'indices' of BHs
@@ -308,7 +315,7 @@ class Groupcats_Snap(Groupcats):
         if any(bin_inds < 0):
             raise ValueError("Some bh_inds not matched!! '{}'".format(str(bin_inds)))
 
-        # bh_halos = halo_num[bin_inds]
+        bh_halos = halo_num[bin_inds]
         bh_subhalos = subh_num[bin_inds]
         if np.any(bh_subhalos < 0):
             print("\nFound unmatched BHs")
@@ -353,10 +360,8 @@ class Groupcats_Snap(Groupcats):
                 logging.error("BH: {}, ID: {}, subhalo: {} (Nbh: {}, most bound: {})".format(
                     bh, bh_id[bh], sh, sh_nbh, gcat_idmb))
                 err = (
-                    "bh_pos = {}, subh_pos = {} ===> dist: {:.4e} ".format(
-                        snap_pos, gcat_pos, dist) +
-                    "(hmass,vmax rads = {:.4e}, {:4e})".format(
-                        hm_rad, max_rad)
+                    f"bh_pos = {snap_pos}, subh_pos = {gcat_pos} ===> dist: {dist:.4e} "
+                    f"(hmass,vmax rads = {hm_rad:.4e}, {max_rad:4e})"
                 )
                 logging.error(err)
                 logging.error("bh_mass = {:.4e}, subh_bh_mass = {:.4e} ===> diff: {:.4e}".format(
@@ -367,7 +372,7 @@ class Groupcats_Snap(Groupcats):
                 logging.warning(err)
                 # raise ValueError(err)
 
-        return bh_subhalos
+        return bh_subhalos, bh_halos
 
 
 def _construct_offset_table(halos, groups):
@@ -451,46 +456,45 @@ def _construct_offset_table(halos, groups):
     return halo_num, subh_num, offsets
 
 
-'''
-def process_snapshot_snaps(sim_path, recreate=False, verbose=VERBOSE):
+def process_groupcats_snaps(sim_path, proc_path, recreate=False, verbose=VERBOSE):
     try:
         comm = MPI.COMM_WORLD
     except NameError:
-        logging.warning("Loading MPI...")
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
 
     beg = datetime.now()
     if comm.rank == 0:
-        temp = 'snapdir_' + '[0-9]' * 3
-        temp = os.path.join(sim_path, temp)
+        temp = os.path.join(sim_path, 'output', 'snapdir_*')
         snap_dirs = sorted(glob.glob(temp))
+        num_snaps = len(snap_dirs)
         if verbose:
-            print("Found {} snapshot directories".format(len(snap_dirs)))
-        if len(snap_dirs) == 0:
+            print("Found {} snapshot directories".format(num_snaps))
+        if num_snaps == 0:
             err = "ERROR: no snapshot directories found (pattern: '{}')".format(temp)
             logging.error(err)
             raise FileNotFoundError(err)
 
-        snap_list = []
-        prev = None
-        for dd in snap_dirs:
-            sn = int(os.path.basename(dd).split('_')[-1])
-            snap_list.append(sn)
-            if prev is None:
-                if sn != 0:
-                    err = "WARNING: first snapshot ({}) is not zero!".format(sn)
-                    logging.warning(err)
-            elif prev + 1 != sn:
-                err = "WARNING: snapshot {} does not follow previous {}!".format(sn, prev)
-                logging.warning(err)
+        snap_list = np.arange(num_snaps).tolist()
+        # bad_snaps = None
+        # if mode == 'tos':
+        #     bad_snaps = _BAD_SNAPS_TOS
+        # elif mode == 'tng':
+        #     pass
+        # elif mode == 'new':
+        #     pass
+        # else:
+        #     raise ValueError("Unrecognized `mode` '{}'!".format(mode))
 
-            prev = sn
+        # if bad_snaps is not None:
+        #     logging.warning("Removing TOS bad snaps '{}' from targets".format(bad_snaps))
+        #     for bsn in bad_snaps:
+        #         snap_list.remove(bsn)
+        #         assert (bsn not in snap_list), "FAILED"
 
         np.random.seed(1234)
         np.random.shuffle(snap_list)
         snap_list = np.array_split(snap_list, comm.size)
-
     else:
         snap_list = None
 
@@ -499,26 +503,86 @@ def process_snapshot_snaps(sim_path, recreate=False, verbose=VERBOSE):
     comm.barrier()
     num_lines = 0
     for snap_num in snap_list:
-        snap = Snapshots_Snap(snap_num, sim_path=sim_path, recreate=recreate, verbose=verbose)
-        num_lines += snap[snap.KEYS.SCALE].size
+        try:
+            snap = Groupcats_Snap(
+                snap_num, sim_path=sim_path, processed_path=proc_path,
+                recreate=recreate, verbose=verbose, load=True)
+        except Exception as err:
+            logging.error("FAILED to load snap '{}'!".format(snap_num))
+            logging.error(str(err))
+            raise err
+
+        if len(snap.keys()) > 0:
+            num_lines += snap[GCAT_KEYS.SCALE].size
 
     num_lines = comm.gather(num_lines, root=0)
 
     end = datetime.now()
     if verbose:
-        print("Rank: {}, done at {}, after {}".format(comm.rank, end, (end-beg)))
+        print("Rank: {}, done at {}, after {}".format(comm.rank, end, (end - beg)))
     if comm.rank == 0:
-        tot_num_lines = np.sum(num_lines)
+        tot = np.sum(num_lines)
         ave = np.mean(num_lines)
         med = np.median(num_lines)
         std = np.std(num_lines)
         if verbose:
-            print("Tot lines={:.2e}, med={:.2e}, ave={:.2e}±{:.2e}".format(
-                tot_num_lines, med, ave, std))
+            print(f"Tot lines={tot:.2e}, med={med:.2e}, ave={ave:.2e}±{std:.2e}")
 
         tail = f"Done at {str(end)} after {str(end-beg)} ({(end-beg).total_seconds()})"
         print("\n" + "=" * len(tail) + "\n" + tail + "\n")
+        logging.warning(tail)
 
     comm.barrier()
     return
-'''
+
+
+if __name__ == "__main__":
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+
+    beg = datetime.now()
+    recreate = ('-r' in sys.argv) or ('--recreate' in sys.argv)
+    verbose = ('-v' in sys.argv) or ('--verbose' in sys.argv) or VERBOSE
+
+    if comm.rank == 0:
+        print("`recreate` = {}".format(recreate))
+        print("`verbose`  = {}".format(verbose))
+        this_fname = os.path.abspath(__file__)
+        head = f"{this_fname} : {str(beg)} - rank: {comm.rank}/{comm.size}"
+        print("\n" + head + "\n" + "=" * len(head) + "\n")
+
+        if (len(sys.argv) < 4) or ('-h' in sys.argv) or ('--help' in sys.argv):
+            # logging.warning("USAGE: `python {} <MODE> <PATH_IN> <PATH_OUT>`\n\n".format(__file__))
+            logging.warning(f"USAGE: `python {__file__} <PATH_IN> <PATH_OUT>`\n\n")
+            sys.exit(0)
+
+        cc = 1
+        # mode = sys.argv[cc]
+        # cc += 1
+        sim_path = os.path.abspath(sys.argv[cc]).rstrip('/')
+        cc += 1
+        proc_path = os.path.abspath(sys.argv[cc]).rstrip('/')
+        cc += 1
+
+        # mode = mode.strip().lower()
+        # print("mode   '{}'".format(mode))
+        print("input  `sim_path`  : {}".format(sim_path))
+        print("output `proc_path` : {}".format(proc_path))
+        # valid_modes = ['tos', 'tng', 'new']
+        # if mode not in valid_modes:
+        #     err = "Unrecognized `mode` '{}'!".format(mode)
+        #     logging.error(err)
+        #     raise ValueError(err)
+
+    else:
+        # mode = None
+        sim_path = None
+        proc_path = None
+
+    # mode = comm.bcast(mode, root=0)
+    sim_path = comm.bcast(sim_path, root=0)
+    proc_path = comm.bcast(proc_path, root=0)
+    comm.barrier()
+
+    # process_snapshot_snaps(mode, sim_path, proc_path, recreate=recreate, verbose=verbose)
+    process_groupcats_snaps(sim_path, proc_path, recreate=recreate, verbose=verbose)

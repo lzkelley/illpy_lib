@@ -23,10 +23,8 @@ class Mergers(Processed):
 
     _PROCESSED_FILENAME = "bh-mergers.hdf5"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        fname = self.filename()
-        self._load(fname, self._recreate)
+    def __init__(self, *args, load=True, **kwargs):
+        super().__init__(*args, load=load, **kwargs)
         return
 
     def _parse_raw_file_line(self, line):
